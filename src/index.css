@@ -1,0 +1,116 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Automotive diagnostic theme with dark blue/black palette */
+
+@layer base {
+  :root {
+    --background: 218 23% 8%;
+    --foreground: 210 40% 98%;
+
+    --card: 218 23% 12%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 218 23% 12%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 217 91% 60%;
+    --primary-foreground: 218 23% 8%;
+
+    --secondary: 217 32% 17%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 32% 17%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 217 91% 60%;
+    --accent-foreground: 218 23% 8%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217 32% 17%;
+    --input: 217 32% 17%;
+    --ring: 217 91% 60%;
+
+    --radius: 0.5rem;
+
+    /* Automotive specific colors */
+    --engine-temp: 14 91% 60%;
+    --oil-pressure: 142 76% 36%;
+    --fuel-level: 47 91% 60%;
+    --boost-pressure: 262 91% 60%;
+    --warning: 38 92% 50%;
+    --critical: 0 84% 60%;
+    --success: 142 76% 36%;
+  }
+
+  .dark {
+    --background: 218 23% 8%;
+    --foreground: 210 40% 98%;
+    --card: 218 23% 12%;
+    --card-foreground: 210 40% 98%;
+    --popover: 218 23% 12%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 218 23% 8%;
+    --secondary: 217 32% 17%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 32% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 217 91% 60%;
+    --accent-foreground: 218 23% 8%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217 32% 17%;
+    --input: 217 32% 17%;
+    --ring: 217 91% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  }
+}
+
+@layer utilities {
+  .automotive-gradient {
+    background: linear-gradient(135deg, hsl(217 32% 17%) 0%, hsl(218 23% 12%) 100%);
+  }
+  
+  .diagnostic-border {
+    border: 1px solid hsl(217 91% 60% / 0.2);
+    box-shadow: 0 0 10px hsl(217 91% 60% / 0.1);
+  }
+  
+  .status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+  }
+  
+  .status-connected {
+    background-color: hsl(142 76% 36%);
+    box-shadow: 0 0 6px hsl(142 76% 36%);
+  }
+  
+  .status-disconnected {
+    background-color: hsl(0 84% 60%);
+    box-shadow: 0 0 6px hsl(0 84% 60%);
+  }
+  
+  .status-warning {
+    background-color: hsl(38 92% 50%);
+    box-shadow: 0 0 6px hsl(38 92% 50%);
+  }
+}

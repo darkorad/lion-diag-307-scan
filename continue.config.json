@@ -1,0 +1,13 @@
+{
+  "models": [
+    {
+      "title": "Deepseek Local",
+      "provider": "openai",
+      "model": "deepseek-coder-6.7b-instruct:2",
+      "apiBase": "http://192.168.100.87:1234/v1",
+      "apiKey": "sk-local-placeholder"
+    }
+  ],
+  "tabAutocompleteModel": "Deepseek Local",
+  "chatModel": "Deepseek Local"
+}
