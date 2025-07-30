@@ -365,7 +365,7 @@ export class EnhancedConnectionService {
         resolve({ success: true });
       };
 
-      const onError = (error: any) => {
+      const onError = (error: unknown) => {
         clearTimeout(timeout);
         reject(new Error(`Connection failed: ${JSON.stringify(error)}`));
       };

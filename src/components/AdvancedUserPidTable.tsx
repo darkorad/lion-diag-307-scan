@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -334,7 +333,7 @@ const AdvancedUserPidTable: React.FC = () => {
                 <Label>Category</Label>
                 <Select
                   value={editingPid.category || 'standard'}
-                  onValueChange={(value) => setEditingPid({...editingPid, category: value as any})}
+                  onValueChange={(value) => setEditingPid({...editingPid, category: value})}
                 >
                   <SelectTrigger>
                     <SelectValue />

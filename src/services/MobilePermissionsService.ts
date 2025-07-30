@@ -1,15 +1,60 @@
 import { permissionService } from './PermissionService';
 
 // Global type declarations for Capacitor
+type CapacitorPlugins = {
+  Geolocation?: {
+    requestPermissions: () => Promise<{ location: 'granted' | 'denied' }>;
+    checkPermissions: () => Promise<{ location: 'granted' | 'denied' }>;
+  };
+  BluetoothLe?: {
+    initialize: () => Promise<void>;
+  };
+  Filesystem?: {
+    requestPermissions: () => Promise<{ publicStorage: 'granted' | 'denied' }>;
+  };
+  Camera?: {
+    requestPermissions: () => Promise<{ camera: 'granted' | 'denied' }>;
+  };
+};
+
 declare global {
   interface Window {
     Capacitor?: {
-      Plugins?: {
-        Geolocation?: any;
-        BluetoothLe?: any;
-        Filesystem?: any;
-        Camera?: any;
+      Plugins?: CapacitorPlugins;
+    };
+    cordova?: {
+      plugins?: {
+        permissions: {
+          requestPermissions: (
+            permissions: string[],
+            successCallback: (status: { hasPermission: boolean }) => void,
+            errorCallback: (error: unknown) => void
+          ) => void;
+          requestPermission: (
+            permission: string,
+            successCallback: (status: { hasPermission: boolean }) => void,
+            errorCallback: () => void
+          ) => void;
+          ACCESS_COARSE_LOCATION: string;
+          ACCESS_FINE_LOCATION: string;
+          READ_EXTERNAL_STORAGE: string;
+          WRITE_EXTERNAL_STORAGE: string;
+          CAMERA: string;
+        };
+        notification?: {
+          local?: {
+            hasPermission: () => Promise<boolean>;
+            requestPermission: () => Promise<void>;
+          };
+        };
+        settings?: {
+          open: () => void;
+        };
       };
+    };
+    bluetoothSerial: {
+      isEnabled: (success: () => void, error: () => void) => void;
+      enable: (success: () => void, error: (error: unknown) => void) => void;
     };
   }
 
@@ -140,11 +185,11 @@ export class MobilePermissionsService {
               permissions.ACCESS_COARSE_LOCATION,
               permissions.ACCESS_FINE_LOCATION
             ],
-            (status: any) => {
+            (status: { hasPermission: boolean }) => {
               console.log('Cordova location permissions:', status);
               resolve(status.hasPermission);
             },
-            (error: any) => {
+            (error: unknown) => {
               console.warn('Location permission failed:', error);
               resolve(false);
             }
@@ -183,7 +228,7 @@ export class MobilePermissionsService {
         return new Promise((resolve) => {
           permissions.requestPermission(
             permissions.ACCESS_FINE_LOCATION,
-            (status: any) => {
+            (status: { hasPermission: boolean }) => {
               console.log('Precise location permission:', status.hasPermission);
               resolve(status.hasPermission);
             },
@@ -253,7 +298,7 @@ export class MobilePermissionsService {
         return new Promise((resolve) => {
           permissions.requestPermission(
             'android.permission.BLUETOOTH_SCAN',
-            (status: any) => {
+            (status: { hasPermission: boolean }) => {
               console.log('Bluetooth scan permission:', status.hasPermission);
               resolve(status.hasPermission);
             },
@@ -279,7 +324,7 @@ export class MobilePermissionsService {
         return new Promise((resolve) => {
           permissions.requestPermission(
             'android.permission.BLUETOOTH_CONNECT',
-            (status: any) => {
+            (status: { hasPermission: boolean }) => {
               console.log('Bluetooth connect permission:', status.hasPermission);
               resolve(status.hasPermission);
             },
@@ -313,7 +358,7 @@ export class MobilePermissionsService {
               permissions.READ_EXTERNAL_STORAGE,
               permissions.WRITE_EXTERNAL_STORAGE
             ],
-            (status: any) => {
+            (status: { hasPermission: boolean }) => {
               console.log('Storage permissions:', status);
               resolve(status.hasPermission);
             },
@@ -345,7 +390,7 @@ export class MobilePermissionsService {
         return new Promise((resolve) => {
           permissions.requestPermission(
             permissions.CAMERA,
-            (status: any) => {
+            (status: { hasPermission: boolean }) => {
               console.log('Camera permission:', status.hasPermission);
               resolve(status.hasPermission);
             },

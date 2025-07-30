@@ -9,7 +9,7 @@ export interface ActuatorTest {
   testType: 'activation' | 'calibration' | 'reset';
   command: string;
   duration?: number;
-  parameters?: { [key: string]: any };
+  parameters?: Record<string, unknown>;
 }
 
 export interface ServiceFunction {
@@ -28,15 +28,15 @@ export interface BiDirectionalFunction {
   type: 'actuator' | 'service' | 'calibration' | 'programming';
   vehicleSupport: string[];
   command: string;
-  parameters: { [key: string]: any };
+  parameters: Record<string, unknown>;
 }
 
 export interface ProfessionalReport {
   id: string;
-  vehicleInfo: any;
+  vehicleInfo: VehicleProfile;
   diagnosticSummary: string;
-  dtcCodes: any[];
-  liveData: any;
+  dtcCodes: { code: string; description: string }[];
+  liveData: Record<string, unknown>;
   recommendations: string[];
   serviceHistory: string[];
   timestamp: Date;
@@ -53,7 +53,7 @@ export class ProfessionalDiagnosticService {
   }
 
   // Bi-directional Controls
-  async performActuatorTest(test: ActuatorTest): Promise<{ success: boolean; result?: any; error?: string }> {
+  async performActuatorTest(test: ActuatorTest): Promise<{ success: boolean; result?: string; error?: string }> {
     try {
       console.log(`Performing actuator test: ${test.name}`);
       
@@ -323,7 +323,11 @@ export class ProfessionalDiagnosticService {
   }
 
   // Generate Professional Report
-  async generateProfessionalReport(diagnosticData: any): Promise<ProfessionalReport> {
+  async generateProfessionalReport(diagnosticData: {
+    vehicleInfo: VehicleProfile;
+    dtcCodes: { code: string; description: string }[];
+    liveData: Record<string, unknown>;
+  }): Promise<ProfessionalReport> {
     return {
       id: `RPT_${Date.now()}`,
       vehicleInfo: diagnosticData.vehicleInfo,
@@ -337,14 +341,20 @@ export class ProfessionalDiagnosticService {
     };
   }
 
-  private generateDiagnosticSummary(data: any): string {
+  private generateDiagnosticSummary(data: {
+    dtcCodes: { code: string; description: string }[];
+    liveData: Record<string, unknown>;
+  }): string {
     const issues = data.dtcCodes?.length || 0;
     const systems = Object.keys(data.liveData || {}).length;
     
     return `Diagnostic scan completed. Found ${issues} diagnostic trouble codes across ${systems} monitored systems. ${issues === 0 ? 'No critical issues detected.' : 'Immediate attention required for flagged systems.'}`;
   }
 
-  private generateRecommendations(data: any): string[] {
+  private generateRecommendations(data: {
+    dtcCodes: { code: string; description: string }[];
+    liveData: Record<string, unknown>;
+  }): string[] {
     const recommendations: string[] = [];
     
     if (data.dtcCodes?.length > 0) {
@@ -352,11 +362,11 @@ export class ProfessionalDiagnosticService {
       recommendations.push('Perform component testing on affected systems');
     }
     
-    if (data.liveData?.engineTemp > 110) {
+    if (typeof data.liveData?.engineTemp === 'number' && data.liveData.engineTemp > 110) {
       recommendations.push('Check cooling system - high operating temperature detected');
     }
     
-    if (data.liveData?.fuelTrim > 25) {
+    if (typeof data.liveData?.fuelTrim === 'number' && data.liveData.fuelTrim > 25) {
       recommendations.push('Investigate fuel system - high fuel trim values detected');
     }
     

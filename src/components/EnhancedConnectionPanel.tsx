@@ -39,7 +39,12 @@ const EnhancedConnectionPanel: React.FC<EnhancedConnectionPanelProps> = ({
   const [devices, setDevices] = useState<BluetoothDevice[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<BluetoothDevice | null>(null);
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
-  const [permissionStatus, setPermissionStatus] = useState<any>(null);
+  const [permissionStatus, setPermissionStatus] = useState<{
+    bluetooth: boolean;
+    location: boolean;
+    bluetoothScan: boolean;
+    bluetoothConnect: boolean;
+  } | null>(null);
   const [connectionStrategy, setConnectionStrategy] = useState<string>('');
   const [scanProgress, setScanProgress] = useState(0);
 

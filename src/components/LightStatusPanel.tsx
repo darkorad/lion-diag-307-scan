@@ -46,9 +46,9 @@ const LightStatusPanel: React.FC<LightStatusPanelProps> = ({ isConnected, onBack
       const interval = setInterval(fetchLightStatus, 5000);
       return () => clearInterval(interval);
     }
-  }, [isConnected]);
+  }, [isConnected, fetchLightStatus]);
 
-  const fetchLightStatus = async () => {
+  const fetchLightStatus = useCallback(async () => {
     if (!isConnected) return;
     
     setIsLoading(true);
@@ -61,7 +61,7 @@ const LightStatusPanel: React.FC<LightStatusPanelProps> = ({ isConnected, onBack
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [isConnected]);
 
   const getLightIcon = (lightType: string, isOn: boolean) => {
     const iconProps = { className: `h-6 w-6 ${isOn ? 'text-red-500' : 'text-gray-400'}` };

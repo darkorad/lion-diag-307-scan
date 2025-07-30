@@ -26,7 +26,12 @@ interface ConnectionPanelProps {
   onConnectionChange: (connected: boolean) => void;
   connectionStatus: string;
   onStatusChange: (status: string) => void;
-  vehicleInfo: any;
+  vehicleInfo: {
+    make: string;
+    model: string;
+    engine: string;
+    year: number;
+  };
 }
 
 const ConnectionPanel: React.FC<ConnectionPanelProps> = ({

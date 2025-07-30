@@ -275,9 +275,9 @@ export class EnhancedBluetoothManager {
     }
   }
 
-  private handleConnectionFailure(device: BluetoothDevice, error: any): void {
+  private handleConnectionFailure(device: BluetoothDevice, error: unknown): void {
     // If device fails multiple times, consider blacklisting temporarily
-    const errorStr = error.toString().toLowerCase();
+    const errorStr = String(error).toLowerCase();
     
     if (errorStr.includes('timeout') || errorStr.includes('unreachable')) {
       // Temporary issue, don't blacklist

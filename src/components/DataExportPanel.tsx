@@ -189,7 +189,7 @@ Please find the detailed diagnostic data attached.
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Export Format</label>
-              <Select value={exportFormat} onValueChange={(value) => setExportFormat(value as any)}>
+              <Select value={exportFormat} onValueChange={(value: 'csv' | 'json' | 'pdf') => setExportFormat(value)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

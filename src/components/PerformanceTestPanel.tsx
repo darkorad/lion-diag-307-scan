@@ -55,7 +55,7 @@ const PerformanceTestPanel: React.FC<PerformanceTestPanelProps> = ({ isConnected
     }, 100);
 
     return () => clearInterval(interval);
-  }, [isTestRunning, testType]);
+  }, [isTestRunning, testType, stopTest]);
 
   const startTest = () => {
     setIsTestRunning(true);
@@ -68,7 +68,7 @@ const PerformanceTestPanel: React.FC<PerformanceTestPanelProps> = ({ isConnected
     }
   };
 
-  const stopTest = () => {
+  const stopTest = useCallback(() => {
     setIsTestRunning(false);
     
     if (testType === 'acceleration') {
@@ -79,7 +79,7 @@ const PerformanceTestPanel: React.FC<PerformanceTestPanelProps> = ({ isConnected
         enginePerformance: performanceMetricsService.calculateEnginePerformance(2500, 25, 75)
       });
     }
-  };
+  }, [testType, currentSpeed]);
 
   const resetTest = () => {
     setIsTestRunning(false);
@@ -129,7 +129,7 @@ const PerformanceTestPanel: React.FC<PerformanceTestPanelProps> = ({ isConnected
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Tabs value={testType} onValueChange={(value) => setTestType(value as any)}>
+          <Tabs value={testType} onValueChange={(value) => setTestType(value as 'acceleration' | 'fuel_efficiency' | 'power_test')}>
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="acceleration">Acceleration Test</TabsTrigger>
               <TabsTrigger value="fuel_efficiency">Fuel Efficiency</TabsTrigger>

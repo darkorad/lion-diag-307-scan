@@ -41,13 +41,7 @@ const ReadinessPanel: React.FC<ReadinessPanelProps> = ({ isConnected, onBack }) 
   });
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    if (isConnected) {
-      fetchReadinessStatus();
-    }
-  }, [isConnected]);
-
-  const fetchReadinessStatus = async () => {
+  const fetchReadinessStatus = React.useCallback(async () => {
     if (!isConnected) return;
     
     setIsLoading(true);
@@ -61,7 +55,13 @@ const ReadinessPanel: React.FC<ReadinessPanelProps> = ({ isConnected, onBack }) 
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [isConnected]);
+
+  useEffect(() => {
+    if (isConnected) {
+      fetchReadinessStatus();
+    }
+  }, [isConnected, fetchReadinessStatus]);
 
   const getSystemIcon = (system: string) => {
     const iconProps = { className: 'h-5 w-5' };

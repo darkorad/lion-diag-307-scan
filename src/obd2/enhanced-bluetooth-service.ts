@@ -1,26 +1,28 @@
+type BluetoothSerial = {
+  list: (success: (devices: unknown[]) => void, error: (error: unknown) => void) => void;
+  connect: (address: string, success: () => void, error: (error: unknown) => void) => void;
+  connectInsecure: (address: string, success: () => void, error: (error: unknown) => void) => void;
+  disconnect: (success: () => void, error: (error: unknown) => void) => void;
+  write: (data: string, success: () => void, error: (error: unknown) => void) => void;
+  available: (success: (count: number) => void, error: (error: unknown) => void) => void;
+  read: (success: (data: string) => void, error: (error: unknown) => void) => void;
+  readUntil: (delimiter: string, success: (data: string) => void, error: (error: unknown) => void) => void;
+  isConnected: (success: () => void, error: () => void) => void;
+  isEnabled: (success: () => void, error: () => void) => void;
+  enable: (success: () => void, error: (error: unknown) => void) => void;
+  discoverUnpaired: (success: (devices: unknown[]) => void, error: (error: unknown) => void) => void;
+  setDeviceDiscoveredListener: (notify: (device: unknown) => void) => void;
+  clearDeviceDiscoveredListener: () => void;
+  setName: (name: string, success: () => void, error: (error: unknown) => void) => void;
+  setDiscoverable: (duration: number, success: () => void, error: (error: unknown) => void) => void;
+  subscribe: (delimiter: string, success: (data: string) => void, error: (error: unknown) => void) => void;
+  unsubscribe: (success: () => void, error: (error: unknown) => void) => void;
+  showBluetoothSettings: (success: () => void, error: (error: unknown) => void) => void;
+};
+
 declare global {
   interface Window {
-    bluetoothSerial: {
-      list: (success: (devices: any[]) => void, error: (error: any) => void) => void;
-      connect: (address: string, success: () => void, error: (error: any) => void) => void;
-      connectInsecure: (address: string, success: () => void, error: (error: any) => void) => void;
-      disconnect: (success: () => void, error: (error: any) => void) => void;
-      write: (data: string, success: () => void, error: (error: any) => void) => void;
-      available: (success: (count: number) => void, error: (error: any) => void) => void;
-      read: (success: (data: string) => void, error: (error: any) => void) => void;
-      readUntil: (delimiter: string, success: (data: string) => void, error: (error: any) => void) => void;
-      isConnected: (success: () => void, error: () => void) => void;
-      isEnabled: (success: () => void, error: () => void) => void;
-      enable: (success: () => void, error: (error: any) => void) => void;
-      discoverUnpaired: (success: (devices: any[]) => void, error: (error: any) => void) => void;
-      setDeviceDiscoveredListener: (notify: (device: any) => void) => void;
-      clearDeviceDiscoveredListener: () => void;
-      setName: (name: string, success: () => void, error: (error: any) => void) => void;
-      setDiscoverable: (duration: number, success: () => void, error: (error: any) => void) => void;
-      subscribe: (delimiter: string, success: (data: string) => void, error: (error: any) => void) => void;
-      unsubscribe: (success: () => void, error: (error: any) => void) => void;
-      showBluetoothSettings: (success: () => void, error: (error: any) => void) => void;
-    };
+    bluetoothSerial: BluetoothSerial;
   }
 }
 
@@ -41,11 +43,12 @@ export class EnhancedBluetoothService {
   private connectionAttempts: Map<string, number> = new Map();
   private maxConnectionAttempts = 3; // Reduced for better UX
   private connectionTimeout = 15000; // Reduced timeout
-  private commandQueue: Array<{ command: string; resolve: Function; reject: Function }> = [];
+  private commandQueue: Array<{ command: string; resolve: (value: string | PromiseLike<string>) => void; reject: (reason?: unknown) => void; }> = [];
   private isProcessingQueue = false;
-  
+  private commandTimeout = 15000;
+
   // Enhanced protocol definitions with success rates
-  private protocols = {
+  private protocols: Record<string, { name: string; successRate: number }> = {
     '0': { name: 'Automatic', successRate: 85 },
     '4': { name: 'ISO 14230-4 KWP (5 baud init)', successRate: 90 }, // Best for older cars
     '5': { name: 'ISO 14230-4 KWP (fast init)', successRate: 88 },
@@ -368,7 +371,7 @@ export class EnhancedBluetoothService {
         resolve();
       };
 
-      const onError = (error: any) => {
+      const onError = (error: unknown) => {
         clearTimeout(timeout);
         reject(new Error(`${method} connection error: ${JSON.stringify(error)}`));
       };

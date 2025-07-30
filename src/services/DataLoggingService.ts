@@ -4,7 +4,7 @@ export interface LogEntry {
   timestamp: Date;
   vehicleId: string;
   sessionId: string;
-  data: Record<string, any>;
+  data: Record<string, unknown>;
   location?: {
     latitude: number;
     longitude: number;
@@ -60,7 +60,7 @@ class DataLoggingService {
     return null;
   }
 
-  logData(data: Record<string, any>, location?: { latitude: number; longitude: number }): void {
+  logData(data: Record<string, unknown>, location?: { latitude: number; longitude: number }): void {
     if (!this.currentSession || !this.isLogging) return;
 
     const entry: LogEntry = {
@@ -76,14 +76,14 @@ class DataLoggingService {
     this.updateSessionStats(data);
   }
 
-  private updateSessionStats(data: Record<string, any>): void {
+  private updateSessionStats(data: Record<string, unknown>): void {
     if (!this.currentSession) return;
 
-    if (data.vehicleSpeed && data.vehicleSpeed > this.currentSession.maxSpeed) {
+    if (typeof data.vehicleSpeed === 'number' && data.vehicleSpeed > this.currentSession.maxSpeed) {
       this.currentSession.maxSpeed = data.vehicleSpeed;
     }
 
-    if (data.engineRPM && data.engineRPM > this.currentSession.maxRPM) {
+    if (typeof data.engineRPM === 'number' && data.engineRPM > this.currentSession.maxRPM) {
       this.currentSession.maxRPM = data.engineRPM;
     }
   }

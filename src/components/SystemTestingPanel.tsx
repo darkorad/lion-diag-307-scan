@@ -25,13 +25,13 @@ import { useToast } from '@/hooks/use-toast';
 
 interface SystemTestingPanelProps {
   isConnected: boolean;
-  vehicleInfo?: any;
+  vehicleInfo?: Record<string, unknown>;
 }
 
-const SystemTestingPanel: React.FC<SystemTestingPanelProps> = ({ isConnected, vehicleInfo }) => {
+const SystemTestingPanel: React.FC<SystemTestingPanelProps> = ({ isConnected }) => {
   const [isRunningTest, setIsRunningTest] = useState(false);
   const [currentTest, setCurrentTest] = useState<string>('');
-  const [testResults, setTestResults] = useState<{ [key: string]: any }>({});
+  const [testResults, setTestResults] = useState<Record<string, unknown>>({});
   const [activeTests, setActiveTests] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
@@ -211,33 +211,49 @@ const SystemTestingPanel: React.FC<SystemTestingPanelProps> = ({ isConnected, ve
     setActiveTests(prev => new Set(prev).add(testId));
 
     try {
-      let stepIndex = 0;
-      const results: any = {
+      const results: {
+        startTime: Date;
+        steps: {
+          step: number;
+          description: string;
+          status: string;
+          timestamp: Date;
+          result?: { value: string; status: string };
+        }[];
+        status: string;
+        endTime?: Date;
+        overallResult?: {
+          score: number;
+          status: string;
+          summary: string;
+          recommendations: string[];
+        };
+      } = {
         startTime: new Date(),
         steps: [],
         status: 'running'
       };
 
       // Simulate test execution with steps
-      for (const step of test.steps) {
+      for (let i = 0; i < test.steps.length; i++) {
+        const step = test.steps[i];
         results.steps.push({
-          step: stepIndex + 1,
+          step: i + 1,
           description: step,
           status: 'running',
           timestamp: new Date()
         });
-        
+
         setTestResults(prev => ({ ...prev, [testId]: { ...results } }));
 
         // Simulate step duration
         await new Promise(resolve => setTimeout(resolve, test.duration / test.steps.length));
 
         // Mark step as completed
-        results.steps[stepIndex].status = 'completed';
-        results.steps[stepIndex].result = generateStepResult(test.id, stepIndex);
-        
+        results.steps[i].status = 'completed';
+        results.steps[i].result = generateStepResult(test.id, i);
+
         setTestResults(prev => ({ ...prev, [testId]: { ...results } }));
-        stepIndex++;
       }
 
       // Complete the test
@@ -278,9 +294,9 @@ const SystemTestingPanel: React.FC<SystemTestingPanelProps> = ({ isConnected, ve
     }
   };
 
-  const generateStepResult = (testId: string, stepIndex: number): any => {
+  const generateStepResult = (testId: string, stepIndex: number): { value: string; status: string } => {
     // Generate realistic test results based on test type and step
-    const results: { [key: string]: any } = {
+    const results: { [key: string]: { value: string; status: string }[] } = {
       actuator_test: [
         { value: '12.5ms', status: 'good' },
         { value: '11.8ms', status: 'good' },
@@ -359,8 +375,18 @@ const SystemTestingPanel: React.FC<SystemTestingPanelProps> = ({ isConnected, ve
     return results[testId]?.[stepIndex] || { value: 'OK', status: 'good' };
   };
 
-  const generateOverallResult = (testId: string): any => {
-    const overallResults: { [key: string]: any } = {
+  const generateOverallResult = (testId: string): {
+    score: number;
+    status: string;
+    summary: string;
+    recommendations: string[];
+  } => {
+    const overallResults: { [key: string]: {
+      score: number;
+      status: string;
+      summary: string;
+      recommendations: string[];
+    } } = {
       actuator_test: {
         score: 85,
         status: 'warning',
@@ -451,10 +477,30 @@ const SystemTestingPanel: React.FC<SystemTestingPanelProps> = ({ isConnected, ve
     return systemTests.filter(test => test.category === category);
   };
 
-  const renderTestCard = (test: any) => {
+  const renderTestCard = (test: {
+    id: string;
+    category: string;
+    name: string;
+    description: string;
+    icon: JSX.Element;
+    duration: number;
+    steps: string[];
+  }) => {
     const isActive = activeTests.has(test.id);
-    const result = testResults[test.id];
-    const isCurrentTest = currentTest === test.id;
+    const result = testResults[test.id] as {
+      status: string;
+      steps: {
+        description: string;
+        status: string;
+        result?: { value: string; status: string };
+      }[];
+      overallResult?: {
+        score: number;
+        status: string;
+        summary: string;
+        recommendations: string[];
+      };
+    };
 
     return (
       <Card key={test.id} className="p-4">
@@ -505,13 +551,13 @@ const SystemTestingPanel: React.FC<SystemTestingPanelProps> = ({ isConnected, ve
           <div className="space-y-2">
             <div className="text-sm font-medium">Test Progress:</div>
             <div className="space-y-1 max-h-32 overflow-y-auto">
-              {result.steps?.map((step: any, index: number) => (
+              {result.steps?.map((step, index: number) => (
                 <div key={index} className="flex items-center justify-between text-xs">
                   <span className={step.status === 'completed' ? 'text-green-600' : 'text-muted-foreground'}>
                     {step.description}
                   </span>
                   {step.status === 'completed' && step.result && (
-                    <Badge 
+                    <Badge
                       variant={step.result.status === 'good' ? 'default' : 'destructive'}
                       className="text-xs"
                     >
@@ -542,7 +588,7 @@ const SystemTestingPanel: React.FC<SystemTestingPanelProps> = ({ isConnected, ve
             {result.overallResult.recommendations && (
               <div className="text-xs space-y-1">
                 <div className="font-medium">Recommendations:</div>
-                {result.overallResult.recommendations.map((rec: string, index: number) => (
+                {result.overallResult.recommendations.map((rec, index: number) => (
                   <div key={index} className="text-muted-foreground">• {rec}</div>
                 ))}
               </div>

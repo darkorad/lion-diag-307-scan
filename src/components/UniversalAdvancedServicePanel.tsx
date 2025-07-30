@@ -45,7 +45,7 @@ interface ServiceExecution {
   name: string;
   status: 'running' | 'completed' | 'failed';
   progress: number;
-  result?: any;
+  result?: Record<string, unknown>;
   error?: string;
   startTime: Date;
   endTime?: Date;
@@ -55,11 +55,21 @@ const UniversalAdvancedServicePanel: React.FC<UniversalAdvancedServicePanelProps
   isConnected,
   onBack
 }) => {
-  const [vehicleInfo, setVehicleInfo] = useState<any>(null);
-  const [availableFunctions, setAvailableFunctions] = useState<any[]>([]);
+  const [vehicleInfo, setVehicleInfo] = useState<Record<string, unknown> | null>(null);
+  const [availableFunctions, setAvailableFunctions] = useState<
+    {
+      id: string;
+      name: string;
+      description: string;
+      category: string;
+      riskLevel: 'low' | 'medium' | 'high';
+      requiresPin?: boolean;
+      manufacturer?: string;
+      parameters?: Record<string, unknown>;
+    }[]
+  >([]);
   const [serviceExecutions, setServiceExecutions] = useState<ServiceExecution[]>([]);
-  const [selectedFunction, setSelectedFunction] = useState<string | null>(null);
-  const [functionParameters, setFunctionParameters] = useState<{ [key: string]: any }>({});
+  const [functionParameters, setFunctionParameters] = useState<Record<string, Record<string, unknown>>>({});
   const [isExecuting, setIsExecuting] = useState(false);
 
   useEffect(() => {
@@ -185,7 +195,7 @@ const UniversalAdvancedServicePanel: React.FC<UniversalAdvancedServicePanelProps
   };
 
   const getCategoryIcon = (category: string) => {
-    const icons: { [key: string]: any } = {
+    const icons: { [key: string]: React.ElementType } = {
       service: Wrench,
       adaptation: Settings,
       calibration: Target,
@@ -208,7 +218,7 @@ const UniversalAdvancedServicePanel: React.FC<UniversalAdvancedServicePanelProps
     if (!acc[func.category]) acc[func.category] = [];
     acc[func.category].push(func);
     return acc;
-  }, {} as { [key: string]: any[] });
+  }, {} as Record<string, typeof availableFunctions>);
 
   const categories = Object.keys(groupedFunctions);
 

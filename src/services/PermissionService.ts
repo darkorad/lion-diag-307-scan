@@ -51,8 +51,8 @@ export class PermissionService {
 
   // Check if we're running on Android
   private isAndroid(): boolean {
-    return window.navigator.userAgent.includes('Android') || 
-           (window as any).DeviceInfo?.platform === 'android';
+    return window.navigator.userAgent.includes('Android') ||
+           (window as { DeviceInfo?: { platform: string } }).DeviceInfo?.platform === 'android';
   }
 
   // Check current permission status without requesting
@@ -187,13 +187,13 @@ export class PermissionService {
   // Request Bluetooth scan permissions (Android 12+)
   private async requestBluetoothScanPermissions(): Promise<boolean> {
     try {
-      if ((window as any).cordova?.plugins?.permissions) {
-        const permissions = (window as any).cordova.plugins.permissions;
+      if ((window as { cordova?: { plugins?: { permissions: unknown } } }).cordova?.plugins?.permissions) {
+        const permissions = (window as { cordova: { plugins: { permissions: { requestPermission: (permission: string, success: (status: { hasPermission: boolean }) => void, error: () => void) => void } } } }).cordova.plugins.permissions;
         
         return new Promise((resolve) => {
           permissions.requestPermission(
             'android.permission.BLUETOOTH_SCAN',
-            (status: any) => {
+            (status: { hasPermission: boolean }) => {
               console.log('Bluetooth scan permission:', status.hasPermission);
               resolve(status.hasPermission);
             },
@@ -214,13 +214,13 @@ export class PermissionService {
   // Request Bluetooth connect permissions (Android 12+)
   private async requestBluetoothConnectPermissions(): Promise<boolean> {
     try {
-      if ((window as any).cordova?.plugins?.permissions) {
-        const permissions = (window as any).cordova.plugins.permissions;
+      if ((window as { cordova?: { plugins?: { permissions: unknown } } }).cordova?.plugins?.permissions) {
+        const permissions = (window as { cordova: { plugins: { permissions: { requestPermission: (permission: string, success: (status: { hasPermission: boolean }) => void, error: () => void) => void } } } }).cordova.plugins.permissions;
         
         return new Promise((resolve) => {
           permissions.requestPermission(
             'android.permission.BLUETOOTH_CONNECT',
-            (status: any) => {
+            (status: { hasPermission: boolean }) => {
               console.log('Bluetooth connect permission:', status.hasPermission);
               resolve(status.hasPermission);
             },
@@ -244,19 +244,19 @@ export class PermissionService {
       console.log('Requesting location permissions...');
       
       // Try Capacitor first
-      if ((window as any).Capacitor?.Plugins?.Geolocation) {
-        const permission = await (window as any).Capacitor.Plugins.Geolocation.requestPermissions();
+      if ((window as { Capacitor?: { Plugins?: { Geolocation: unknown } } }).Capacitor?.Plugins?.Geolocation) {
+        const permission = await (window as { Capacitor: { Plugins: { Geolocation: { requestPermissions: () => Promise<{ location: 'granted' | 'denied' }> } } } }).Capacitor.Plugins.Geolocation.requestPermissions();
         return permission.location === 'granted';
       }
 
       // Try Cordova permissions plugin
-      if ((window as any).cordova?.plugins?.permissions) {
-        const permissions = (window as any).cordova.plugins.permissions;
+      if ((window as { cordova?: { plugins?: { permissions: unknown } } }).cordova?.plugins?.permissions) {
+        const permissions = (window as { cordova: { plugins: { permissions: { requestPermission: (permission: string, success: (status: { hasPermission: boolean }) => void, error: () => void) => void } } } }).cordova.plugins.permissions;
         
         return new Promise((resolve) => {
           permissions.requestPermission(
             'android.permission.ACCESS_FINE_LOCATION',
-            (status: any) => {
+            (status: { hasPermission: boolean }) => {
               console.log('Location permission:', status.hasPermission);
               resolve(status.hasPermission);
             },
@@ -290,9 +290,9 @@ export class PermissionService {
   private async requestStoragePermissions(): Promise<boolean> {
     try {
       // For Capacitor, storage permissions are usually handled automatically
-      if ((window as any).Capacitor?.Plugins?.Filesystem) {
+      if ((window as { Capacitor?: { Plugins?: { Filesystem: unknown } } }).Capacitor?.Plugins?.Filesystem) {
         try {
-          const permission = await (window as any).Capacitor.Plugins.Filesystem.requestPermissions();
+          const permission = await (window as { Capacitor: { Plugins: { Filesystem: { requestPermissions: () => Promise<{ publicStorage: 'granted' | 'denied' }> } } } }).Capacitor.Plugins.Filesystem.requestPermissions();
           return permission.publicStorage === 'granted';
         } catch {
           return true; // Assume granted

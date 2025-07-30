@@ -30,16 +30,15 @@ import { useToast } from '@/hooks/use-toast';
 interface VehicleTestingPanelProps {
   isConnected: boolean;
   onCommand?: (command: string) => Promise<string>;
-  vehicleInfo?: any;
+  vehicleInfo?: Record<string, unknown>;
 }
 
 const VehicleTestingPanel: React.FC<VehicleTestingPanelProps> = ({
   isConnected,
   onCommand,
-  vehicleInfo
 }) => {
   const [isRunning, setIsRunning] = useState(false);
-  const [testResults, setTestResults] = useState<any>({});
+  const [testResults, setTestResults] = useState<Record<string, { success: boolean; message?: string; error?: string }>>({});
   const [selectedTest, setSelectedTest] = useState<string | null>(null);
   const [realOdometer, setRealOdometer] = useState<number | null>(null);
   const { toast } = useToast();

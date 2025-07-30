@@ -10,8 +10,8 @@ export class EnhancedOBD2Service {
   private dataCallbacks: Set<(data: OBD2Data) => void> = new Set();
   private dpfCallbacks: Set<(data: DPFData) => void> = new Set();
   private dataCollectionInterval: NodeJS.Timeout | null = null;
-  private vehicleInfo: any = null;
-  private supportedPids: any[] = [];
+  private vehicleInfo: Record<string, unknown> | null = null;
+  private supportedPids: { pid: string }[] = [];
   private dataRate = 0;
   private lastDataCollection = 0;
 
@@ -154,8 +154,8 @@ export class EnhancedOBD2Service {
   }
 
   // Get manufacturer-specific PIDs
-  private getManufacturerSpecificPids(manufacturer: string): any {
-    const pids: { [key: string]: any } = {
+  private getManufacturerSpecificPids(manufacturer: string): Record<string, string> {
+    const pids: Record<string, Record<string, string>> = {
       'Peugeot': {
         turbochargerPressure: '221C50',
         fuelRailPressure: '221C60'
@@ -216,7 +216,7 @@ export class EnhancedOBD2Service {
           const response = await this.sendCommand(pid);
           const value = this.parsePidResponse(pid, response);
           if (value !== null) {
-            (currentData as any)[key] = value;
+            (currentData as Record<string, unknown>)[key] = value;
           }
         } catch (error) {
           console.warn(`Failed to get ${key}:`, error);
@@ -231,7 +231,7 @@ export class EnhancedOBD2Service {
           const response = await this.sendCommand(pid);
           const value = this.parsePidResponse(pid, response);
           if (value !== null) {
-            (currentData as any)[key] = value;
+            (currentData as Record<string, unknown>)[key] = value;
           }
         } catch (error) {
           console.warn(`Failed to get ${key}:`, error);
@@ -319,8 +319,8 @@ export class EnhancedOBD2Service {
   }
 
   // Parse supported PIDs from response
-  private parseSupportedPids(pidRange: string, response: string): any[] {
-    const pids: any[] = [];
+  private parseSupportedPids(pidRange: string, response: string): { pid: string }[] {
+    const pids: { pid: string }[] = [];
     try {
       // Implementation would parse the bitmap response
       // For now, return empty array
@@ -388,7 +388,7 @@ export class EnhancedOBD2Service {
         const response = await this.sendCommand(pid);
         const value = this.parsePidResponse(pid, response);
         if (value !== null) {
-          (dpfData as any)[key] = value;
+          (dpfData as Record<string, unknown>)[key] = value;
         }
       } catch (error) {
         // DPF PIDs may not be supported on all vehicles
@@ -397,7 +397,14 @@ export class EnhancedOBD2Service {
   }
 
   // Get advanced functions for universal panel
-  public getAdvancedFunctions(): any[] {
+  public getAdvancedFunctions(): {
+    id: string;
+    name: string;
+    description: string;
+    category: string;
+    riskLevel: 'low' | 'medium' | 'high';
+    parameters: Record<string, unknown>;
+  }[] {
     return [
       {
         id: 'dpf_regen',
@@ -419,7 +426,7 @@ export class EnhancedOBD2Service {
   }
 
   // Execute advanced function
-  public async executeAdvancedFunction(functionId: string, parameters?: any): Promise<any> {
+  public async executeAdvancedFunction(functionId: string, parameters?: Record<string, unknown>): Promise<{ success: boolean; result?: string; error?: string }> {
     try {
       switch (functionId) {
         case 'dpf_regen':

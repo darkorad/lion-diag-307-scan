@@ -42,20 +42,20 @@ const ProfessionalConnectionPanel: React.FC<ProfessionalConnectionPanelProps> = 
   const [devices, setDevices] = useState<BluetoothDevice[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<BluetoothDevice | null>(null);
   const [scanProgress, setScanProgress] = useState(0);
-  const [connectionHistory, setConnectionHistory] = useState<any[]>([]);
+  const [connectionHistory, setConnectionHistory] = useState<ConnectionResult[]>([]);
   const [connectionResult, setConnectionResult] = useState<ConnectionResult | null>(null);
 
-  useEffect(() => {
-    checkCurrentConnection();
-    loadConnectionHistory();
-  }, []);
-
-  const checkCurrentConnection = () => {
+  const checkCurrentConnection = React.useCallback(() => {
     const status = masterBluetoothService.getConnectionStatus();
     if (status.isConnected && status.device) {
       onDeviceConnected(status.device);
     }
-  };
+  }, [onDeviceConnected]);
+
+  useEffect(() => {
+    checkCurrentConnection();
+    loadConnectionHistory();
+  }, [checkCurrentConnection]);
 
   const loadConnectionHistory = () => {
     const history = masterBluetoothService.getConnectionHistory();
@@ -160,12 +160,12 @@ const ProfessionalConnectionPanel: React.FC<ProfessionalConnectionPanelProps> = 
   };
 
   const getQualityBadge = (quality?: string) => {
-    const variant = quality === 'excellent' ? 'default' : 
-                   quality === 'good' ? 'secondary' : 
-                   quality === 'fair' ? 'outline' : 'destructive';
-    
+    const variant = quality === 'excellent' ? 'default' :
+                    quality === 'good' ? 'secondary' :
+                    quality === 'fair' ? 'outline' : 'destructive';
+
     return (
-      <Badge variant={variant as any} className="text-xs">
+      <Badge variant={variant as 'default' | 'secondary' | 'outline' | 'destructive'} className="text-xs">
         {quality || 'Unknown'}
       </Badge>
     );

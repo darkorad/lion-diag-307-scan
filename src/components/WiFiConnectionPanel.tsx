@@ -20,7 +20,7 @@ import { OBD2Adapter } from '@/types/adapters';
 import { useToast } from '@/hooks/use-toast';
 
 interface WiFiConnectionPanelProps {
-  onConnected: (config: any) => void;
+  onConnected: (config: { ip: string; port: number; timeout: number }) => void;
   isConnected: boolean;
   selectedAdapter?: OBD2Adapter | null;
 }

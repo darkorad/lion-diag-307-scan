@@ -46,8 +46,12 @@ const LiveDataPanel: React.FC<LiveDataPanelProps> = ({ isConnected, onBack }) =>
   const [dpfData, setDpfData] = useState<DPFData | null>(null);
   const [dataPoints, setDataPoints] = useState<DataPoint[]>([]);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
-  const [vehicleInfo, setVehicleInfo] = useState<any>(null);
-  const [supportedPids, setSupportedPids] = useState<any[]>([]);
+  const [vehicleInfo, setVehicleInfo] = useState<{
+    manufacturer: string;
+    model: string;
+    year: number;
+  } | null>(null);
+  const [supportedPids, setSupportedPids] = useState<string[]>([]);
   const [dataRate, setDataRate] = useState(0);
 
   useEffect(() => {
@@ -335,7 +339,7 @@ const LiveDataPanel: React.FC<LiveDataPanelProps> = ({ isConnected, onBack }) =>
   };
 
   const getCategoryIcon = (category: string) => {
-    const icons: { [key: string]: any } = {
+    const icons: { [key: string]: React.ElementType } = {
       engine: Car,
       fuel: Droplets,
       emissions: Wind,

@@ -16,7 +16,7 @@ export interface AdvancedFunction {
   name: string;
   description: string;
   command: string;
-  parameters?: { [key: string]: any };
+  parameters?: Record<string, unknown>;
   category: string;
   riskLevel: 'low' | 'medium' | 'high';
   requiresPin?: boolean;

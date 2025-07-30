@@ -109,64 +109,183 @@ const Peugeot307AdvancedPanel: React.FC<Peugeot307AdvancedPanelProps> = ({ isCon
   const [isReadingPin, setIsReadingPin] = useState(false);
   const [dpfRegenerationProgress, setDpfRegenerationProgress] = useState(0);
   const [isDpfRegenerating, setIsDpfRegenerating] = useState(false);
-  const [egrTestResult, setEgrTestResult] = useState<any>(null);
+  const [egrTestResult, setEgrTestResult] = useState<{
+    success: boolean;
+    results?: {
+      command: string;
+      response: string;
+      position: string;
+    }[];
+    summary: string;
+    error?: string;
+  } | null>(null);
   const [isEgrTesting, setIsEgrTesting] = useState(false);
 
-  // Enhanced PID list for Peugeot 307
-  const peugeot307PIDs = [
-    // Standard OBD2 PIDs
-    { pid: '010C', name: 'Engine RPM', unit: 'rpm', category: 'engine' },
-    { pid: '010D', name: 'Vehicle Speed', unit: 'km/h', category: 'engine' },
-    { pid: '0105', name: 'Coolant Temperature', unit: '°C', category: 'engine' },
-    { pid: '010F', name: 'Intake Air Temperature', unit: '°C', category: 'engine' },
-    { pid: '0110', name: 'MAF Air Flow', unit: 'g/s', category: 'engine' },
-    { pid: '0111', name: 'Throttle Position', unit: '%', category: 'engine' },
-    { pid: '0114', name: 'Oxygen Sensor 1', unit: 'V', category: 'emissions' },
-    { pid: '012F', name: 'Fuel Level', unit: '%', category: 'fuel' },
-    { pid: '015C', name: 'Oil Temperature', unit: '°C', category: 'engine' },
-    { pid: '0142', name: 'Battery Voltage', unit: 'V', category: 'electrical' },
+  const parsePidResponse = React.useCallback((pid: { pid: string; name: string; unit: string; category: string; }, response: string): PidReading => {
+    // Parse actual PID response
+    const hex = response.replace(/\s/g, '');
+    let value = '0';
+    let status: 'normal' | 'warning' | 'critical' = 'normal';
     
-    // PSA Specific PIDs
-    { pid: '221C30', name: 'DPF Inlet Temperature', unit: '°C', category: 'emissions' },
-    { pid: '221C31', name: 'DPF Outlet Temperature', unit: '°C', category: 'emissions' },
-    { pid: '221C32', name: 'DPF Differential Pressure', unit: 'Pa', category: 'emissions' },
-    { pid: '221C34', name: 'DPF Soot Load', unit: '%', category: 'emissions' },
-    { pid: '221C40', name: 'EGR Position', unit: '%', category: 'emissions' },
-    { pid: '221C41', name: 'EGR Temperature', unit: '°C', category: 'emissions' },
-    { pid: '221C50', name: 'Turbo Pressure', unit: 'mbar', category: 'turbo' },
-    { pid: '221C60', name: 'Fuel Rail Pressure', unit: 'bar', category: 'fuel' },
-    { pid: '221C61', name: 'Fuel Temperature', unit: '°C', category: 'fuel' },
-    { pid: '221C80', name: 'Oil Pressure', unit: 'bar', category: 'engine' },
-    { pid: '221C90', name: 'Glow Plug Status', unit: 'state', category: 'engine' },
-    { pid: '222260', name: 'BSI Battery Voltage', unit: 'V', category: 'electrical' },
-    { pid: '222270', name: 'Radio Status', unit: 'state', category: 'comfort' },
-    { pid: '222280', name: 'Central Locking Status', unit: 'state', category: 'security' },
-    { pid: '222290', name: 'Immobilizer Status', unit: 'state', category: 'security' },
-    { pid: '2222A0', name: 'Climate Control Status', unit: 'state', category: 'climate' },
-    { pid: '2222B0', name: 'Window Status', unit: 'state', category: 'comfort' },
-    { pid: '2222C0', name: 'Door Lock Status', unit: 'state', category: 'security' },
-    { pid: '2222D0', name: 'Alarm Status', unit: 'state', category: 'security' },
-    { pid: '2222E0', name: 'Light Sensor', unit: 'lux', category: 'lighting' },
-    { pid: '2222F0', name: 'Rain Sensor', unit: '%', category: 'comfort' },
-    { pid: '222300', name: 'Steering Angle', unit: 'degrees', category: 'steering' },
-    { pid: '222310', name: 'ABS Status', unit: 'state', category: 'safety' },
-    { pid: '222320', name: 'ESP Status', unit: 'state', category: 'safety' },
-    { pid: '222330', name: 'Airbag Status', unit: 'state', category: 'safety' },
-  ];
+    if (hex.length >= 6) {
+      const A = parseInt(hex.substring(4, 6), 16);
+      const B = hex.length >= 8 ? parseInt(hex.substring(6, 8), 16) : 0;
 
-  useEffect(() => {
-    if (isConnected) {
-      fetchAllPIDs();
-      const interval = setInterval(fetchAllPIDs, 3000);
-      return () => clearInterval(interval);
+      // Apply formulas based on PID
+      switch (pid.pid) {
+        case '010C': {
+          const rpm = Math.round((A * 256 + B) / 4);
+          value = rpm.toString();
+          status = rpm > 4000 ? 'warning' : 'normal';
+          break;
+        }
+        case '010D':
+          value = A.toString();
+          break;
+        case '0105': {
+          const temp = A - 40;
+          value = temp.toString();
+          status = temp > 100 ? 'warning' : temp > 110 ? 'critical' : 'normal';
+          break;
+        }
+        case '221C30':
+        case '221C31': {
+          const dpfTemp = Math.round((A * 256 + B) * 0.75 - 48);
+          value = dpfTemp.toString();
+          status = dpfTemp > 600 ? 'warning' : 'normal';
+          break;
+        }
+        case '221C34': {
+          const soot = Math.round((A * 256 + B) / 100);
+          value = soot.toString();
+          status = soot > 80 ? 'critical' : soot > 60 ? 'warning' : 'normal';
+          break;
+        }
+        default:
+          value = A.toString();
+      }
     }
-  }, [isConnected]);
 
-  const fetchAllPIDs = async () => {
+    return {
+      pid: pid.pid,
+      name: pid.name,
+      value,
+      unit: pid.unit,
+      status,
+      category: pid.category
+    };
+  }, []);
+
+  const generateMockPIDReading = React.useCallback((pid: { pid: string; name: string; unit: string; category: string; }): PidReading => {
+    let value = '';
+    let status: 'normal' | 'warning' | 'critical' = 'normal';
+
+    switch (pid.pid) {
+      case '010C': {
+        const rpm = 800 + Math.random() * 1000;
+        value = Math.round(rpm).toString();
+        status = rpm > 4000 ? 'warning' : 'normal';
+        break;
+      }
+      case '010D':
+        value = Math.round(Math.random() * 60).toString();
+        break;
+      case '0105': {
+        const temp = 85 + Math.random() * 15;
+        value = Math.round(temp).toString();
+        status = temp > 100 ? 'warning' : temp > 110 ? 'critical' : 'normal';
+        break;
+      }
+      case '221C30':
+      case '221C31': {
+        const dpfTemp = 350 + Math.random() * 200;
+        value = Math.round(dpfTemp).toString();
+        status = dpfTemp > 600 ? 'warning' : 'normal';
+        break;
+      }
+      case '221C34': {
+        const soot = Math.random() * 100;
+        value = Math.round(soot).toString();
+        status = soot > 80 ? 'critical' : soot > 60 ? 'warning' : 'normal';
+        break;
+      }
+      case '221C50': {
+        const turbo = 1200 + Math.random() * 400;
+        value = Math.round(turbo).toString();
+        break;
+      }
+      case '221C60': {
+        const pressure = 1200 + Math.random() * 400;
+        value = Math.round(pressure).toString();
+        status = pressure < 800 ? 'warning' : pressure > 1800 ? 'warning' : 'normal';
+        break;
+      }
+      case '0142':
+      case '222260': {
+        const voltage = 12.4 + Math.random() * 1.2;
+        value = voltage.toFixed(1);
+        status = voltage < 12.0 ? 'warning' : voltage < 11.5 ? 'critical' : 'normal';
+        break;
+      }
+      default:
+        value = Math.round(Math.random() * 100).toString();
+    }
+
+    return {
+      pid: pid.pid,
+      name: pid.name,
+      value,
+      unit: pid.unit,
+      status,
+      category: pid.category
+    };
+  }, []);
+
+  const fetchAllPIDs = React.useCallback(async () => {
     if (!isConnected) return;
 
     try {
       const readings: PidReading[] = [];
+      const peugeot307PIDs = [
+        // Standard OBD2 PIDs
+        { pid: '010C', name: 'Engine RPM', unit: 'rpm', category: 'engine' },
+        { pid: '010D', name: 'Vehicle Speed', unit: 'km/h', category: 'engine' },
+        { pid: '0105', name: 'Coolant Temperature', unit: '°C', category: 'engine' },
+        { pid: '010F', name: 'Intake Air Temperature', unit: '°C', category: 'engine' },
+        { pid: '0110', name: 'MAF Air Flow', unit: 'g/s', category: 'engine' },
+        { pid: '0111', name: 'Throttle Position', unit: '%', category: 'engine' },
+        { pid: '0114', name: 'Oxygen Sensor 1', unit: 'V', category: 'emissions' },
+        { pid: '012F', name: 'Fuel Level', unit: '%', category: 'fuel' },
+        { pid: '015C', name: 'Oil Temperature', unit: '°C', category: 'engine' },
+        { pid: '0142', name: 'Battery Voltage', unit: 'V', category: 'electrical' },
+
+        // PSA Specific PIDs
+        { pid: '221C30', name: 'DPF Inlet Temperature', unit: '°C', category: 'emissions' },
+        { pid: '221C31', name: 'DPF Outlet Temperature', unit: '°C', category: 'emissions' },
+        { pid: '221C32', name: 'DPF Differential Pressure', unit: 'Pa', category: 'emissions' },
+        { pid: '221C34', name: 'DPF Soot Load', unit: '%', category: 'emissions' },
+        { pid: '221C40', name: 'EGR Position', unit: '%', category: 'emissions' },
+        { pid: '221C41', name: 'EGR Temperature', unit: '°C', category: 'emissions' },
+        { pid: '221C50', name: 'Turbo Pressure', unit: 'mbar', category: 'turbo' },
+        { pid: '221C60', name: 'Fuel Rail Pressure', unit: 'bar', category: 'fuel' },
+        { pid: '221C61', name: 'Fuel Temperature', unit: '°C', category: 'fuel' },
+        { pid: '221C80', name: 'Oil Pressure', unit: 'bar', category: 'engine' },
+        { pid: '221C90', name: 'Glow Plug Status', unit: 'state', category: 'engine' },
+        { pid: '222260', name: 'BSI Battery Voltage', unit: 'V', category: 'electrical' },
+        { pid: '222270', name: 'Radio Status', unit: 'state', category: 'comfort' },
+        { pid: '222280', name: 'Central Locking Status', unit: 'state', category: 'security' },
+        { pid: '222290', name: 'Immobilizer Status', unit: 'state', category: 'security' },
+        { pid: '2222A0', name: 'Climate Control Status', unit: 'state', category: 'climate' },
+        { pid: '2222B0', name: 'Window Status', unit: 'state', category: 'comfort' },
+        { pid: '2222C0', name: 'Door Lock Status', unit: 'state', category: 'security' },
+        { pid: '2222D0', name: 'Alarm Status', unit: 'state', category: 'security' },
+        { pid: '2222E0', name: 'Light Sensor', unit: 'lux', category: 'lighting' },
+        { pid: '2222F0', name: 'Rain Sensor', unit: '%', category: 'comfort' },
+        { pid: '222300', name: 'Steering Angle', unit: 'degrees', category: 'steering' },
+        { pid: '222310', name: 'ABS Status', unit: 'state', category: 'safety' },
+        { pid: '222320', name: 'ESP Status', unit: 'state', category: 'safety' },
+        { pid: '222330', name: 'Airbag Status', unit: 'state', category: 'safety' },
+      ];
       
       for (const pid of peugeot307PIDs.slice(0, 20)) { // Read first 20 PIDs
         const reading = await generatePIDReading(pid);
@@ -179,9 +298,17 @@ const Peugeot307AdvancedPanel: React.FC<Peugeot307AdvancedPanelProps> = ({ isCon
     } catch (error) {
       console.error('Error fetching PIDs:', error);
     }
-  };
+  }, [isConnected, generatePIDReading]);
 
-  const generatePIDReading = async (pid: any): Promise<PidReading | null> => {
+  useEffect(() => {
+    if (isConnected) {
+      fetchAllPIDs();
+      const interval = setInterval(fetchAllPIDs, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [isConnected, fetchAllPIDs]);
+
+  const generatePIDReading = React.useCallback(async (pid: { pid: string; name: string; unit: string; category: string; }): Promise<PidReading | null> => {
     try {
       // Try to read actual PID data if connected
       if (isConnected) {
@@ -197,9 +324,9 @@ const Peugeot307AdvancedPanel: React.FC<Peugeot307AdvancedPanelProps> = ({ isCon
       console.error(`Error reading PID ${pid.pid}:`, error);
       return generateMockPIDReading(pid);
     }
-  };
+  }, [isConnected, parsePidResponse, generateMockPIDReading]);
 
-  const parsePidResponse = (pid: any, response: string): PidReading => {
+  const parsePidResponse = (pid: { pid: string; name: string; unit: string; category: string; }, response: string): PidReading => {
     // Parse actual PID response
     const hex = response.replace(/\s/g, '');
     let value = '0';
@@ -211,26 +338,34 @@ const Peugeot307AdvancedPanel: React.FC<Peugeot307AdvancedPanelProps> = ({ isCon
       
       // Apply formulas based on PID
       switch (pid.pid) {
-        case '010C':
-          value = Math.round((A * 256 + B) / 4).toString();
-          status = parseInt(value) > 4000 ? 'warning' : 'normal';
+        case '010C': {
+          const rpm = Math.round((A * 256 + B) / 4);
+          value = rpm.toString();
+          status = rpm > 4000 ? 'warning' : 'normal';
           break;
+        }
         case '010D':
           value = A.toString();
           break;
-        case '0105':
-          value = (A - 40).toString();
-          status = parseInt(value) > 100 ? 'warning' : parseInt(value) > 110 ? 'critical' : 'normal';
+        case '0105': {
+          const temp = A - 40;
+          value = temp.toString();
+          status = temp > 100 ? 'warning' : temp > 110 ? 'critical' : 'normal';
           break;
+        }
         case '221C30':
-        case '221C31':
-          value = Math.round((A * 256 + B) * 0.75 - 48).toString();
-          status = parseInt(value) > 600 ? 'warning' : 'normal';
+        case '221C31': {
+          const dpfTemp = Math.round((A * 256 + B) * 0.75 - 48);
+          value = dpfTemp.toString();
+          status = dpfTemp > 600 ? 'warning' : 'normal';
           break;
-        case '221C34':
-          value = Math.round((A * 256 + B) / 100).toString();
-          status = parseInt(value) > 80 ? 'critical' : parseInt(value) > 60 ? 'warning' : 'normal';
+        }
+        case '221C34': {
+          const soot = Math.round((A * 256 + B) / 100);
+          value = soot.toString();
+          status = soot > 80 ? 'critical' : soot > 60 ? 'warning' : 'normal';
           break;
+        }
         default:
           value = A.toString();
       }
@@ -246,50 +381,57 @@ const Peugeot307AdvancedPanel: React.FC<Peugeot307AdvancedPanelProps> = ({ isCon
     };
   };
 
-  const generateMockPIDReading = (pid: any): PidReading => {
+  const generateMockPIDReading = (pid: { pid: string; name: string; unit: string; category: string; }): PidReading => {
     let value = '';
     let status: 'normal' | 'warning' | 'critical' = 'normal';
 
     switch (pid.pid) {
-      case '010C':
+      case '010C': {
         const rpm = 800 + Math.random() * 1000;
         value = Math.round(rpm).toString();
         status = rpm > 4000 ? 'warning' : 'normal';
         break;
+      }
       case '010D':
         value = Math.round(Math.random() * 60).toString();
         break;
-      case '0105':
+      case '0105': {
         const temp = 85 + Math.random() * 15;
         value = Math.round(temp).toString();
         status = temp > 100 ? 'warning' : temp > 110 ? 'critical' : 'normal';
         break;
+      }
       case '221C30':
-      case '221C31':
+      case '221C31': {
         const dpfTemp = 350 + Math.random() * 200;
         value = Math.round(dpfTemp).toString();
         status = dpfTemp > 600 ? 'warning' : 'normal';
         break;
-      case '221C34':
+      }
+      case '221C34': {
         const soot = Math.random() * 100;
         value = Math.round(soot).toString();
         status = soot > 80 ? 'critical' : soot > 60 ? 'warning' : 'normal';
         break;
-      case '221C50':
+      }
+      case '221C50': {
         const turbo = 1200 + Math.random() * 400;
         value = Math.round(turbo).toString();
         break;
-      case '221C60':
+      }
+      case '221C60': {
         const pressure = 1200 + Math.random() * 400;
         value = Math.round(pressure).toString();
         status = pressure < 800 ? 'warning' : pressure > 1800 ? 'warning' : 'normal';
         break;
+      }
       case '0142':
-      case '222260':
+      case '222260': {
         const voltage = 12.4 + Math.random() * 1.2;
         value = voltage.toFixed(1);
         status = voltage < 12.0 ? 'warning' : voltage < 11.5 ? 'critical' : 'normal';
         break;
+      }
       default:
         value = Math.round(Math.random() * 100).toString();
     }
@@ -502,7 +644,7 @@ const Peugeot307AdvancedPanel: React.FC<Peugeot307AdvancedPanelProps> = ({ isCon
   };
 
   const getCategoryIcon = (category: string) => {
-    const icons: { [key: string]: any } = {
+    const icons: { [key: string]: React.ElementType } = {
       engine: Car,
       fuel: Droplets,
       turbo: Wind,

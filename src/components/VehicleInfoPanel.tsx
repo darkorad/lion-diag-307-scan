@@ -33,13 +33,7 @@ const VehicleInfoPanel: React.FC<VehicleInfoPanelProps> = ({ isConnected, onBack
   });
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    if (isConnected) {
-      fetchVehicleInfo();
-    }
-  }, [isConnected]);
-
-  const fetchVehicleInfo = async () => {
+  const fetchVehicleInfo = React.useCallback(async () => {
     if (!isConnected) return;
     
     setIsLoading(true);
@@ -53,7 +47,13 @@ const VehicleInfoPanel: React.FC<VehicleInfoPanelProps> = ({ isConnected, onBack
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [isConnected]);
+
+  useEffect(() => {
+    if (isConnected) {
+      fetchVehicleInfo();
+    }
+  }, [isConnected, fetchVehicleInfo]);
 
   return (
     <div className="space-y-6">

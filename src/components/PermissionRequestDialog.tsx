@@ -39,9 +39,9 @@ const PermissionRequestDialog: React.FC<PermissionRequestDialogProps> = ({
       checkCurrentPermissions();
       setHasCheckedInitial(true);
     }
-  }, [open, hasCheckedInitial]);
+  }, [open, hasCheckedInitial, checkCurrentPermissions]);
 
-  const checkCurrentPermissions = async () => {
+  const checkCurrentPermissions = useCallback(async () => {
     try {
       const status = await permissionService.checkPermissionStatus();
       setPermissionStatus(status);
@@ -54,7 +54,7 @@ const PermissionRequestDialog: React.FC<PermissionRequestDialogProps> = ({
     } catch (error) {
       console.error('Error checking permissions:', error);
     }
-  };
+  }, [onPermissionsGranted, onOpenChange]);
 
   const handleRequestPermissions = async () => {
     setIsRequesting(true);

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import StartScreen from '@/components/StartScreen';
@@ -14,6 +13,7 @@ import { bluetoothIntegrationService, BluetoothIntegrationResult } from '@/servi
 import { masterBluetoothService, BluetoothDevice } from '@/services/MasterBluetoothService';
 import { permissionService } from '@/services/PermissionService';
 import { Button } from '@/components/ui/button';
+import DTCPanel from '@/components/DTCPanel';
 
 const Index = () => {
   const [currentView, setCurrentView] = useState('start'); // Fixed: Always start with start screen
@@ -151,10 +151,7 @@ const Index = () => {
         );
       case 'trouble-codes':
         return (
-          <TroubleCodesPanel
-            isConnected={isConnected}
-            onBack={handleBack}
-          />
+          <DTCPanel />
         );
       case 'vehicle-info':
         return (

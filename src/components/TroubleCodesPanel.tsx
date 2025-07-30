@@ -31,7 +31,7 @@ interface TroubleCode {
   system: string;
   severity: 'low' | 'medium' | 'high' | 'critical';
   firstDetected: string;
-  freezeFrameData?: any;
+  freezeFrameData?: Record<string, unknown>;
   symptoms?: string[];
   possibleCauses?: string[];
   repairSuggestions?: string[];

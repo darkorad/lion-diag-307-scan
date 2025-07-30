@@ -31,10 +31,10 @@ import { useToast } from '@/hooks/use-toast';
 
 interface VehicleCodingPanelProps {
   isConnected: boolean;
-  vehicleInfo?: any;
+  vehicleInfo?: Record<string, unknown>;
 }
 
-const VehicleCodingPanel: React.FC<VehicleCodingPanelProps> = ({ isConnected, vehicleInfo }) => {
+const VehicleCodingPanel: React.FC<VehicleCodingPanelProps> = ({ isConnected }) => {
   const [isCoding, setIsCoding] = useState(false);
   const [currentModule, setCurrentModule] = useState('bcm');
   const [codingProgress, setCodingProgress] = useState(0);
@@ -42,7 +42,7 @@ const VehicleCodingPanel: React.FC<VehicleCodingPanelProps> = ({ isConnected, ve
   const [customValues, setCustomValues] = useState<{ [key: string]: string }>({});
   const { toast } = useToast();
 
-  const vehicleModules = [
+  const vehicleModules = React.useMemo(() => [
     {
       id: 'bcm',
       name: 'Body Control Module',
@@ -122,15 +122,9 @@ const VehicleCodingPanel: React.FC<VehicleCodingPanelProps> = ({ isConnected, ve
         { id: 'perimeter_alarm', name: 'Perimeter Alarm', type: 'boolean', value: false }
       ]
     }
-  ];
+  ], []);
 
-  useEffect(() => {
-    if (isConnected) {
-      loadCurrentCoding();
-    }
-  }, [isConnected, currentModule]);
-
-  const loadCurrentCoding = async () => {
+  const loadCurrentCoding = React.useCallback(async () => {
     // Simulate loading current vehicle coding
     const module = vehicleModules.find(m => m.id === currentModule);
     if (module) {
@@ -148,7 +142,13 @@ const VehicleCodingPanel: React.FC<VehicleCodingPanelProps> = ({ isConnected, ve
       setHiddenFeatures(features);
       setCustomValues(values);
     }
-  };
+  }, [currentModule, vehicleModules]);
+
+  useEffect(() => {
+    if (isConnected) {
+      loadCurrentCoding();
+    }
+  }, [isConnected, loadCurrentCoding]);
 
   const applyVehicleCoding = async () => {
     if (!isConnected) {
@@ -238,7 +238,13 @@ const VehicleCodingPanel: React.FC<VehicleCodingPanelProps> = ({ isConnected, ve
     }
   };
 
-  const renderFeatureControl = (feature: any) => {
+  const renderFeatureControl = (feature: {
+    id: string;
+    name: string;
+    type: string;
+    value: string | boolean;
+    options?: string[];
+  }) => {
     const module = vehicleModules.find(m => m.id === currentModule);
     if (!module) return null;
 

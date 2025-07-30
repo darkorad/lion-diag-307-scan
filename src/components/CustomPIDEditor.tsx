@@ -124,11 +124,12 @@ export const CustomPIDEditor: React.FC<CustomPIDEditorProps> = ({ onPIDSave }) =
     let filename = '';
 
     switch (format) {
-      case 'json':
+      case 'json': {
         content = JSON.stringify(customPIDs, null, 2);
         filename = 'custom_pids.json';
         break;
-      case 'csv':
+      }
+      case 'csv': {
         const headers = 'Name,PID,Unit,Formula,Min,Max,Manufacturer,Category,Description\n';
         const rows = customPIDs.map(pid => 
           `"${pid.name}","${pid.pid}","${pid.unit}","${pid.formula}",${pid.minValue},${pid.maxValue},"${pid.manufacturer}","${pid.category}","${pid.description}"`
@@ -136,12 +137,14 @@ export const CustomPIDEditor: React.FC<CustomPIDEditorProps> = ({ onPIDSave }) =
         content = headers + rows;
         filename = 'custom_pids.csv';
         break;
-      case 'xml':
+      }
+      case 'xml': {
         content = `<?xml version="1.0" encoding="UTF-8"?>\n<pids>\n${customPIDs.map(pid => 
           `  <pid>\n    <name>${pid.name}</name>\n    <id>${pid.pid}</id>\n    <unit>${pid.unit}</unit>\n    <formula>${pid.formula}</formula>\n    <min>${pid.minValue}</min>\n    <max>${pid.maxValue}</max>\n    <manufacturer>${pid.manufacturer}</manufacturer>\n    <category>${pid.category}</category>\n    <description>${pid.description}</description>\n  </pid>`
         ).join('\n')}\n</pids>`;
         filename = 'custom_pids.xml';
         break;
+      }
     }
 
     const blob = new Blob([content], { type: 'text/plain' });

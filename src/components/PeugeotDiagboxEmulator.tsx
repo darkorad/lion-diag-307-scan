@@ -84,7 +84,7 @@ const PeugeotDiagboxEmulator: React.FC<PeugeotDiagboxEmulatorProps> = ({ isConne
   const [advancedFunctions, setAdvancedFunctions] = useState<AdvancedFunction[]>([]);
 
   // Peugeot ECU modules database
-  const peugeotECUs: ECUModule[] = [
+  const peugeotECUs: ECUModule[] = React.useMemo(() => [
     { id: 'bsi', name: 'BSI (Built-in Systems Interface)', address: '00', status: 'ok', category: 'body', hasAdvancedFunctions: true, supportsCoding: true },
     { id: 'engine', name: 'Engine Control Module (ECM)', address: '01', status: 'ok', category: 'engine', hasAdvancedFunctions: true, supportsCoding: true },
     { id: 'abs', name: 'ABS/ESP Control Module', address: '03', status: 'ok', category: 'chassis', hasAdvancedFunctions: true, supportsCoding: false },
@@ -105,10 +105,10 @@ const PeugeotDiagboxEmulator: React.FC<PeugeotDiagboxEmulatorProps> = ({ isConne
     { id: 'door_modules', name: 'Door Control Modules', address: '42', status: 'ok', category: 'body', hasAdvancedFunctions: true, supportsCoding: true },
     { id: 'seat_memory', name: 'Seat Memory Module', address: '72', status: 'unavailable', category: 'comfort', hasAdvancedFunctions: true, supportsCoding: true },
     { id: 'rain_light', name: 'Rain/Light Sensor', address: '77', status: 'ok', category: 'comfort', hasAdvancedFunctions: true, supportsCoding: true }
-  ];
+  ], []);
 
   // Hidden/Advanced functions database
-  const peugeotHiddenFunctions: HiddenFunction[] = [
+  const peugeotHiddenFunctions: HiddenFunction[] = React.useMemo(() => [
     // BSI Functions
     { id: 'bsi_daytime_running', name: 'Daytime Running Lights', description: 'Enable/disable DRL', unlock: false, category: 'lighting', command: '3B8901', enabled: true },
     { id: 'bsi_auto_lights', name: 'Automatic Headlights', description: 'Auto headlight activation', unlock: false, category: 'lighting', command: '3B8501', enabled: true },
@@ -145,10 +145,10 @@ const PeugeotDiagboxEmulator: React.FC<PeugeotDiagboxEmulatorProps> = ({ isConne
     { id: 'security_volumetric_sensor', name: 'Volumetric Alarm Sensor', description: 'Interior movement detection', unlock: true, category: 'security', command: '3BA301', enabled: false },
     { id: 'security_perimetric_only', name: 'Perimetric Alarm Only', description: 'Disable volumetric, keep perimetric', unlock: false, category: 'security', command: '3BA401', enabled: false },
     { id: 'security_plip_distance', name: 'Remote Key Range', description: 'Adjust remote key operating range', unlock: true, category: 'security', command: '3BA501', enabled: false }
-  ];
+  ], []);
 
   // Advanced functions per ECU
-  const ecuAdvancedFunctions: { [key: string]: AdvancedFunction[] } = {
+  const ecuAdvancedFunctions: { [key: string]: AdvancedFunction[] } = React.useMemo(() => ({
     bsi: [
       { id: 'bsi_learn_keys', name: 'Learn New Keys', description: 'Program new remote keys', ecuId: 'bsi', category: 'security', command: '3101', riskLevel: 'high', requiresPin: true },
       { id: 'bsi_delete_keys', name: 'Delete All Keys', description: 'Remove all programmed keys', ecuId: 'bsi', category: 'security', command: '3102', riskLevel: 'high', requiresPin: true },
@@ -175,15 +175,9 @@ const PeugeotDiagboxEmulator: React.FC<PeugeotDiagboxEmulatorProps> = ({ isConne
       { id: 'climate_actuator_test', name: 'Actuator Test', description: 'Test all climate actuators', ecuId: 'climate', category: 'testing', command: '2F11', riskLevel: 'low' },
       { id: 'climate_reset_learn', name: 'Reset Climate Learning', description: 'Reset learned climate values', ecuId: 'climate', category: 'maintenance', command: '3107', riskLevel: 'low' }
     ]
-  };
+  }), []);
 
-  useEffect(() => {
-    if (isConnected) {
-      scanECUModules();
-    }
-  }, [isConnected]);
-
-  const scanECUModules = async () => {
+  const scanECUModules = React.useCallback(async () => {
     setIsScanning(true);
     setScanProgress(0);
     
@@ -225,7 +219,13 @@ const PeugeotDiagboxEmulator: React.FC<PeugeotDiagboxEmulatorProps> = ({ isConne
       setIsScanning(false);
       setScanProgress(0);
     }
-  };
+  }, [peugeotECUs, peugeotHiddenFunctions]);
+
+  useEffect(() => {
+    if (isConnected) {
+      scanECUModules();
+    }
+  }, [isConnected, scanECUModules]);
 
   const authenticateWithPin = async () => {
     try {
@@ -295,7 +295,7 @@ const PeugeotDiagboxEmulator: React.FC<PeugeotDiagboxEmulatorProps> = ({ isConne
   };
 
   const getCategoryIcon = (category: string) => {
-    const icons: { [key: string]: any } = {
+    const icons: { [key: string]: React.ElementType } = {
       engine: Car,
       body: Cpu,
       chassis: Settings,
@@ -324,7 +324,7 @@ const PeugeotDiagboxEmulator: React.FC<PeugeotDiagboxEmulatorProps> = ({ isConne
     } else {
       setAdvancedFunctions([]);
     }
-  }, [selectedEcu]);
+  }, [selectedEcu, ecuAdvancedFunctions]);
 
   return (
     <div className="space-y-6">

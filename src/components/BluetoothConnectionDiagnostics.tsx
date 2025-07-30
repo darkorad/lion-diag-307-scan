@@ -43,13 +43,13 @@ const BluetoothConnectionDiagnostics: React.FC<BluetoothConnectionDiagnosticsPro
 
   useEffect(() => {
     checkBluetoothStatus();
+  }, [checkBluetoothStatus]);
+
+  const addDiagnosticInfo = useCallback((message: string) => {
+    setDiagnosticInfo(prev => [...prev.slice(-9), `${new Date().toLocaleTimeString()}: ${message}`]);
   }, []);
 
-  const addDiagnosticInfo = (message: string) => {
-    setDiagnosticInfo(prev => [...prev.slice(-9), `${new Date().toLocaleTimeString()}: ${message}`]);
-  };
-
-  const checkBluetoothStatus = async () => {
+  const checkBluetoothStatus = useCallback(async () => {
     addDiagnosticInfo('Checking Bluetooth status...');
     try {
       const status = await enhancedBluetoothService.checkBluetoothStatus();
@@ -65,9 +65,9 @@ const BluetoothConnectionDiagnostics: React.FC<BluetoothConnectionDiagnosticsPro
       addDiagnosticInfo(`Bluetooth check failed: ${error}`);
       console.error('Bluetooth check failed:', error);
     }
-  };
+  }, [addDiagnosticInfo, loadPairedDevices]);
 
-  const loadPairedDevices = async () => {
+  const loadPairedDevices = useCallback(async () => {
     try {
       addDiagnosticInfo('Loading paired devices...');
       const devices = await enhancedBluetoothService.getPairedDevices();
@@ -77,7 +77,7 @@ const BluetoothConnectionDiagnostics: React.FC<BluetoothConnectionDiagnosticsPro
       addDiagnosticInfo(`Failed to load paired devices: ${error}`);
       console.error('Failed to load paired devices:', error);
     }
-  };
+  }, [addDiagnosticInfo]);
 
   const handleDiscoverDevices = async () => {
     setIsScanning(true);

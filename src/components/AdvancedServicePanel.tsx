@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,7 +31,7 @@ interface ServiceFunction {
   name: string;
   description: string;
   category: string;
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<{ className?: string }>;
   command: string;
   parameters?: ServiceParameter[];
   riskLevel: 'low' | 'medium' | 'high';
@@ -46,14 +45,18 @@ interface ServiceParameter {
   options?: string[];
   min?: number;
   max?: number;
-  default?: any;
+  default?: string | number | boolean;
   unit?: string;
 }
 
 interface AdvancedServicePanelProps {
   isConnected: boolean;
   onCommand?: (command: string) => Promise<string>;
-  vehicleInfo?: any;
+  vehicleInfo?: {
+    make: string;
+    model: string;
+    year: number;
+  };
 }
 
 export const AdvancedServicePanel: React.FC<AdvancedServicePanelProps> = ({
@@ -63,8 +66,8 @@ export const AdvancedServicePanel: React.FC<AdvancedServicePanelProps> = ({
 }) => {
   const [activeService, setActiveService] = useState<string | null>(null);
   const [serviceProgress, setServiceProgress] = useState(0);
-  const [serviceResults, setServiceResults] = useState<{ [key: string]: any }>({});
-  const [parameters, setParameters] = useState<{ [key: string]: any }>({});
+  const [serviceResults, setServiceResults] = useState<{ [key: string]: { success: boolean; response: string; timestamp: Date; duration: number } }>({});
+  const [parameters, setParameters] = useState<{ [key: string]: string | number | boolean }>({});
 
   const serviceFunctions: ServiceFunction[] = [
     // Oil Service Functions
@@ -303,7 +306,7 @@ export const AdvancedServicePanel: React.FC<AdvancedServicePanelProps> = ({
         for (const param of service.parameters) {
           const value = parameters[`${service.id}_${param.name}`] || param.default;
           // Convert parameter to hex if needed
-          command += value.toString(16).padStart(2, '0');
+          command += (value as string | number).toString(16).padStart(2, '0');
         }
       }
 
@@ -367,7 +370,7 @@ export const AdvancedServicePanel: React.FC<AdvancedServicePanelProps> = ({
     }
   };
 
-  const getRiskLevelVariant = (level: string) => {
+  const getRiskLevelVariant = (level: string): 'secondary' | 'default' | 'destructive' | 'outline' => {
     switch (level) {
       case 'low': return 'secondary';
       case 'medium': return 'default';
@@ -460,7 +463,7 @@ export const AdvancedServicePanel: React.FC<AdvancedServicePanelProps> = ({
                                     type="number"
                                     min={param.min}
                                     max={param.max}
-                                    defaultValue={param.default}
+                                    defaultValue={param.default as number}
                                     onChange={(e) => setParameters(prev => ({
                                       ...prev,
                                       [`${service.id}_${param.name}`]: Number(e.target.value)
@@ -468,7 +471,7 @@ export const AdvancedServicePanel: React.FC<AdvancedServicePanelProps> = ({
                                   />
                                 ) : param.type === 'select' ? (
                                   <Select
-                                    defaultValue={param.default}
+                                    defaultValue={param.default as string}
                                     onValueChange={(value) => setParameters(prev => ({
                                       ...prev,
                                       [`${service.id}_${param.name}`]: value

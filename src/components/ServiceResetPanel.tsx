@@ -24,7 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 
 interface ServiceResetPanelProps {
   isConnected: boolean;
-  vehicleInfo?: any;
+  vehicleInfo?: Record<string, unknown>;
 }
 
 const ServiceResetPanel: React.FC<ServiceResetPanelProps> = ({ isConnected, vehicleInfo }) => {
@@ -34,7 +34,7 @@ const ServiceResetPanel: React.FC<ServiceResetPanelProps> = ({ isConnected, vehi
   const [supportedResets, setSupportedResets] = useState<string[]>([]);
   const { toast } = useToast();
 
-  const serviceResets = [
+  const serviceResets = React.useMemo(() => [
     {
       id: 'oil',
       name: 'Oil Service Reset',
@@ -131,21 +131,21 @@ const ServiceResetPanel: React.FC<ServiceResetPanelProps> = ({ isConnected, vehi
       category: 'suspension',
       supported: false
     }
-  ];
+  ], []);
 
-  useEffect(() => {
-    if (isConnected) {
-      checkSupportedResets();
-    }
-  }, [isConnected, vehicleInfo]);
-
-  const checkSupportedResets = async () => {
+  const checkSupportedResets = React.useCallback(async () => {
     // Simulate checking which resets are supported by the vehicle
     const supported = serviceResets
       .filter(reset => reset.supported)
       .map(reset => reset.id);
     setSupportedResets(supported);
-  };
+  }, [serviceResets]);
+
+  useEffect(() => {
+    if (isConnected) {
+      checkSupportedResets();
+    }
+  }, [isConnected, vehicleInfo, checkSupportedResets]);
 
   const performServiceReset = async (resetType: string) => {
     if (!isConnected) {
@@ -271,7 +271,14 @@ const ServiceResetPanel: React.FC<ServiceResetPanelProps> = ({ isConnected, vehi
     { id: 'suspension', name: 'Suspension', icon: <Car className="h-4 w-4" /> }
   ];
 
-  const renderResetCard = (reset: any) => {
+  const renderResetCard = (reset: {
+    id: string;
+    name: string;
+    description: string;
+    icon: JSX.Element;
+    category: string;
+    supported: boolean;
+  }) => {
     const isSupported = supportedResets.includes(reset.id);
     const isInProgress = isPerformingReset && lastResetType === reset.id;
 

@@ -18,7 +18,7 @@ export interface ConnectionResult {
   success: boolean;
   error?: string;
   protocol?: string;
-  deviceInfo?: any;
+  deviceInfo?: BluetoothDevice;
   strategy?: string;
   connectionTime?: number;
 }
@@ -204,9 +204,9 @@ export class MasterBluetoothService {
     return Math.min(score, 100);
   }
 
-  private calculateConnectionQuality(device: any): 'excellent' | 'good' | 'fair' | 'poor' {
+  private calculateConnectionQuality(device: { name?: string; rssi?: number }): 'excellent' | 'good' | 'fair' | 'poor' {
     const compatibility = this.calculateCompatibility(device.name || '');
-    const rssi = device.rssi || -70;
+    const rssi = device.rssi ?? -70;
     
     if (compatibility >= 80 && rssi > -50) return 'excellent';
     if (compatibility >= 60 && rssi > -60) return 'good';
@@ -352,7 +352,7 @@ export class MasterBluetoothService {
     };
   }
 
-  private async establishConnectionWithStrategy(device: BluetoothDevice, strategy: any): Promise<boolean> {
+  private async establishConnectionWithStrategy(device: BluetoothDevice, strategy: { name: string; timeout: number; method: 'connect' | 'connectInsecure' }): Promise<boolean> {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         reject(new Error(`${strategy.name} connection timeout after ${strategy.timeout}ms`));
@@ -364,7 +364,7 @@ export class MasterBluetoothService {
         resolve(true);
       };
 
-      const onError = (error: any) => {
+      const onError = (error: unknown) => {
         clearTimeout(timeout);
         const errorMsg = typeof error === 'string' ? error : JSON.stringify(error);
         reject(new Error(`${strategy.name} connection failed: ${errorMsg}`));
@@ -484,8 +484,8 @@ export class MasterBluetoothService {
       deviceName: device.name,
       timestamp: Date.now(),
       success,
-      strategy,
-      error
+      strategy: strategy,
+      error: error
     };
     
     this.connectionHistory.push(connectionAttempt);

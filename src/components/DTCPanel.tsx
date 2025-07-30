@@ -37,9 +37,9 @@ const DTCPanel: React.FC<DTCPanelProps> = ({ isConnected, onBack }) => {
     if (isConnected) {
       fetchAllDTCs();
     }
-  }, [isConnected]);
+  }, [isConnected, fetchAllDTCs]);
 
-  const fetchAllDTCs = async () => {
+  const fetchAllDTCs = useCallback(async () => {
     if (!isConnected) return;
     
     setIsLoading(true);
@@ -61,7 +61,7 @@ const DTCPanel: React.FC<DTCPanelProps> = ({ isConnected, onBack }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [isConnected]);
 
   const clearDTCs = async () => {
     setIsClearingCodes(true);

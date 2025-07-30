@@ -361,7 +361,7 @@ export class UnifiedBluetoothService {
     }
   }
 
-  private async attemptConnectionWithTimeout(device: BluetoothDevice, method: string, timeout: number): Promise<void> {
+  private async establishConnectionWithStrategy(device: BluetoothDevice, strategy: { name: string; timeout: number; method: 'connect' | 'connectInsecure' }): Promise<boolean> {
     return new Promise((resolve, reject) => {
       const timeoutId = setTimeout(() => {
         reject(new Error(`${method} connection timeout after ${timeout}ms`));
@@ -373,7 +373,7 @@ export class UnifiedBluetoothService {
         resolve();
       };
 
-      const onError = (error: any) => {
+      const onError = (error: unknown) => {
         clearTimeout(timeoutId);
         const errorMsg = typeof error === 'string' ? error : JSON.stringify(error);
         reject(new Error(`${method} connection failed: ${errorMsg}`));

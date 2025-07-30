@@ -24,7 +24,7 @@ interface DiagnosticTool {
   manufacturer: string;
   description: string;
   features: string[];
-  icon: any;
+  icon: React.ElementType;
   supported: boolean;
   comingSoon?: boolean;
 }

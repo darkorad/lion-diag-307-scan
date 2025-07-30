@@ -1,4 +1,12 @@
 import { BluetoothDevice } from '@/services/MasterBluetoothService';
+import {
+  ConnectionError,
+  BluetoothNotAvailableError,
+  ConnectionFailedError,
+  NoDataReceivedError,
+  handleError
+} from './connection-errors';
+import { obd2Service } from './OBD2Service';
 
 export interface ConnectionState {
   isConnected: boolean;
@@ -6,6 +14,7 @@ export interface ConnectionState {
   connectionTime: number | null;
   lastSeen: number | null;
   connectionQuality: 'excellent' | 'good' | 'fair' | 'poor' | null;
+  error: ConnectionError | null;
 }
 
 export interface ConnectionHistory {
@@ -25,7 +34,8 @@ export class BluetoothConnectionManager {
     device: null,
     connectionTime: null,
     lastSeen: null,
-    connectionQuality: null
+    connectionQuality: null,
+    error: null,
   };
   
   private connectionHistory: ConnectionHistory[] = [];
@@ -40,10 +50,8 @@ export class BluetoothConnectionManager {
     return BluetoothConnectionManager.instance;
   }
 
-  // Subscribe to connection state changes
   subscribe(listener: (state: ConnectionState) => void): () => void {
     this.listeners.add(listener);
-    // Immediately call with current state
     listener(this.connectionState);
     
     return () => {
@@ -51,12 +59,10 @@ export class BluetoothConnectionManager {
     };
   }
 
-  // Notify all listeners of state changes
   private notifyListeners(): void {
     this.listeners.forEach(listener => listener(this.connectionState));
   }
 
-  // Set connection state (called by bluetooth services)
   setConnected(device: BluetoothDevice): void {
     const now = Date.now();
     
@@ -65,58 +71,42 @@ export class BluetoothConnectionManager {
       device,
       connectionTime: now,
       lastSeen: now,
-      connectionQuality: 'good'
+      connectionQuality: 'good',
+      error: null,
     };
     
     this.startHeartbeat();
     this.notifyListeners();
-    
-    console.log('Connection manager: Device connected', device.name);
-    
-    // Save to localStorage for persistence
     this.saveConnectionState();
   }
 
-  // Set disconnected state
-  setDisconnected(): void {
+  setDisconnected(error?: ConnectionError): void {
     if (this.connectionState.isConnected && this.connectionState.device) {
-      // Add to history
-      this.addToHistory(this.connectionState.device, true, true);
+      this.addToHistory(this.connectionState.device, !error, !!error);
     }
     
     this.connectionState = {
+      ...this.connectionState,
       isConnected: false,
-      device: null,
       connectionTime: null,
-      lastSeen: null,
-      connectionQuality: null
+      connectionQuality: null,
+      error: error || null,
     };
     
     this.stopHeartbeat();
     this.notifyListeners();
-    
-    console.log('Connection manager: Device disconnected');
-    
-    // Clear from localStorage
     this.clearConnectionState();
   }
 
-  // Update connection quality based on communication
   updateConnectionQuality(latency: number, success: boolean): void {
     if (!this.connectionState.isConnected) return;
     
     this.connectionState.lastSeen = Date.now();
     
     if (success) {
-      if (latency < 500) {
-        this.connectionState.connectionQuality = 'excellent';
-      } else if (latency < 1000) {
-        this.connectionState.connectionQuality = 'good';
-      } else if (latency < 2000) {
-        this.connectionState.connectionQuality = 'fair';
-      } else {
-        this.connectionState.connectionQuality = 'poor';
-      }
+      if (latency < 250) this.connectionState.connectionQuality = 'excellent';
+      else if (latency < 750) this.connectionState.connectionQuality = 'good';
+      else this.connectionState.connectionQuality = 'fair';
     } else {
       this.connectionState.connectionQuality = 'poor';
     }
@@ -124,22 +114,6 @@ export class BluetoothConnectionManager {
     this.notifyListeners();
   }
 
-  // Get current connection state
-  getConnectionState(): ConnectionState {
-    return { ...this.connectionState };
-  }
-
-  // Check if connected (used by other services)
-  isConnected(): boolean {
-    return this.connectionState.isConnected;
-  }
-
-  // Get connected device
-  getConnectedDevice(): BluetoothDevice | null {
-    return this.connectionState.device;
-  }
-
-  // Start heartbeat to monitor connection
   private startHeartbeat(): void {
     this.stopHeartbeat();
     
@@ -150,9 +124,8 @@ export class BluetoothConnectionManager {
       }
       
       try {
-        // Test connection with a simple command
         const startTime = Date.now();
-        await this.testConnection();
+        await obd2Service.sendCommandPublic('ATI'); // Simple command
         const latency = Date.now() - startTime;
         
         this.updateConnectionQuality(latency, true);
@@ -160,15 +133,13 @@ export class BluetoothConnectionManager {
         
       } catch (error) {
         console.warn('Heartbeat failed:', error);
-        this.updateConnectionQuality(5000, false);
+        this.updateConnectionQuality(2000, false);
         
-        // If we haven't had a successful heartbeat in 30 seconds, consider disconnected
-        if (Date.now() - this.lastHeartbeat > 30000) {
-          console.error('Connection lost - no heartbeat for 30 seconds');
-          this.setDisconnected();
+        if (Date.now() - this.lastHeartbeat > 20000) {
+          this.setDisconnected(new ConnectionFailedError('Device', 'Connection lost'));
         }
       }
-    }, 10000); // Check every 10 seconds
+    }, 5000); // Check every 5 seconds
   }
 
   private stopHeartbeat(): void {
@@ -178,37 +149,6 @@ export class BluetoothConnectionManager {
     }
   }
 
-  // Test connection with OBD2 device
-  private async testConnection(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (!window.bluetoothSerial) {
-        reject(new Error('Bluetooth not available'));
-        return;
-      }
-
-      // Send simple AT command to test connection
-      window.bluetoothSerial.write('ATI\r', 
-        () => {
-          // Wait for response
-          setTimeout(() => {
-            window.bluetoothSerial.read(
-              (data) => {
-                if (data && data.length > 0) {
-                  resolve();
-                } else {
-                  reject(new Error('No response'));
-                }
-              },
-              () => reject(new Error('Read failed'))
-            );
-          }, 100);
-        },
-        () => reject(new Error('Write failed'))
-      );
-    });
-  }
-
-  // Add connection to history
   private addToHistory(device: BluetoothDevice, success: boolean, dataReceived: boolean): void {
     const now = Date.now();
     const duration = this.connectionState.connectionTime ? now - this.connectionState.connectionTime : 0;
@@ -225,27 +165,23 @@ export class BluetoothConnectionManager {
     
     this.connectionHistory.unshift(historyEntry);
     
-    // Keep only last 50 entries
-    if (this.connectionHistory.length > 50) {
-      this.connectionHistory = this.connectionHistory.slice(0, 50);
+    if (this.connectionHistory.length > 20) {
+      this.connectionHistory = this.connectionHistory.slice(0, 20);
     }
     
-    // Save to localStorage
     this.saveConnectionHistory();
   }
 
-  // Get connection history
   getConnectionHistory(): ConnectionHistory[] {
     return [...this.connectionHistory];
   }
 
-  // Clear connection history
   clearConnectionHistory(): void {
     this.connectionHistory = [];
     localStorage.removeItem('obd2_connection_history');
+    this.notifyListeners(); // To update UI
   }
 
-  // Save connection state to localStorage
   private saveConnectionState(): void {
     try {
       const state = {
@@ -259,12 +195,10 @@ export class BluetoothConnectionManager {
     }
   }
 
-  // Clear connection state from localStorage
   private clearConnectionState(): void {
     localStorage.removeItem('obd2_connection_state');
   }
 
-  // Save connection history to localStorage
   private saveConnectionHistory(): void {
     try {
       localStorage.setItem('obd2_connection_history', JSON.stringify(this.connectionHistory));
@@ -273,7 +207,6 @@ export class BluetoothConnectionManager {
     }
   }
 
-  // Load connection history from localStorage
   loadConnectionHistory(): void {
     try {
       const stored = localStorage.getItem('obd2_connection_history');
@@ -286,30 +219,22 @@ export class BluetoothConnectionManager {
     }
   }
 
-  // Initialize manager (call on app start)
   initialize(): void {
     this.loadConnectionHistory();
-    console.log('Bluetooth Connection Manager initialized');
   }
 
-  // Force refresh connection state (for manual sync)
   async refreshConnectionState(): Promise<void> {
-    if (!window.bluetoothSerial) return;
-
-    try {
-      // Check if bluetooth serial thinks we're connected
-      await this.testConnection();
-      
-      if (!this.connectionState.isConnected) {
-        console.log('Found active connection, syncing state...');
-        // We have an active connection but our state doesn't reflect it
-        // This shouldn't happen with proper state management, but we can recover
-      }
-    } catch (error) {
+    if (!obd2Service.isDeviceConnected()) {
       if (this.connectionState.isConnected) {
-        console.log('Connection test failed, updating state...');
         this.setDisconnected();
       }
+      return;
+    }
+
+    try {
+      await obd2Service.sendCommandPublic('ATI');
+    } catch (error) {
+      this.setDisconnected(handleError(error));
     }
   }
 }
