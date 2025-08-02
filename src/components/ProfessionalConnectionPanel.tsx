@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import QRCodeScanner from './QRCodeScanner';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -44,6 +45,7 @@ const ProfessionalConnectionPanel: React.FC<ProfessionalConnectionPanelProps> = 
   const [scanProgress, setScanProgress] = useState(0);
   const [connectionHistory, setConnectionHistory] = useState<ConnectionResult[]>([]);
   const [connectionResult, setConnectionResult] = useState<ConnectionResult | null>(null);
+  const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
 
   const checkCurrentConnection = React.useCallback(() => {
     const status = masterBluetoothService.getConnectionStatus();
@@ -281,6 +283,14 @@ const ProfessionalConnectionPanel: React.FC<ProfessionalConnectionPanelProps> = 
                       Find All OBD2 Devices
                     </>
                   )}
+            </Button>
+            <Button
+              onClick={() => setIsQrScannerOpen(true)}
+              disabled={isScanning || isConnected}
+              className="flex-1"
+            >
+              <Car className="mr-2 h-4 w-4" />
+              Scan QR Code
                 </Button>
               </div>
 
@@ -458,6 +468,21 @@ const ProfessionalConnectionPanel: React.FC<ProfessionalConnectionPanelProps> = 
           </Card>
         </TabsContent>
       </Tabs>
+      <QRCodeScanner
+        isOpen={isQrScannerOpen}
+        onClose={() => setIsQrScannerOpen(false)}
+        onScan={(data) => {
+          if (data) {
+            // Assuming the QR code contains the device address
+            const device = devices.find((d) => d.address === data);
+            if (device) {
+              handleConnectDevice(device);
+            } else {
+              toast.error("Device not found");
+            }
+          }
+        }}
+      />
     </div>
   );
 };
