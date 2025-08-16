@@ -410,15 +410,16 @@ export class WorkingDiagnosticService {
       });
     }
 
-    // Add manufacturer specific PIDs - fix the type inference issue by explicit casting
-    const manufacturerPids = (MANUFACTURER_PIDS as ManufacturerPID[]).filter((pid: ManufacturerPID) => {
+    // Add manufacturer specific PIDs - properly type the filtered result
+    const allPids: ManufacturerPID[] = MANUFACTURER_PIDS;
+    const manufacturerPids: ManufacturerPID[] = allPids.filter((pid: ManufacturerPID) => {
       return pid != null && 
              pid.manufacturer != null && 
              Array.isArray(pid.manufacturer) && 
              pid.manufacturer.includes(manufacturer);
     });
     
-    // Add the first 6 PIDs if any are available
+    // Add the first 6 PIDs if any are available - now slice() will work correctly
     if (manufacturerPids.length > 0) {
       const availablePids = manufacturerPids.slice(0, 6);
       availablePids.forEach(pid => {
