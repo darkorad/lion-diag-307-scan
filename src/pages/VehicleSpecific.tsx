@@ -78,7 +78,15 @@ const VehicleSpecific = () => {
 
   const handleConnect = async () => {
     try {
-      const success = await mobileSafeBluetoothService.connectToDevice('');
+      // Create a mock device object for connection
+      const mockDevice = {
+        id: 'auto-connect',
+        address: '',
+        name: 'Auto Connect',
+        isPaired: false
+      };
+      
+      const success = await mobileSafeBluetoothService.connectToDevice(mockDevice);
       if (success) {
         setIsConnected(true);
         setConnectionStatus('Connected');

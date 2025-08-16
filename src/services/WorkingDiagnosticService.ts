@@ -412,9 +412,10 @@ export class WorkingDiagnosticService {
       });
     }
 
-    // Add service procedures - fix the slice issue by ensuring manufacturerPids is an array
-    const manufacturerPids = MANUFACTURER_PIDS.filter(pid => 
-      pid.manufacturer.includes(manufacturer)
+    // Add manufacturer specific PIDs - properly type the array
+    const allManufacturerPids: typeof MANUFACTURER_PIDS = MANUFACTURER_PIDS || [];
+    const manufacturerPids = allManufacturerPids.filter(pid => 
+      pid.manufacturer && pid.manufacturer.includes(manufacturer)
     );
     
     // Only slice if we have results
