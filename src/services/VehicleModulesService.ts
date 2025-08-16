@@ -153,7 +153,7 @@ export class VehicleModulesService {
     }
   }
 
-  isInitialized(): boolean {
+  getInitializationStatus(): boolean {
     return this.isInitialized;
   }
 }
