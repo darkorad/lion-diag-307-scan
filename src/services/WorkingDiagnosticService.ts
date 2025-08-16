@@ -413,13 +413,16 @@ export class WorkingDiagnosticService {
       });
     }
 
-    // Add manufacturer specific PIDs - fix the type issue
+    // Add manufacturer specific PIDs - fix the type issue with explicit typing
     if (MANUFACTURER_PIDS && Array.isArray(MANUFACTURER_PIDS)) {
       const manufacturerPids = MANUFACTURER_PIDS.filter(pid => 
-        pid && pid.manufacturer && Array.isArray(pid.manufacturer) && pid.manufacturer.includes(manufacturer)
+        pid && 
+        pid.manufacturer && 
+        Array.isArray(pid.manufacturer) && 
+        pid.manufacturer.includes(manufacturer)
       );
       
-      // Add the first 6 PIDs if any are available
+      // Add the first 6 PIDs if any are available - explicitly type the result
       if (manufacturerPids.length > 0) {
         const availablePids = manufacturerPids.slice(0, 6);
         availablePids.forEach(pid => {
