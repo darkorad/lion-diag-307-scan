@@ -1,3 +1,4 @@
+
 import { REAL_DTC_CODES, MANUFACTURER_PIDS, ACTUATOR_TESTS, SERVICE_PROCEDURES, VEHICLE_CODING } from '@/constants/realDiagnosticCodes';
 import type { ManufacturerPID } from '@/constants/realDiagnosticCodes';
 import { mobileSafeBluetoothService } from '@/services/MobileSafeBluetoothService';
@@ -344,13 +345,13 @@ export class WorkingDiagnosticService {
       });
     }
 
-    // Add manufacturer specific PIDs - Fixed with type assertion
-    const manufacturerPids = MANUFACTURER_PIDS.filter(pid => 
+    // Add manufacturer specific PIDs - Fixed with explicit typing
+    const manufacturerPids: ManufacturerPID[] = MANUFACTURER_PIDS.filter(pid => 
       Array.isArray(pid.manufacturer) && 
       pid.manufacturer.some(m => typeof m === 'string' && m.toLowerCase() === manufacturer.toLowerCase())
     ) as ManufacturerPID[];
     
-    const availablePids = manufacturerPids.slice(0, 6);
+    const availablePids: ManufacturerPID[] = manufacturerPids.slice(0, 6);
 
     availablePids.forEach(pid => {
       functions.push({
