@@ -13,14 +13,15 @@ import {
   ArrowLeft,
   CheckCircle,
   AlertCircle,
-  Smartphone
+  Smartphone,
+  Loader2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import PeugeotAlarmPanel from '@/components/PeugeotAlarmPanel';
-import BluetoothDeviceScanner from '@/components/BluetoothDeviceScanner';
-import { enhancedBluetoothService } from '@/obd2/enhanced-bluetooth-service';
-import { safeMasterBluetoothService } from '@/services/SafeMasterBluetoothService';
 import { toast } from 'sonner';
+import { safeMasterBluetoothService } from '@/services/SafeMasterBluetoothService';
+import { vehicleModulesService } from '@/services/VehicleModulesService';
+import BluetoothDeviceScanner from '@/components/BluetoothDeviceScanner';
+import PeugeotAlarmPanel from '@/components/PeugeotAlarmPanel';
 
 const VehicleSpecific: React.FC = () => {
   const navigate = useNavigate();
@@ -28,36 +29,54 @@ const VehicleSpecific: React.FC = () => {
   const [connectedDevice, setConnectedDevice] = useState<any>(null);
   const [selectedVehicle, setSelectedVehicle] = useState<string>('peugeot307');
   const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
-    // Safe initialization with error handling
+    let mounted = true;
+
     const initializePage = async () => {
       try {
         setIsLoading(true);
-        await checkConnection();
+        setHasError(false);
+        
+        console.log('Initializing Vehicle Specific page...');
+        
+        // Initialize services safely
+        await vehicleModulesService.initialize();
+        
+        // Check connection status
+        if (mounted) {
+          await checkConnection();
+        }
+        
       } catch (error) {
         console.error('Page initialization error:', error);
-        toast.error('Failed to check connection status');
+        if (mounted) {
+          setHasError(true);
+          toast.error('Failed to initialize page');
+        }
       } finally {
-        setIsLoading(false);
+        if (mounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     initializePage();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const checkConnection = async () => {
     try {
-      // Use safe bluetooth service to check actual connection
-      const status = await safeMasterBluetoothService.getConnectionStatus();
-      console.log('Connection status check:', status);
+      const status = safeMasterBluetoothService.getConnectionStatus();
+      console.log('Connection status:', status);
       
       setIsConnected(status.isConnected);
-      if (status.isConnected && status.device) {
-        setConnectedDevice(status.device);
-      } else {
-        setConnectedDevice(null);
-      }
+      setConnectedDevice(status.device || null);
+      
     } catch (error) {
       console.error('Connection check failed:', error);
       setIsConnected(false);
@@ -71,8 +90,7 @@ const VehicleSpecific: React.FC = () => {
         throw new Error('Not connected to OBD2 device');
       }
       
-      const response = await safeMasterBluetoothService.sendCommand(command);
-      return response;
+      return await safeMasterBluetoothService.sendCommand(command);
     } catch (error) {
       console.error('Command failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -104,7 +122,6 @@ const VehicleSpecific: React.FC = () => {
     }
   };
 
-  // Safe vehicle data with error boundaries
   const vehicles = [
     { id: 'peugeot307', name: 'Peugeot 307', logo: '🦁' },
     { id: 'peugeot206', name: 'Peugeot 206', logo: '🦁' },
@@ -118,17 +135,47 @@ const VehicleSpecific: React.FC = () => {
     try {
       console.log('Selecting vehicle:', vehicleId);
       setSelectedVehicle(vehicleId);
+      toast.success(`Selected ${vehicles.find(v => v.id === vehicleId)?.name}`);
     } catch (error) {
       console.error('Vehicle selection error:', error);
       toast.error('Failed to select vehicle');
     }
   };
 
+  if (hasError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-red-600">
+              <AlertCircle className="h-5 w-5" />
+              Page Error
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              There was an error loading the Vehicle Specific page.
+            </p>
+            <div className="flex gap-2">
+              <Button onClick={() => window.location.reload()} variant="outline">
+                Retry
+              </Button>
+              <Button onClick={() => navigate('/')}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Home
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <Smartphone className="h-12 w-12 animate-spin mx-auto mb-4" />
+          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4" />
           <p>Loading Vehicle Specific Features...</p>
         </div>
       </div>
@@ -136,9 +183,9 @@ const VehicleSpecific: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 safe-area-inset">
+    <div className="min-h-screen bg-background p-4">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Mobile-optimized Header */}
+        {/* Header */}
         <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
           <div className="flex items-center space-x-4">
             <Button variant="outline" size="sm" onClick={() => navigate('/')}>

@@ -1,10 +1,10 @@
+
 import { BluetoothDevice, ConnectionResult, ConnectionStatus, ConnectionHistory } from './MasterBluetoothService';
 
 export class SafeMasterBluetoothService {
   private static instance: SafeMasterBluetoothService;
   private currentDevice: BluetoothDevice | null = null;
   private connectionHistory: ConnectionHistory[] = [];
-  private problematicDevices = new Set<string>();
   private isInitialized = false;
   private initializationPromise: Promise<boolean> | null = null;
 
@@ -33,16 +33,16 @@ export class SafeMasterBluetoothService {
       console.log('Initializing SafeMasterBluetoothService...');
       
       // Wait for Capacitor to be ready on mobile
-      if (window.Capacitor) {
-        await new Promise(resolve => {
+      if (typeof window !== 'undefined' && window.Capacitor) {
+        try {
           // Check if we're on a native platform
           if (window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
             // Wait a bit for plugins to be ready
-            setTimeout(resolve, 1000);
-          } else {
-            resolve(true);
+            await new Promise(resolve => setTimeout(resolve, 1000));
           }
-        });
+        } catch (error) {
+          console.warn('Capacitor platform check failed:', error);
+        }
       }
 
       // Load connection history from storage
@@ -59,22 +59,29 @@ export class SafeMasterBluetoothService {
 
   private loadConnectionHistory(): void {
     try {
+      if (typeof window === 'undefined' || !window.localStorage) {
+        return;
+      }
+      
       const stored = localStorage.getItem('bluetooth_connection_history');
       if (stored) {
         const data = JSON.parse(stored);
-        this.connectionHistory = data.history || [];
-        this.problematicDevices = new Set(data.problematic || []);
+        this.connectionHistory = Array.isArray(data.history) ? data.history : [];
       }
     } catch (error) {
       console.warn('Failed to load connection history:', error);
+      this.connectionHistory = [];
     }
   }
 
   private saveConnectionHistory(): void {
     try {
+      if (typeof window === 'undefined' || !window.localStorage) {
+        return;
+      }
+      
       const data = {
         history: this.connectionHistory.slice(0, 50), // Keep last 50 entries
-        problematic: Array.from(this.problematicDevices),
         timestamp: Date.now()
       };
       localStorage.setItem('bluetooth_connection_history', JSON.stringify(data));
@@ -88,7 +95,7 @@ export class SafeMasterBluetoothService {
       await this.ensureInitialized();
       
       // Check if Bluetooth is available
-      if (window.bluetoothSerial) {
+      if (typeof window !== 'undefined' && window.bluetoothSerial) {
         return new Promise((resolve) => {
           window.bluetoothSerial.isEnabled(
             () => resolve(true),
@@ -109,7 +116,7 @@ export class SafeMasterBluetoothService {
     try {
       await this.ensureInitialized();
       
-      if (window.bluetoothSerial) {
+      if (typeof window !== 'undefined' && window.bluetoothSerial) {
         return new Promise((resolve) => {
           window.bluetoothSerial.enable(
             () => {
@@ -139,41 +146,16 @@ export class SafeMasterBluetoothService {
       // Check if Bluetooth is enabled first
       const isEnabled = await this.isBluetoothEnabled();
       if (!isEnabled) {
-        console.warn('Bluetooth not enabled, returning mock devices');
-        return this.getMockDevices();
+        console.warn('Bluetooth not enabled');
+        return [];
       }
       
-      // Return mock devices for now (replace with actual scanning later)
-      return this.getMockDevices();
+      // Return empty array for now - real implementation would scan for devices
+      return [];
     } catch (error) {
       console.error('Device scan failed:', error);
       return [];
     }
-  }
-
-  private getMockDevices(): BluetoothDevice[] {
-    return [
-      {
-        id: 'mock-device-1',
-        address: '00:1D:A5:68:98:8B',
-        name: 'ELM327 OBD2',
-        isPaired: true,
-        isConnected: false,
-        deviceType: 'ELM327',
-        compatibility: 0.95,
-        rssi: -45
-      },
-      {
-        id: 'mock-device-2', 
-        address: '00:1D:A5:68:98:8C',
-        name: 'Vgate iCar Pro',
-        isPaired: false,
-        isConnected: false,
-        deviceType: 'OBD2',
-        compatibility: 0.85,
-        rssi: -60
-      }
-    ];
   }
 
   async connectToDevice(device: BluetoothDevice): Promise<ConnectionResult> {
@@ -181,13 +163,10 @@ export class SafeMasterBluetoothService {
       await this.ensureInitialized();
       console.log(`Connecting to device: ${device.name}`);
       
-      const startTime = Date.now();
-      
       // Simulate connection process
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       this.currentDevice = { ...device, isConnected: true };
-      const connectionTime = Date.now() - startTime;
       
       // Add to connection history
       const historyEntry: ConnectionHistory = {
@@ -204,8 +183,7 @@ export class SafeMasterBluetoothService {
       return {
         success: true,
         device: this.currentDevice,
-        strategy: 'safe_connection',
-        connectionTime
+        strategy: 'safe_connection'
       };
     } catch (error) {
       console.error('Connection failed:', error);
@@ -246,23 +224,13 @@ export class SafeMasterBluetoothService {
     
     console.log(`Sending command: ${command}`);
     
-    // Mock response
+    // Mock response for testing
     await new Promise(resolve => setTimeout(resolve, 100));
     return `41 ${command.substring(2)} FF FF`;
   }
 
   getConnectionHistory(): ConnectionHistory[] {
     return [...this.connectionHistory];
-  }
-
-  isDeviceProblematic(address: string): boolean {
-    return this.problematicDevices.has(address);
-  }
-
-  resetDeviceHistory(address: string): void {
-    this.problematicDevices.delete(address);
-    this.saveConnectionHistory();
-    console.log(`Reset device history for ${address}`);
   }
 
   isConnectedToDevice(): boolean {
