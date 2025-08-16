@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ProfessionalDiagnostics from "./pages/ProfessionalDiagnostics";
+import VehicleSpecific from "./pages/VehicleSpecific";
 import MobileErrorBoundary from "./components/mobile/MobileErrorBoundary";
 import './App.css';
 
@@ -95,6 +96,7 @@ function App() {
                 <Route path="/" element={<Index />} />
                 <Route path="/professional" element={<ProfessionalDiagnostics />} />
                 <Route path="/professional-diagnostics" element={<ProfessionalDiagnostics />} />
+                <Route path="/vehicle-specific" element={<VehicleSpecific />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </div>

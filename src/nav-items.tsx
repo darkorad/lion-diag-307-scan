@@ -2,6 +2,7 @@
 import { Home, Car, Settings, Info, Wrench, Cpu, Radio, Shield } from "lucide-react";
 import Index from "./pages/Index";
 import ProfessionalDiagnostics from "./pages/ProfessionalDiagnostics";
+import VehicleSpecific from "./pages/VehicleSpecific";
 
 export const navItems = [
   {
@@ -20,7 +21,7 @@ export const navItems = [
     title: "Vehicle Specific",
     to: "/vehicle-specific",
     icon: <Car className="h-4 w-4" />,
-    page: <div>Vehicle Specific Features Coming Soon</div>,
+    page: <VehicleSpecific />,
   },
   {
     title: "Advanced Functions",
