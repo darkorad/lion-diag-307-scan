@@ -410,8 +410,8 @@ export class WorkingDiagnosticService {
       });
     }
 
-    // Add manufacturer specific PIDs - fix the type issue properly
-    const manufacturerPids: ManufacturerPID[] = MANUFACTURER_PIDS.filter((pid: ManufacturerPID) => {
+    // Add manufacturer specific PIDs with explicit typing
+    const manufacturerPids = (MANUFACTURER_PIDS as ManufacturerPID[]).filter(pid => {
       return pid && 
              pid.manufacturer && 
              Array.isArray(pid.manufacturer) && 
