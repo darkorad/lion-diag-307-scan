@@ -344,11 +344,11 @@ export class WorkingDiagnosticService {
       });
     }
 
-    // Add manufacturer specific PIDs - Now properly typed
+    // Add manufacturer specific PIDs - Fixed with type assertion
     const manufacturerPids = MANUFACTURER_PIDS.filter(pid => 
       Array.isArray(pid.manufacturer) && 
       pid.manufacturer.some(m => typeof m === 'string' && m.toLowerCase() === manufacturer.toLowerCase())
-    );
+    ) as ManufacturerPID[];
     
     const availablePids = manufacturerPids.slice(0, 6);
 
