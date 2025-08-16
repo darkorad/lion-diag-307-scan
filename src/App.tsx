@@ -94,6 +94,7 @@ function App() {
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/professional" element={<ProfessionalDiagnostics />} />
+                <Route path="/professional-diagnostics" element={<ProfessionalDiagnostics />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </div>
