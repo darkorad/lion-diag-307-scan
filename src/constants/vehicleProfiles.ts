@@ -35,6 +35,54 @@ export const VEHICLE_PROFILES: VehicleProfile[] = [
     }
   },
   {
+    id: 'peugeot-307-2006-1.6-hdi-110hp',
+    make: 'Peugeot',
+    model: '307',
+    year: 2006,
+    engine: '1.6L HDI 110HP',
+    fuel: 'Diesel',
+    displayName: 'Peugeot 307 2006 1.6 HDI 110HP Restyling',
+    vinPatterns: ['VF3*', 'VR3*'],
+    supportedPids: {
+      standard: ['010C', '010D', '0105', '0110', '0111', '010A', '010F', '0107', '0114', '012F', '0133', '013C'],
+      manufacturer: ['2260', '2261', '2262', '2263', '2264', '2265', '2266', '2267', '2268', '2269', '226A', '226B'],
+      dpf: ['2262', '2263', '2264', '2265', '226A', '226B']
+    },
+    pidMappings: {
+      DPF_INLET_TEMP: '2262',
+      DPF_OUTLET_TEMP: '2263',
+      DPF_DIFF_PRESSURE: '2264',
+      DPF_SOOT_LOAD: '2265',
+      TURBO_PRESSURE: '2260',
+      RAIL_PRESSURE: '2261',
+      EGR_POSITION: '2266',
+      BOOST_PRESSURE: '2267',
+      FUEL_TEMP: '2268',
+      ENGINE_OIL_TEMP: '2269',
+      DPF_REGENERATION_STATUS: '226A',
+      INJECTOR_CORRECTION: '226B'
+    },
+    specificParameters: {
+      hasDPF: true,
+      hasEGR: true,
+      hasTurbo: true,
+      fuelType: 'diesel',
+      emissionStandard: 'Euro4',
+      manufacturerProtocol: 'PSA',
+      useOlderProtocol: false,
+      dpfRegenerationSupported: true,
+      advancedDiagnostics: true,
+      hasAdvancedFunctions: true,
+      supportsComfortFunctions: true,
+      supportsBSIAccess: true,
+      injectorCodingSupported: true,
+      serviceResetSupported: true,
+      particleFilterType: 'FAP',
+      fuelSystem: 'Common Rail',
+      turboType: 'Variable Geometry'
+    }
+  },
+  {
     id: 'peugeot-307-2006-diesel',
     make: 'Peugeot',
     model: '307',
