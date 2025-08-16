@@ -576,4 +576,4 @@ export const getVehicleMakeById = (id: string): VehicleMake | undefined => {
   return VEHICLE_DATABASE.find(make => make.id === id);
 };
 
-export { VehicleMake, VehicleModel, VehicleGeneration, VehicleEngine } from '@/types/vehicle';
+export type { VehicleMake, VehicleModel, VehicleGeneration, VehicleEngine } from '@/types/vehicle';
