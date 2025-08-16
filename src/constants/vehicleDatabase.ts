@@ -53,7 +53,7 @@ export const VEHICLE_DATABASE: VehicleMake[] = [
             id: 'peugeot-307-gen2-restyling',
             name: 'Restyling (Phase 2)',
             yearRange: { start: 2005, end: 2008 },
-            bodyTypes: ['Hatchbook', 'Estate', 'SW'],
+            bodyTypes: ['Hatchback', 'Estate', 'SW'],
             engines: [
               {
                 id: 'peugeot-307-2006-1.6-hdi-110hp',
@@ -98,6 +98,54 @@ export const VEHICLE_DATABASE: VehicleMake[] = [
                   particleFilterType: 'FAP',
                   fuelSystem: 'Common Rail',
                   turboType: 'Variable Geometry'
+                }
+              },
+              {
+                id: 'peugeot-307-2006-1.6-hdi-80kw-110hp-restyling',
+                name: '1.6L HDI 80kW/110HP Restyling',
+                displacement: '1.6L',
+                fuelType: 'Diesel',
+                power: { hp: 110, kw: 80 },
+                engineCode: '9HZ (DV6TED4)',
+                emissionStandard: 'Euro4',
+                supportedPids: {
+                  standard: ['010C', '010D', '0105', '0110', '0111', '010A', '010F', '0107', '0114', '012F', '0133', '013C'],
+                  manufacturer: ['2260', '2261', '2262', '2263', '2264', '2265', '2266', '2267', '2268', '2269', '226A', '226B', '226C', '226D'],
+                  dpf: ['2262', '2263', '2264', '2265', '226A', '226B']
+                },
+                pidMappings: {
+                  DPF_INLET_TEMP: '2262',
+                  DPF_OUTLET_TEMP: '2263',
+                  DPF_DIFF_PRESSURE: '2264',
+                  DPF_SOOT_LOAD: '2265',
+                  TURBO_PRESSURE: '2260',
+                  RAIL_PRESSURE: '2261',
+                  EGR_POSITION: '2266',
+                  BOOST_PRESSURE: '2267',
+                  FUEL_TEMP: '2268',
+                  ENGINE_OIL_TEMP: '2269',
+                  DPF_REGENERATION_STATUS: '226A',
+                  INJECTOR_CORRECTION: '226B',
+                  EXHAUST_TEMP: '226C',
+                  TURBO_ACTUATOR: '226D'
+                },
+                specificParameters: {
+                  hasDPF: true,
+                  hasEGR: true,
+                  hasTurbo: true,
+                  manufacturerProtocol: 'PSA',
+                  useOlderProtocol: false,
+                  dpfRegenerationSupported: true,
+                  advancedDiagnostics: true,
+                  hasAdvancedFunctions: true,
+                  supportsComfortFunctions: true,
+                  supportsBSIAccess: true,
+                  injectorCodingSupported: true,
+                  serviceResetSupported: true,
+                  particleFilterType: 'FAP',
+                  fuelSystem: 'Common Rail',
+                  turboType: 'Variable Geometry',
+                  isRestylingVersion: true
                 }
               },
               {
@@ -185,9 +233,7 @@ export const VEHICLE_DATABASE: VehicleMake[] = [
       {
         id: 'peugeot-3008',
         name: '3008',
-        country: 'France',
-        logo: '/src/assets/logos/peugeot-logo.png',
-        models: [
+        generations: [
           {
             id: 'peugeot-3008-gen1',
             name: 'First Generation',
@@ -529,3 +575,5 @@ export const VEHICLE_DATABASE: VehicleMake[] = [
 export const getVehicleMakeById = (id: string): VehicleMake | undefined => {
   return VEHICLE_DATABASE.find(make => make.id === id);
 };
+
+export { VehicleMake, VehicleModel, VehicleGeneration, VehicleEngine } from '@/types/vehicle';
