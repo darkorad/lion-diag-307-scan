@@ -42,83 +42,6 @@ export class WorkingDiagnosticService {
 
   private constructor() {}
 
-  getAvailableFunctions(manufacturer: string): any[] {
-    const functions = [];
-
-    // Add actuator tests
-    const tests = ACTUATOR_TESTS[manufacturer.toUpperCase() as keyof typeof ACTUATOR_TESTS];
-    if (tests) {
-      Object.keys(tests).forEach(test => {
-        functions.push({
-          id: `actuator_${test}`,
-          name: test.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()),
-          type: 'actuator_test',
-          category: 'testing',
-          description: `Test ${test.replace(/_/g, ' ').toLowerCase()} component`,
-          manufacturer
-        });
-      });
-    }
-
-    // Add manufacturer specific PIDs - Fixed with better typing
-    const availablePids = MANUFACTURER_PIDS
-      .filter(isManufacturerPID)
-      .filter(pid => pid.manufacturer.some(m => m.toLowerCase() === manufacturer.toLowerCase()))
-      .slice(0, 6);
-
-    availablePids.forEach(pid => {
-      functions.push({
-        id: `pid_${pid.pid}`,
-        name: pid.name,
-        type: 'live_pid',
-        category: 'monitoring',
-        description: pid.description,
-        manufacturer,
-        pid: pid.pid,
-        unit: pid.unit
-      });
-    });
-
-    // Add service procedures
-    Object.entries(SERVICE_PROCEDURES).forEach(([key, proc]) => {
-      if (key.includes(manufacturer.toUpperCase())) {
-        functions.push({
-          id: `service_${key}`,
-          name: proc.name,
-          type: 'service_reset',
-          category: 'service',
-          description: proc.description,
-          manufacturer
-        });
-      }
-    });
-
-    // Add coding options
-    const codingKey = `${manufacturer.toUpperCase()}_CODING` as keyof typeof VEHICLE_CODING;
-    if (VEHICLE_CODING[codingKey]) {
-      functions.push({
-        id: `coding_${manufacturer}`,
-        name: 'Vehicle Coding',
-        type: 'coding',
-        category: 'coding',
-        description: 'Modify vehicle control unit settings',
-        manufacturer
-      });
-    }
-
-    // Always add DPF regeneration for diesel vehicles
-    functions.push({
-      id: 'dpf_regeneration',
-      name: 'DPF Forced Regeneration',
-      type: 'dpf_regen',
-      category: 'service',
-      description: 'Force diesel particulate filter regeneration cycle',
-      manufacturer
-    });
-
-    return functions;
-  }
-
   async readDTCs(): Promise<DiagnosticResult> {
     try {
       const storedResponse = await this.sendOBDCommand('03');
@@ -390,29 +313,91 @@ export class WorkingDiagnosticService {
 
     let value: number;
     switch (formula) {
-      case 'A': 
-        value = A; 
-        break;
-      case 'A*100/255': 
-        value = Math.round((A * 100) / 255); 
-        break;
-      case 'A*10': 
-        value = A * 10; 
-        break;
-      case '(A*256+B)*0.1-40': 
-        value = (A * 256 + B) * 0.1 - 40; 
-        break;
-      case 'A*256+B': 
-        value = A * 256 + B; 
-        break;
-      case '(A*256+B)/4': 
-        value = (A * 256 + B) / 4; 
-        break;
-      default: 
-        value = A;
+      case 'A': value = A; break;
+      case 'A*100/255': value = Math.round((A * 100) / 255); break;
+      case 'A*10': value = A * 10; break;
+      case '(A*256+B)/4': value = Math.round((A * 256 + B) / 4); break;
+      case '(A*256+B)*0.1-40': value = Math.round((A * 256 + B) * 0.1 - 40); break;
+      case 'A-40': value = A - 40; break;
+      case 'A*256+B': value = A * 256 + B; break;
+      default: value = A;
     }
 
-    return { value: Math.round(value * 100) / 100, unit: '' };
+    return { value, unit: '' };
+  }
+
+  getAvailableFunctions(manufacturer: string): any[] {
+    const functions = [];
+
+    const tests = ACTUATOR_TESTS[manufacturer.toUpperCase() as keyof typeof ACTUATOR_TESTS];
+    if (tests) {
+      Object.keys(tests).forEach(test => {
+        functions.push({
+          id: `actuator_${test}`,
+          name: test.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()),
+          type: 'actuator_test',
+          category: 'testing',
+          description: `Test ${test.replace(/_/g, ' ').toLowerCase()} component`,
+          manufacturer
+        });
+      });
+    }
+
+    const availablePids = MANUFACTURER_PIDS
+      .filter((pid): pid is ManufacturerPID => {
+        if (!isManufacturerPID(pid)) return false;
+        return pid.manufacturer.some(m => m.toLowerCase() === manufacturer.toLowerCase());
+      })
+      .slice(0, 6);
+
+    availablePids.forEach(pid => {
+      functions.push({
+        id: `pid_${pid.pid}`,
+        name: pid.name,
+        type: 'live_pid',
+        category: 'monitoring',
+        description: pid.description,
+        manufacturer,
+        pid: pid.pid,
+        unit: pid.unit
+      });
+    });
+
+    Object.entries(SERVICE_PROCEDURES).forEach(([key, proc]) => {
+      if (key.includes(manufacturer.toUpperCase())) {
+        functions.push({
+          id: `service_${key}`,
+          name: proc.name,
+          type: 'service_reset',
+          category: 'service',
+          description: proc.description,
+          manufacturer
+        });
+      }
+    });
+
+    const codingKey = `${manufacturer.toUpperCase()}_CODING` as keyof typeof VEHICLE_CODING;
+    if (VEHICLE_CODING[codingKey]) {
+      functions.push({
+        id: `coding_${manufacturer}`,
+        name: 'Vehicle Coding',
+        type: 'coding',
+        category: 'coding',
+        description: 'Modify vehicle control unit settings',
+        manufacturer
+      });
+    }
+
+    functions.push({
+      id: 'dpf_regeneration',
+      name: 'DPF Forced Regeneration',
+      type: 'dpf_regen',
+      category: 'service',
+      description: 'Force diesel particulate filter regeneration cycle',
+      manufacturer
+    });
+
+    return functions;
   }
 }
 
