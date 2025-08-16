@@ -25,7 +25,7 @@ export interface VehicleParameter {
 
 export class VehicleModulesService {
   private static instance: VehicleModulesService;
-  private isInitialized = false;
+  private initialized = false;
 
   static getInstance(): VehicleModulesService {
     if (!VehicleModulesService.instance) {
@@ -38,7 +38,7 @@ export class VehicleModulesService {
 
   async initialize(): Promise<boolean> {
     try {
-      if (this.isInitialized) {
+      if (this.initialized) {
         return true;
       }
       
@@ -47,7 +47,7 @@ export class VehicleModulesService {
       // Initialize mobile-safe bluetooth service
       await mobileSafeBluetoothService.initialize();
       
-      this.isInitialized = true;
+      this.initialized = true;
       console.log('VehicleModulesService initialized successfully');
       return true;
     } catch (error) {
@@ -154,7 +154,7 @@ export class VehicleModulesService {
   }
 
   getInitializationStatus(): boolean {
-    return this.isInitialized;
+    return this.initialized;
   }
 }
 

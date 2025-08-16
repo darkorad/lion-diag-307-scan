@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,8 +12,7 @@ import {
   Loader2, 
   CheckCircle, 
   AlertCircle,
-  RefreshCw,
-  Plus
+  RefreshCw
 } from 'lucide-react';
 import { BluetoothDevice, mobileSafeBluetoothService } from '@/services/MobileSafeBluetoothService';
 import { toast } from 'sonner';
@@ -29,57 +28,73 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
   const [devices, setDevices] = useState<BluetoothDevice[]>([]);
   const [scanProgress, setScanProgress] = useState(0);
   const [bluetoothEnabled, setBluetoothEnabled] = useState(false);
+  const [mounted, setMounted] = useState(true);
 
-  useEffect(() => {
-    checkBluetoothStatus();
-    loadPairedDevices();
-  }, []);
-
-  const checkBluetoothStatus = async () => {
+  const checkBluetoothStatus = useCallback(async () => {
+    if (!mounted) return;
+    
     try {
       const isEnabled = await mobileSafeBluetoothService.isBluetoothEnabled();
-      setBluetoothEnabled(isEnabled);
+      if (mounted) {
+        setBluetoothEnabled(isEnabled);
+      }
     } catch (error) {
       console.error('Error checking Bluetooth status:', error);
-      setBluetoothEnabled(false);
+      if (mounted) {
+        setBluetoothEnabled(false);
+      }
     }
-  };
+  }, [mounted]);
 
-  const enableBluetooth = async () => {
+  const loadPairedDevices = useCallback(async () => {
+    if (!mounted) return;
+    
     try {
-      if (Capacitor.isNativePlatform() && window.bluetoothSerial?.enable) {
-        window.bluetoothSerial.enable(
-          () => {
-            setBluetoothEnabled(true);
-            toast.success('Bluetooth enabled');
-          },
-          (error) => {
-            console.error('Failed to enable Bluetooth:', error);
-            toast.error('Failed to enable Bluetooth');
-          }
-        );
-      } else {
-        toast.info('Bluetooth management not available on web platform');
-        setBluetoothEnabled(true); // Assume enabled for web
+      const pairedDeviceList = await mobileSafeBluetoothService.scanForDevices();
+      if (mounted) {
+        setDevices(pairedDeviceList);
+      }
+    } catch (error) {
+      console.error('Failed to load paired devices:', error);
+      if (mounted) {
+        setDevices([]);
+      }
+    }
+  }, [mounted]);
+
+  useEffect(() => {
+    setMounted(true);
+    checkBluetoothStatus();
+    loadPairedDevices();
+
+    return () => {
+      setMounted(false);
+    };
+  }, [checkBluetoothStatus, loadPairedDevices]);
+
+  const enableBluetooth = useCallback(async () => {
+    if (!mounted) return;
+    
+    try {
+      const enabled = await mobileSafeBluetoothService.enableBluetooth();
+      if (mounted) {
+        setBluetoothEnabled(enabled);
+        if (enabled) {
+          toast.success('Bluetooth enabled');
+        } else {
+          toast.error('Failed to enable Bluetooth');
+        }
       }
     } catch (error) {
       console.error('Error enabling Bluetooth:', error);
-      toast.error('Error enabling Bluetooth');
+      if (mounted) {
+        toast.error('Error enabling Bluetooth');
+      }
     }
-  };
+  }, [mounted]);
 
-  const loadPairedDevices = async () => {
-    try {
-      const pairedDeviceList = await mobileSafeBluetoothService.scanForDevices();
-      setDevices(pairedDeviceList);
-    } catch (error) {
-      console.error('Failed to load paired devices:', error);
-      setDevices([]);
-    }
-  };
-
-  const scanForDevices = async () => {
-    if (!bluetoothEnabled) {
+  const scanForDevices = useCallback(async () => {
+    if (!mounted || !bluetoothEnabled) {
       toast.error('Please enable Bluetooth first');
       return;
     }
@@ -105,39 +120,53 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
       clearInterval(progressInterval);
       setScanProgress(100);
       
-      setDevices(discoveredDevices);
-      toast.success(`Found ${discoveredDevices.length} devices`);
+      if (mounted) {
+        setDevices(discoveredDevices);
+        toast.success(`Found ${discoveredDevices.length} devices`);
+      }
       
     } catch (error) {
       console.error('Scan failed:', error);
-      toast.error('Device scan failed');
+      if (mounted) {
+        toast.error('Device scan failed');
+      }
     } finally {
       setTimeout(() => {
-        setIsScanning(false);
-        setScanProgress(0);
+        if (mounted) {
+          setIsScanning(false);
+          setScanProgress(0);
+        }
       }, 1000);
     }
-  };
+  }, [bluetoothEnabled, mounted]);
 
-  const connectToDevice = async (device: BluetoothDevice) => {
+  const connectToDevice = useCallback(async (device: BluetoothDevice) => {
+    if (!mounted) return;
+    
     setIsConnecting(device.id);
 
     try {
       const result = await mobileSafeBluetoothService.connectToDevice(device);
       
-      if (result.success && result.device) {
-        toast.success(`Connected to ${device.name}`);
-        onDeviceConnected(result.device);
-      } else {
-        toast.error(`Failed to connect to ${device.name}: ${result.error}`);
+      if (mounted) {
+        if (result.success && result.device) {
+          toast.success(`Connected to ${device.name}`);
+          onDeviceConnected(result.device);
+        } else {
+          toast.error(`Failed to connect to ${device.name}: ${result.error}`);
+        }
       }
     } catch (error) {
       console.error('Connection error:', error);
-      toast.error(`Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      if (mounted) {
+        toast.error(`Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     } finally {
-      setIsConnecting(null);
+      if (mounted) {
+        setIsConnecting(null);
+      }
     }
-  };
+  }, [onDeviceConnected, mounted]);
 
   const getDeviceIcon = (device: BluetoothDevice) => {
     switch (device.deviceType) {
@@ -171,6 +200,7 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
           <div className="flex items-center space-x-2">
             <div className={`w-3 h-3 rounded-full ${bluetoothEnabled ? 'bg-green-500' : 'bg-red-500'}`} />
             <span>{bluetoothEnabled ? 'Bluetooth Ready' : 'Bluetooth Disabled'}</span>
+            <span className="text-sm text-muted-foreground">({Capacitor.getPlatform()})</span>
           </div>
         </CardContent>
       </Card>
@@ -222,7 +252,7 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
             <div className="space-y-3">
               <h4 className="font-semibold">Found Devices ({devices.length})</h4>
               {devices.map((device) => (
-                <Card key={device.id}>
+                <Card key={device.id} className="border-2 hover:border-blue-300 transition-colors">
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
@@ -236,6 +266,11 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
+                        {device.isPaired && (
+                          <Badge variant="outline" className="text-xs border-green-300 text-green-700">
+                            Paired
+                          </Badge>
+                        )}
                         <Badge variant={device.deviceType === 'ELM327' ? 'default' : 'secondary'}>
                           {device.deviceType}
                         </Badge>
@@ -279,7 +314,7 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
           <ul className="mt-2 text-sm space-y-1">
             <li>1. Make sure your OBD2 adapter is powered on</li>
             <li>2. Enable Bluetooth on your device</li>
-            <li>3. Pair your OBD2 adapter in device settings first</li>
+            <li>3. For better connection, pair your OBD2 adapter in device settings first</li>
             <li>4. Scan and connect to start diagnostics</li>
           </ul>
         </AlertDescription>

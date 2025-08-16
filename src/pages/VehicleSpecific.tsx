@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,7 +18,6 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { mobileSafeBluetoothService, BluetoothDevice } from '@/services/MobileSafeBluetoothService';
-import { vehicleModulesService } from '@/services/VehicleModulesService';
 import BluetoothDeviceScanner from '@/components/BluetoothDeviceScanner';
 import PeugeotAlarmPanel from '@/components/PeugeotAlarmPanel';
 
@@ -29,56 +28,20 @@ const VehicleSpecific: React.FC = () => {
   const [selectedVehicle, setSelectedVehicle] = useState<string>('peugeot307');
   const [isLoading, setIsLoading] = useState(true);
   const [initError, setInitError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(true);
 
-  useEffect(() => {
-    let mounted = true;
+  const vehicles = [
+    { id: 'peugeot307', name: 'Peugeot 307', logo: '🦁' },
+    { id: 'peugeot206', name: 'Peugeot 206', logo: '🦁' },
+    { id: 'citroen', name: 'Citroën', logo: '🔰' },
+    { id: 'renault', name: 'Renault', logo: '♦️' },
+    { id: 'volkswagen', name: 'Volkswagen', logo: '🚗' },
+    { id: 'audi', name: 'Audi', logo: '⭕' }
+  ];
 
-    const initializePage = async () => {
-      try {
-        setIsLoading(true);
-        setInitError(null);
-        
-        console.log('Initializing Vehicle Specific page...');
-        
-        // Initialize services with proper error handling
-        const bluetoothInit = await mobileSafeBluetoothService.initialize();
-        const vehicleInit = await vehicleModulesService.initialize();
-        
-        if (!bluetoothInit) {
-          console.warn('Bluetooth service initialization failed');
-        }
-        
-        if (!vehicleInit) {
-          console.warn('Vehicle modules service initialization failed');
-        }
-        
-        // Check connection status safely
-        if (mounted) {
-          await checkConnection();
-        }
-        
-      } catch (error) {
-        console.error('Page initialization error:', error);
-        if (mounted) {
-          const errorMessage = error instanceof Error ? error.message : 'Unknown initialization error';
-          setInitError(errorMessage);
-          toast.error('Failed to initialize page: ' + errorMessage);
-        }
-      } finally {
-        if (mounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    initializePage();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const checkConnection = async () => {
+  const checkConnection = useCallback(async () => {
+    if (!mounted) return;
+    
     try {
       const status = mobileSafeBluetoothService.getConnectionStatus();
       console.log('Connection status:', status);
@@ -88,12 +51,63 @@ const VehicleSpecific: React.FC = () => {
       
     } catch (error) {
       console.error('Connection check failed:', error);
-      setIsConnected(false);
-      setConnectedDevice(null);
+      if (mounted) {
+        setIsConnected(false);
+        setConnectedDevice(null);
+      }
     }
-  };
+  }, [mounted]);
 
-  const handleSendCommand = async (command: string): Promise<string> => {
+  useEffect(() => {
+    let isMounted = true;
+    setMounted(true);
+
+    const initializePage = async () => {
+      if (!isMounted) return;
+      
+      try {
+        setIsLoading(true);
+        setInitError(null);
+        
+        console.log('Initializing Vehicle Specific page...');
+        
+        // Initialize Bluetooth service safely
+        const bluetoothInit = await mobileSafeBluetoothService.initialize();
+        
+        if (!bluetoothInit) {
+          console.warn('Bluetooth service initialization failed');
+        }
+        
+        // Check connection status safely
+        if (isMounted) {
+          await checkConnection();
+        }
+        
+      } catch (error) {
+        console.error('Page initialization error:', error);
+        if (isMounted) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown initialization error';
+          setInitError(errorMessage);
+          toast.error('Failed to initialize page: ' + errorMessage);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    initializePage();
+
+    return () => {
+      isMounted = false;
+      setMounted(false);
+    };
+  }, [checkConnection]);
+
+  const handleSendCommand = useCallback(async (command: string): Promise<string> => {
+    if (!mounted) throw new Error('Component unmounted');
+    
     try {
       if (!isConnected) {
         throw new Error('Not connected to OBD2 device');
@@ -106,9 +120,11 @@ const VehicleSpecific: React.FC = () => {
       toast.error('Command failed: ' + errorMessage);
       throw error;
     }
-  };
+  }, [isConnected, mounted]);
 
-  const handleDeviceConnected = async (device: BluetoothDevice) => {
+  const handleDeviceConnected = useCallback(async (device: BluetoothDevice) => {
+    if (!mounted) return;
+    
     try {
       setConnectedDevice(device);
       setIsConnected(true);
@@ -116,11 +132,15 @@ const VehicleSpecific: React.FC = () => {
       await checkConnection(); // Refresh status
     } catch (error) {
       console.error('Device connection handling failed:', error);
-      toast.error('Failed to handle device connection');
+      if (mounted) {
+        toast.error('Failed to handle device connection');
+      }
     }
-  };
+  }, [checkConnection, mounted]);
 
-  const handleDisconnect = async () => {
+  const handleDisconnect = useCallback(async () => {
+    if (!mounted) return;
+    
     try {
       await mobileSafeBluetoothService.disconnect();
       setIsConnected(false);
@@ -128,29 +148,26 @@ const VehicleSpecific: React.FC = () => {
       toast.info('Disconnected from device');
     } catch (error) {
       console.error('Disconnect failed:', error);
-      toast.error('Disconnect failed');
+      if (mounted) {
+        toast.error('Disconnect failed');
+      }
     }
-  };
+  }, [mounted]);
 
-  const vehicles = [
-    { id: 'peugeot307', name: 'Peugeot 307', logo: '🦁' },
-    { id: 'peugeot206', name: 'Peugeot 206', logo: '🦁' },
-    { id: 'citroen', name: 'Citroën', logo: '🔰' },
-    { id: 'renault', name: 'Renault', logo: '♦️' },
-    { id: 'volkswagen', name: 'Volkswagen', logo: '🚗' },
-    { id: 'audi', name: 'Audi', logo: '⭕' }
-  ];
-
-  const handleVehicleSelection = (vehicleId: string) => {
+  const handleVehicleSelection = useCallback((vehicleId: string) => {
+    if (!mounted) return;
+    
     try {
       console.log('Selecting vehicle:', vehicleId);
       setSelectedVehicle(vehicleId);
       toast.success(`Selected ${vehicles.find(v => v.id === vehicleId)?.name}`);
     } catch (error) {
       console.error('Vehicle selection error:', error);
-      toast.error('Failed to select vehicle');
+      if (mounted) {
+        toast.error('Failed to select vehicle');
+      }
     }
-  };
+  }, [mounted, vehicles]);
 
   // Error state
   if (initError) {
