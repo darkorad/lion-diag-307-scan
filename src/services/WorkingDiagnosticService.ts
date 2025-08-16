@@ -411,19 +411,16 @@ export class WorkingDiagnosticService {
       });
     }
 
-    // Add manufacturer specific PIDs - completely rewrite to fix TypeScript inference
-    const allPids: ManufacturerPID[] = MANUFACTURER_PIDS || [];
-    const matchingPids: ManufacturerPID[] = [];
-    
-    for (let i = 0; i < allPids.length; i++) {
-      const pid = allPids[i];
-      if (pid && pid.manufacturer && Array.isArray(pid.manufacturer) && pid.manufacturer.includes(manufacturer)) {
-        matchingPids.push(pid);
-      }
-    }
+    // Add manufacturer specific PIDs - fix TypeScript inference by explicit typing
+    const manufacturerSpecificPids: ManufacturerPID[] = (MANUFACTURER_PIDS as ManufacturerPID[]).filter((pid: ManufacturerPID) => {
+      return pid && 
+             pid.manufacturer && 
+             Array.isArray(pid.manufacturer) && 
+             pid.manufacturer.includes(manufacturer);
+    });
     
     // Take first 6 matching PIDs
-    const availablePids = matchingPids.slice(0, 6);
+    const availablePids = manufacturerSpecificPids.slice(0, 6);
     
     availablePids.forEach(pid => {
       functions.push({
