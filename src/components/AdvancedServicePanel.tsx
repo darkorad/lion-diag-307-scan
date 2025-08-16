@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -209,47 +210,47 @@ const AdvancedServicePanel: React.FC<AdvancedServicePanelProps> = ({
   const categories = Object.keys(groupedFunctions);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 p-2 sm:p-4">
       {/* Header with Back Button */}
       <div className="flex items-center gap-4">
         <BackButton 
           onBack={onBack}
-          fallbackRoute="/"
+          fallbackRoute="/professional-diagnostics"
           variant="ghost"
           size="sm"
           label="Back"
           showIcon={true}
         />
         <div className="h-6 w-px bg-border" />
-        <h1 className="text-2xl font-bold">Advanced Diagnostic Functions</h1>
+        <h1 className="text-lg sm:text-xl md:text-2xl font-bold">Advanced Service Functions</h1>
       </div>
 
       {/* Vehicle Info */}
       {vehicleInfo && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-base">
               <Car className="h-5 w-5" />
               Vehicle Information
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm text-muted-foreground">Manufacturer</p>
-                <p className="font-semibold">{vehicleInfo.manufacturer || 'Unknown'}</p>
+                <p className="text-xs text-muted-foreground">Manufacturer</p>
+                <p className="text-sm font-semibold">{vehicleInfo.manufacturer || 'Unknown'}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Model</p>
-                <p className="font-semibold">{vehicleInfo.model || 'Unknown'}</p>
+                <p className="text-xs text-muted-foreground">Model</p>
+                <p className="text-sm font-semibold">{vehicleInfo.model || 'Unknown'}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">VIN</p>
-                <p className="font-mono text-sm">{vehicleInfo.vin || 'Not detected'}</p>
+                <p className="text-xs text-muted-foreground">VIN</p>
+                <p className="text-xs font-mono">{vehicleInfo.vin || 'Not detected'}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Available Functions</p>
-                <p className="font-semibold">{availableFunctions.length}</p>
+                <p className="text-xs text-muted-foreground">Available Functions</p>
+                <p className="text-sm font-semibold">{availableFunctions.length}</p>
               </div>
             </div>
           </CardContent>
@@ -260,7 +261,7 @@ const AdvancedServicePanel: React.FC<AdvancedServicePanelProps> = ({
       {serviceExecutions.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-base">
               <Activity className="h-5 w-5" />
               Service Executions
             </CardTitle>
@@ -274,7 +275,7 @@ const AdvancedServicePanel: React.FC<AdvancedServicePanelProps> = ({
                       {execution.status === 'running' && <RefreshCw className="h-4 w-4 animate-spin" />}
                       {execution.status === 'completed' && <CheckCircle className="h-4 w-4 text-green-500" />}
                       {execution.status === 'failed' && <AlertTriangle className="h-4 w-4 text-red-500" />}
-                      <span className="font-medium">{execution.name}</span>
+                      <span className="text-sm font-medium">{execution.name}</span>
                     </div>
                     <Badge variant={execution.status === 'completed' ? 'default' : execution.status === 'failed' ? 'destructive' : 'secondary'}>
                       {execution.status}
@@ -282,7 +283,7 @@ const AdvancedServicePanel: React.FC<AdvancedServicePanelProps> = ({
                   </div>
                   <Progress value={execution.progress} className="w-full" />
                   {execution.error && (
-                    <p className="text-sm text-red-500">{execution.error}</p>
+                    <p className="text-xs text-red-500">{execution.error}</p>
                   )}
                 </div>
               ))}
@@ -292,117 +293,122 @@ const AdvancedServicePanel: React.FC<AdvancedServicePanelProps> = ({
       )}
 
       {/* Function Categories */}
-      <Tabs defaultValue={categories[0]} className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
-          {categories.slice(0, 6).map(category => (
-            <TabsTrigger key={category} value={category} className="capitalize">
-              {category}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+      {categories.length > 0 && (
+        <Tabs defaultValue={categories[0]} className="w-full">
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6">
+            {categories.slice(0, 6).map(category => (
+              <TabsTrigger key={category} value={category} className="capitalize text-xs">
+                {category}
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
-        {categories.map(category => (
-          <TabsContent key={category} value={category} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {groupedFunctions[category].map(func => {
-                const Icon = getCategoryIcon(func.category);
-                const execution = serviceExecutions.find(e => e.name === func.name);
-                
-                return (
-                  <Card key={func.id} className="relative">
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-2">
-                          <Icon className="h-5 w-5" />
-                          <div>
-                            <CardTitle className="text-lg">{func.name}</CardTitle>
-                            <p className="text-sm text-muted-foreground mt-1">
-                              {func.description}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Badge variant={getRiskLevelVariant(func.riskLevel)}>
-                            {func.riskLevel.toUpperCase()}
-                          </Badge>
-                          {func.requiresPin && (
-                            <Badge variant="outline">PIN Required</Badge>
-                          )}
-                          {func.manufacturer && (
-                            <Badge variant="outline">{func.manufacturer}</Badge>
-                          )}
-                        </div>
-                      </div>
-                    </CardHeader>
-                    
-                    <CardContent className="space-y-4">
-                      {func.parameters && (
-                        <div className="space-y-3">
-                          <h4 className="font-medium">Parameters:</h4>
-                          {Object.entries(func.parameters).map(([key, value]) => (
-                            <div key={key} className="space-y-1">
-                              <Label className="capitalize">{key.replace(/_/g, ' ')}</Label>
-                              <Input
-                                type="text"
-                                placeholder={`Enter ${key}`}
-                                onChange={(e) => setFunctionParameters(prev => ({
-                                  ...prev,
-                                  [func.id]: {
-                                    ...prev[func.id],
-                                    [key]: e.target.value
-                                  }
-                                }))}
-                              />
+          {categories.map(category => (
+            <TabsContent key={category} value={category} className="space-y-4">
+              <div className="grid grid-cols-1 gap-4">
+                {groupedFunctions[category].map(func => {
+                  const Icon = getCategoryIcon(func.category);
+                  const execution = serviceExecutions.find(e => e.name === func.name);
+                  
+                  return (
+                    <Card key={func.id} className="relative">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-1">
+                            <Icon className="h-5 w-5 flex-shrink-0" />
+                            <div className="min-w-0">
+                              <CardTitle className="text-base leading-tight">{func.name}</CardTitle>
+                              <p className="text-xs text-muted-foreground mt-1 break-words">
+                                {func.description}
+                              </p>
                             </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {execution && (
-                        <Alert>
-                          <div className="flex items-center gap-2">
-                            {execution.status === 'completed' ? (
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                            ) : execution.status === 'failed' ? (
-                              <AlertTriangle className="h-4 w-4 text-red-600" />
-                            ) : (
-                              <RefreshCw className="h-4 w-4 animate-spin" />
-                            )}
-                            <AlertDescription>
-                              <div>
-                                <p className="font-medium">
-                                  {execution.status === 'completed' ? 'Success' : 
-                                   execution.status === 'failed' ? 'Failed' : 'Running'}
-                                </p>
-                                <p className="text-sm">
-                                  {execution.endTime?.toLocaleString() || 'In progress...'}
-                                </p>
-                              </div>
-                            </AlertDescription>
                           </div>
-                        </Alert>
-                      )}
+                          <div className="flex flex-col gap-1 flex-shrink-0">
+                            <Badge variant={getRiskLevelVariant(func.riskLevel || 'low')} className="text-xs">
+                              {(func.riskLevel || 'low').toUpperCase()}
+                            </Badge>
+                            {func.requiresPin && (
+                              <Badge variant="outline" className="text-xs">PIN Required</Badge>
+                            )}
+                            {func.manufacturer && (
+                              <Badge variant="outline" className="text-xs">{func.manufacturer}</Badge>
+                            )}
+                          </div>
+                        </div>
+                      </CardHeader>
+                      
+                      <CardContent className="space-y-4">
+                        {func.parameters && (
+                          <div className="space-y-3">
+                            <h4 className="text-sm font-medium">Parameters:</h4>
+                            {Object.entries(func.parameters).map(([key, value]) => (
+                              <div key={key} className="space-y-1">
+                                <Label className="text-xs capitalize">{key.replace(/_/g, ' ')}</Label>
+                                <Input
+                                  type="text"
+                                  placeholder={`Enter ${key}`}
+                                  className="text-sm"
+                                  onChange={(e) => setFunctionParameters(prev => ({
+                                    ...prev,
+                                    [func.id]: {
+                                      ...prev[func.id],
+                                      [key]: e.target.value
+                                    }
+                                  }))}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        )}
 
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">
-                          Category: {func.category}
-                        </span>
-                        <Button
-                          onClick={() => executeFunction(func.id)}
-                          disabled={!isConnected || isExecuting}
-                          variant={func.riskLevel === 'high' ? 'destructive' : 'default'}
-                        >
-                          Execute
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </TabsContent>
-        ))}
-      </Tabs>
+                        {execution && (
+                          <Alert>
+                            <div className="flex items-center gap-2">
+                              {execution.status === 'completed' ? (
+                                <CheckCircle className="h-4 w-4 text-green-600" />
+                              ) : execution.status === 'failed' ? (
+                                <AlertTriangle className="h-4 w-4 text-red-600" />
+                              ) : (
+                                <RefreshCw className="h-4 w-4 animate-spin" />
+                              )}
+                              <AlertDescription>
+                                <div>
+                                  <p className="text-sm font-medium">
+                                    {execution.status === 'completed' ? 'Success' : 
+                                     execution.status === 'failed' ? 'Failed' : 'Running'}
+                                  </p>
+                                  <p className="text-xs">
+                                    {execution.endTime?.toLocaleString() || 'In progress...'}
+                                  </p>
+                                </div>
+                              </AlertDescription>
+                            </div>
+                          </Alert>
+                        )}
+
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                          <span className="text-xs text-muted-foreground">
+                            Category: {func.category}
+                          </span>
+                          <Button
+                            onClick={() => executeFunction(func.id)}
+                            disabled={!isConnected || isExecuting}
+                            variant={func.riskLevel === 'high' ? 'destructive' : 'default'}
+                            size="sm"
+                            className="w-full sm:w-auto"
+                          >
+                            Execute
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </TabsContent>
+          ))}
+        </Tabs>
+      )}
 
       {!isConnected && (
         <Alert>

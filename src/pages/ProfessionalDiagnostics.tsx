@@ -52,16 +52,16 @@ const ProfessionalDiagnostics: React.FC = () => {
   if (currentView === 'diagbox') {
     return (
       <div className="min-h-screen bg-background">
-        <div className="container mx-auto p-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
+        <div className="container mx-auto p-2 sm:p-4 max-w-7xl">
+          <div className="flex items-center gap-2 mb-4">
             <Button 
               variant="ghost" 
+              size="sm"
               onClick={handleBackToMenu}
               className="flex items-center gap-2"
             >
               <ArrowLeft className="h-4 w-4" />
-              <span className="hidden sm:inline">Back to Professional Diagnostics</span>
-              <span className="sm:hidden">Back</span>
+              <span>Back</span>
             </Button>
           </div>
           <LexiaDiagboxEmulator isConnected={isConnected} />
@@ -73,7 +73,7 @@ const ProfessionalDiagnostics: React.FC = () => {
   if (currentView === 'dtc') {
     return (
       <div className="min-h-screen bg-background">
-        <div className="container mx-auto p-4">
+        <div className="container mx-auto p-2 sm:p-4 max-w-7xl">
           <DTCPanel 
             isConnected={isConnected}
             onBack={handleBackToMenu}
@@ -86,16 +86,16 @@ const ProfessionalDiagnostics: React.FC = () => {
   if (currentView === 'live-data') {
     return (
       <div className="min-h-screen bg-background">
-        <div className="container mx-auto p-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
+        <div className="container mx-auto p-2 sm:p-4 max-w-7xl">
+          <div className="flex items-center gap-2 mb-4">
             <Button 
               variant="ghost" 
+              size="sm"
               onClick={handleBackToMenu}
               className="flex items-center gap-2"
             >
               <ArrowLeft className="h-4 w-4" />
-              <span className="hidden sm:inline">Back to Professional Diagnostics</span>
-              <span className="sm:hidden">Back</span>
+              <span>Back</span>
             </Button>
           </div>
           <LiveDataMonitor 
@@ -110,16 +110,16 @@ const ProfessionalDiagnostics: React.FC = () => {
   if (currentView === 'advanced') {
     return (
       <div className="min-h-screen bg-background">
-        <div className="container mx-auto p-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
+        <div className="container mx-auto p-2 sm:p-4 max-w-7xl">
+          <div className="flex items-center gap-2 mb-4">
             <Button 
               variant="ghost" 
+              size="sm"
               onClick={handleBackToMenu}
               className="flex items-center gap-2"
             >
               <ArrowLeft className="h-4 w-4" />
-              <span className="hidden sm:inline">Back to Professional Diagnostics</span>
-              <span className="sm:hidden">Back</span>
+              <span>Back</span>
             </Button>
           </div>
           <AdvancedDiagnosticsPanel 
@@ -134,16 +134,16 @@ const ProfessionalDiagnostics: React.FC = () => {
   if (currentView === 'bidirectional') {
     return (
       <div className="min-h-screen bg-background">
-        <div className="container mx-auto p-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
+        <div className="container mx-auto p-2 sm:p-4 max-w-7xl">
+          <div className="flex items-center gap-2 mb-4">
             <Button 
               variant="ghost" 
+              size="sm"
               onClick={handleBackToMenu}
               className="flex items-center gap-2"
             >
               <ArrowLeft className="h-4 w-4" />
-              <span className="hidden sm:inline">Back to Professional Diagnostics</span>
-              <span className="sm:hidden">Back</span>
+              <span>Back</span>
             </Button>
           </div>
           <BiDirectionalControlPanel 
@@ -159,7 +159,7 @@ const ProfessionalDiagnostics: React.FC = () => {
   if (currentView === 'service') {
     return (
       <div className="min-h-screen bg-background">
-        <div className="container mx-auto p-4">
+        <div className="container mx-auto p-2 sm:p-4 max-w-7xl">
           <AdvancedServicePanel 
             isConnected={isConnected}
             onBack={handleBackToMenu}
@@ -172,16 +172,16 @@ const ProfessionalDiagnostics: React.FC = () => {
   if (currentView === 'testing') {
     return (
       <div className="min-h-screen bg-background">
-        <div className="container mx-auto p-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
+        <div className="container mx-auto p-2 sm:p-4 max-w-7xl">
+          <div className="flex items-center gap-2 mb-4">
             <Button 
               variant="ghost" 
+              size="sm"
               onClick={handleBackToMenu}
               className="flex items-center gap-2"
             >
               <ArrowLeft className="h-4 w-4" />
-              <span className="hidden sm:inline">Back to Professional Diagnostics</span>
-              <span className="sm:hidden">Back</span>
+              <span>Back</span>
             </Button>
           </div>
           <VehicleTestingPanel 
@@ -195,17 +195,17 @@ const ProfessionalDiagnostics: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto p-4 max-w-6xl">
+      <div className="container mx-auto p-2 sm:p-4 max-w-6xl">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
             <Button 
               variant="ghost" 
+              size="sm"
               onClick={handleBackToMain}
               className="flex items-center space-x-2"
             >
               <ArrowLeft className="h-4 w-4" />
-              <span className="hidden sm:inline">Back to Main Menu</span>
-              <span className="sm:hidden">Back</span>
+              <span>Back</span>
             </Button>
           </div>
           <Badge variant="default" className="bg-green-500">
@@ -215,13 +215,13 @@ const ProfessionalDiagnostics: React.FC = () => {
 
         <div className="space-y-6">
           <div className="text-center space-y-2">
-            <h1 className="text-2xl sm:text-3xl font-bold text-primary">Professional OBD2 Diagnostics</h1>
-            <p className="text-muted-foreground text-sm sm:text-base">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-primary">Professional OBD2 Diagnostics</h1>
+            <p className="text-muted-foreground text-sm">
               Complete diagnostic suite with advanced features and professional-grade tools
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Fault Code Diagnostics */}
             <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => setCurrentView('dtc')}>
               <CardHeader className="pb-3">
@@ -373,9 +373,9 @@ const ProfessionalDiagnostics: React.FC = () => {
             </Card>
           </div>
 
-          <div className="mt-8 p-4 bg-muted/50 rounded-lg">
-            <h3 className="font-semibold mb-2 text-sm sm:text-base">Professional Features Include:</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs sm:text-sm">
+          <div className="mt-6 p-3 bg-muted/50 rounded-lg">
+            <h3 className="font-semibold mb-2 text-sm">Professional Features Include:</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs">
               <div>• 500+ Standard OBD2 PIDs</div>
               <div>• Manufacturer-Specific PIDs</div>
               <div>• All DTC Types</div>
