@@ -411,30 +411,32 @@ export class WorkingDiagnosticService {
       });
     }
 
-    // Add manufacturer specific PIDs - fix the typing issue completely
-    const manufacturerSpecificPids = MANUFACTURER_PIDS.filter((pid: ManufacturerPID) => {
-      return pid && 
-             pid.manufacturer && 
-             Array.isArray(pid.manufacturer) && 
-             pid.manufacturer.includes(manufacturer);
-    });
+    // Add manufacturer specific PIDs - completely rewrite to fix TypeScript inference
+    const allPids: ManufacturerPID[] = MANUFACTURER_PIDS || [];
+    const matchingPids: ManufacturerPID[] = [];
     
-    // Add the first 6 PIDs if any are available
-    if (manufacturerSpecificPids.length > 0) {
-      const availablePids = manufacturerSpecificPids.slice(0, 6);
-      availablePids.forEach(pid => {
-        functions.push({
-          id: `pid_${pid.pid}`,
-          name: pid.name,
-          type: 'live_pid',
-          category: 'monitoring',
-          description: pid.description,
-          manufacturer,
-          pid: pid.pid,
-          unit: pid.unit
-        });
-      });
+    for (let i = 0; i < allPids.length; i++) {
+      const pid = allPids[i];
+      if (pid && pid.manufacturer && Array.isArray(pid.manufacturer) && pid.manufacturer.includes(manufacturer)) {
+        matchingPids.push(pid);
+      }
     }
+    
+    // Take first 6 matching PIDs
+    const availablePids = matchingPids.slice(0, 6);
+    
+    availablePids.forEach(pid => {
+      functions.push({
+        id: `pid_${pid.pid}`,
+        name: pid.name,
+        type: 'live_pid',
+        category: 'monitoring',
+        description: pid.description,
+        manufacturer,
+        pid: pid.pid,
+        unit: pid.unit
+      });
+    });
 
     // Add service procedures
     Object.entries(SERVICE_PROCEDURES).forEach(([key, proc]) => {
