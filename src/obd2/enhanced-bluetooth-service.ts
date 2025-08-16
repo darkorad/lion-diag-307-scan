@@ -1,4 +1,3 @@
-
 // Enhanced Bluetooth Service for OBD2 scanning and connection management
 
 export interface BluetoothDevice {
@@ -66,7 +65,6 @@ export class EnhancedBluetoothService {
                 name: device.name || 'Unknown Device',
                 address: device.address,
                 isPaired: true,
-                class: device.class,
                 rssi: undefined
               }));
               resolve(bluetoothDevices);
@@ -114,7 +112,6 @@ export class EnhancedBluetoothService {
               name: device.name || 'Unknown Device',
               address: device.address,
               isPaired: false,
-              class: device.class,
               rssi: device.rssi
             }));
             resolve(bluetoothDevices);
@@ -160,7 +157,7 @@ export class EnhancedBluetoothService {
 
     if (window.bluetoothSerial) {
       return new Promise((resolve) => {
-        window.bluetoothSerial.connectInsecure(
+        window.bluetoothSerial.connect(
           deviceAddress,
           () => {
             console.log('Successfully connected to device');

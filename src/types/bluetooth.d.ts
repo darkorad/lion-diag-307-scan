@@ -34,6 +34,12 @@ declare global {
         errorCallback: (error: string) => void
       ) => void;
       
+      connectInsecure: (
+        address: string,
+        successCallback: () => void,
+        errorCallback: (error: string) => void
+      ) => void;
+      
       disconnect: (
         successCallback: () => void,
         errorCallback: (error: string) => void
@@ -68,6 +74,7 @@ declare global {
     address: string;
     name: string;
     rssi?: number;
+    class?: number;
   }
 }
 

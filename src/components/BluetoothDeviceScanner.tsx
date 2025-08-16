@@ -83,7 +83,7 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
               name: device.name || 'Unknown Device',
               isPaired: true,
               isConnected: false,
-              deviceType: isOBD2Device(device.name) ? 'ELM327' : 'Generic',
+              deviceType: isOBD2Device(device.name) ? 'ELM327' as const : 'Generic' as const,
               compatibility: isOBD2Device(device.name) ? 0.9 : 0.3
             }));
             setPairedDevices(pairedDeviceList);
@@ -101,7 +101,7 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
             name: 'ELM327 OBD2',
             isPaired: true,
             isConnected: false,
-            deviceType: 'ELM327',
+            deviceType: 'ELM327' as const,
             compatibility: 0.95
           }
         ]);
@@ -145,7 +145,7 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
               name: device.name || 'Unknown Device',
               isPaired: false,
               isConnected: false,
-              deviceType: isOBD2Device(device.name) ? 'ELM327' : 'Generic',
+              deviceType: isOBD2Device(device.name) ? 'ELM327' as const : 'Generic' as const,
               compatibility: isOBD2Device(device.name) ? 0.9 : 0.3,
               rssi: device.rssi
             }));
@@ -171,7 +171,7 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
               name: 'Vgate iCar Pro',
               isPaired: false,
               isConnected: false,
-              deviceType: 'OBD2',
+              deviceType: 'OBD2' as const,
               compatibility: 0.85,
               rssi: -60
             },
@@ -181,7 +181,7 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
               name: 'ELM327-WiFi',
               isPaired: false,
               isConnected: false,
-              deviceType: 'ELM327',
+              deviceType: 'ELM327' as const,
               compatibility: 0.92,
               rssi: -45
             }
