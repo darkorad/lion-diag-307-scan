@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Car, Settings, Database, Wrench } from 'lucide-react';
-import VisualVehicleSelector from '@/components/VisualVehicleSelector';
+import { VisualVehicleSelector } from '@/components/VisualVehicleSelector';
 import PeugeotComprehensiveDiagnostics from '@/components/PeugeotComprehensiveDiagnostics';
 import PeugeotECUCodingPanel from '@/components/PeugeotECUCodingPanel';
 
