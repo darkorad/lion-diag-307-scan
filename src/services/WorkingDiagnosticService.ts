@@ -412,14 +412,27 @@ export class WorkingDiagnosticService {
       });
     }
 
-    // Add manufacturer specific PIDs - properly type the array
-    const allManufacturerPids: typeof MANUFACTURER_PIDS = MANUFACTURER_PIDS || [];
-    const manufacturerPids = allManufacturerPids.filter(pid => 
+    // Add manufacturer specific PIDs - fix the type issue
+    const manufacturerPids = MANUFACTURER_PIDS.filter(pid => 
       pid.manufacturer && pid.manufacturer.includes(manufacturer)
     );
     
-    // Only slice if we have results
-    const availablePids = manufacturerPids.length > 0 ? manufacturerPids.slice(0, 6) : [];
+    // Add the first 6 PIDs if any are available
+    if (manufacturerPids.length > 0) {
+      const availablePids = manufacturerPids.slice(0, 6);
+      availablePids.forEach(pid => {
+        functions.push({
+          id: `pid_${pid.pid}`,
+          name: pid.name,
+          type: 'live_pid',
+          category: 'monitoring',
+          description: pid.description,
+          manufacturer,
+          pid: pid.pid,
+          unit: pid.unit
+        });
+      });
+    }
 
     // Add service procedures
     Object.entries(SERVICE_PROCEDURES).forEach(([key, proc]) => {
