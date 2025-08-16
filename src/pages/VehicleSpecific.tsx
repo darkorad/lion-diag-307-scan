@@ -13,12 +13,11 @@ import {
   ArrowLeft,
   CheckCircle,
   AlertCircle,
-  Smartphone,
   Loader2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { safeMasterBluetoothService } from '@/services/SafeMasterBluetoothService';
+import { mobileSafeBluetoothService, BluetoothDevice } from '@/services/MobileSafeBluetoothService';
 import { vehicleModulesService } from '@/services/VehicleModulesService';
 import BluetoothDeviceScanner from '@/components/BluetoothDeviceScanner';
 import PeugeotAlarmPanel from '@/components/PeugeotAlarmPanel';
@@ -26,10 +25,10 @@ import PeugeotAlarmPanel from '@/components/PeugeotAlarmPanel';
 const VehicleSpecific: React.FC = () => {
   const navigate = useNavigate();
   const [isConnected, setIsConnected] = useState(false);
-  const [connectedDevice, setConnectedDevice] = useState<any>(null);
+  const [connectedDevice, setConnectedDevice] = useState<BluetoothDevice | null>(null);
   const [selectedVehicle, setSelectedVehicle] = useState<string>('peugeot307');
   const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
+  const [initError, setInitError] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -37,14 +36,23 @@ const VehicleSpecific: React.FC = () => {
     const initializePage = async () => {
       try {
         setIsLoading(true);
-        setHasError(false);
+        setInitError(null);
         
         console.log('Initializing Vehicle Specific page...');
         
-        // Initialize services safely
-        await vehicleModulesService.initialize();
+        // Initialize services with proper error handling
+        const bluetoothInit = await mobileSafeBluetoothService.initialize();
+        const vehicleInit = await vehicleModulesService.initialize();
         
-        // Check connection status
+        if (!bluetoothInit) {
+          console.warn('Bluetooth service initialization failed');
+        }
+        
+        if (!vehicleInit) {
+          console.warn('Vehicle modules service initialization failed');
+        }
+        
+        // Check connection status safely
         if (mounted) {
           await checkConnection();
         }
@@ -52,8 +60,9 @@ const VehicleSpecific: React.FC = () => {
       } catch (error) {
         console.error('Page initialization error:', error);
         if (mounted) {
-          setHasError(true);
-          toast.error('Failed to initialize page');
+          const errorMessage = error instanceof Error ? error.message : 'Unknown initialization error';
+          setInitError(errorMessage);
+          toast.error('Failed to initialize page: ' + errorMessage);
         }
       } finally {
         if (mounted) {
@@ -71,7 +80,7 @@ const VehicleSpecific: React.FC = () => {
 
   const checkConnection = async () => {
     try {
-      const status = safeMasterBluetoothService.getConnectionStatus();
+      const status = mobileSafeBluetoothService.getConnectionStatus();
       console.log('Connection status:', status);
       
       setIsConnected(status.isConnected);
@@ -90,7 +99,7 @@ const VehicleSpecific: React.FC = () => {
         throw new Error('Not connected to OBD2 device');
       }
       
-      return await safeMasterBluetoothService.sendCommand(command);
+      return await mobileSafeBluetoothService.sendCommand(command);
     } catch (error) {
       console.error('Command failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -99,11 +108,12 @@ const VehicleSpecific: React.FC = () => {
     }
   };
 
-  const handleDeviceConnected = async (device: any) => {
+  const handleDeviceConnected = async (device: BluetoothDevice) => {
     try {
       setConnectedDevice(device);
       setIsConnected(true);
       toast.success(`Connected to ${device.name || 'OBD2 Device'}`);
+      await checkConnection(); // Refresh status
     } catch (error) {
       console.error('Device connection handling failed:', error);
       toast.error('Failed to handle device connection');
@@ -112,7 +122,7 @@ const VehicleSpecific: React.FC = () => {
 
   const handleDisconnect = async () => {
     try {
-      await safeMasterBluetoothService.disconnect();
+      await mobileSafeBluetoothService.disconnect();
       setIsConnected(false);
       setConnectedDevice(null);
       toast.info('Disconnected from device');
@@ -142,20 +152,24 @@ const VehicleSpecific: React.FC = () => {
     }
   };
 
-  if (hasError) {
+  // Error state
+  if (initError) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-red-600">
               <AlertCircle className="h-5 w-5" />
-              Page Error
+              Initialization Error
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-muted-foreground">
-              There was an error loading the Vehicle Specific page.
+              Failed to initialize the Vehicle Specific page:
             </p>
+            <div className="bg-red-50 border border-red-200 rounded p-3 text-sm">
+              {initError}
+            </div>
             <div className="flex gap-2">
               <Button onClick={() => window.location.reload()} variant="outline">
                 Retry
@@ -171,6 +185,7 @@ const VehicleSpecific: React.FC = () => {
     );
   }
 
+  // Loading state
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">

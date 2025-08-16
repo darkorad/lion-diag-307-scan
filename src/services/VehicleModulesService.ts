@@ -1,6 +1,6 @@
 
-import { BluetoothDevice } from './MasterBluetoothService';
-import { safeMasterBluetoothService } from './SafeMasterBluetoothService';
+import { BluetoothDevice } from '@/services/MobileSafeBluetoothService';
+import { mobileSafeBluetoothService } from '@/services/MobileSafeBluetoothService';
 
 export interface ModuleInfo {
   id: string;
@@ -38,10 +38,17 @@ export class VehicleModulesService {
 
   async initialize(): Promise<boolean> {
     try {
-      if (this.isInitialized) return true;
+      if (this.isInitialized) {
+        return true;
+      }
       
       console.log('Initializing VehicleModulesService...');
+      
+      // Initialize mobile-safe bluetooth service
+      await mobileSafeBluetoothService.initialize();
+      
       this.isInitialized = true;
+      console.log('VehicleModulesService initialized successfully');
       return true;
     } catch (error) {
       console.error('VehicleModulesService initialization failed:', error);
@@ -53,7 +60,7 @@ export class VehicleModulesService {
     try {
       await this.initialize();
       
-      const status = safeMasterBluetoothService.getConnectionStatus();
+      const status = mobileSafeBluetoothService.getConnectionStatus();
       if (!status.isConnected) {
         throw new Error('Not connected to OBD2 device');
       }
@@ -73,6 +80,20 @@ export class VehicleModulesService {
           ecuAddress: '02',
           supported: false,
           status: 'unknown'
+        },
+        {
+          id: 'abs',
+          name: 'ABS Control Module',
+          ecuAddress: '03',
+          supported: true,
+          status: 'ok'
+        },
+        {
+          id: 'airbag',
+          name: 'Airbag Control Module',
+          ecuAddress: '15',
+          supported: true,
+          status: 'ok'
         }
       ];
 
@@ -85,16 +106,55 @@ export class VehicleModulesService {
 
   async sendCommand(command: string): Promise<string> {
     try {
-      const status = safeMasterBluetoothService.getConnectionStatus();
+      const status = mobileSafeBluetoothService.getConnectionStatus();
       if (!status.isConnected) {
         throw new Error('Not connected to OBD2 device');
       }
 
-      return await safeMasterBluetoothService.sendCommand(command);
+      return await mobileSafeBluetoothService.sendCommand(command);
     } catch (error) {
       console.error('Command failed:', error);
       throw error;
     }
+  }
+
+  async readVehicleParameters(vehicleType: string): Promise<VehicleParameter[]> {
+    try {
+      await this.initialize();
+      
+      // Basic parameters for demonstration
+      const parameters: VehicleParameter[] = [
+        {
+          id: 'engine_speed',
+          name: 'Engine Speed',
+          value: 0,
+          unit: 'RPM',
+          min: 0,
+          max: 8000,
+          writable: false,
+          category: 'Engine'
+        },
+        {
+          id: 'vehicle_speed',
+          name: 'Vehicle Speed',
+          value: 0,
+          unit: 'km/h',
+          min: 0,
+          max: 250,
+          writable: false,
+          category: 'Vehicle'
+        }
+      ];
+
+      return parameters;
+    } catch (error) {
+      console.error('Failed to read vehicle parameters:', error);
+      throw error;
+    }
+  }
+
+  isInitialized(): boolean {
+    return this.isInitialized;
   }
 }
 

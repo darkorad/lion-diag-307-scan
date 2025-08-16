@@ -15,10 +15,9 @@ import {
   RefreshCw,
   Plus
 } from 'lucide-react';
-import { BluetoothDevice } from '@/services/MasterBluetoothService';
+import { BluetoothDevice, mobileSafeBluetoothService } from '@/services/MobileSafeBluetoothService';
 import { toast } from 'sonner';
 import { Capacitor } from '@capacitor/core';
-import { enhancedBluetoothService } from '@/obd2/enhanced-bluetooth-service';
 
 interface BluetoothDeviceScannerProps {
   onDeviceConnected: (device: BluetoothDevice) => void;
@@ -26,10 +25,8 @@ interface BluetoothDeviceScannerProps {
 
 const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDeviceConnected }) => {
   const [isScanning, setIsScanning] = useState(false);
-  const [isPairing, setIsPairing] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState<string | null>(null);
   const [devices, setDevices] = useState<BluetoothDevice[]>([]);
-  const [pairedDevices, setPairedDevices] = useState<BluetoothDevice[]>([]);
   const [scanProgress, setScanProgress] = useState(0);
   const [bluetoothEnabled, setBluetoothEnabled] = useState(false);
 
@@ -40,7 +37,7 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
 
   const checkBluetoothStatus = async () => {
     try {
-      const isEnabled = await enhancedBluetoothService.checkBluetoothStatus();
+      const isEnabled = await mobileSafeBluetoothService.isBluetoothEnabled();
       setBluetoothEnabled(isEnabled);
     } catch (error) {
       console.error('Error checking Bluetooth status:', error);
@@ -50,7 +47,7 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
 
   const enableBluetooth = async () => {
     try {
-      if (Capacitor.isNativePlatform() && window.bluetoothSerial) {
+      if (Capacitor.isNativePlatform() && window.bluetoothSerial?.enable) {
         window.bluetoothSerial.enable(
           () => {
             setBluetoothEnabled(true);
@@ -63,6 +60,7 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
         );
       } else {
         toast.info('Bluetooth management not available on web platform');
+        setBluetoothEnabled(true); // Assume enabled for web
       }
     } catch (error) {
       console.error('Error enabling Bluetooth:', error);
@@ -72,20 +70,11 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
 
   const loadPairedDevices = async () => {
     try {
-      const pairedDeviceList = await enhancedBluetoothService.getPairedDevices();
-      const formattedDevices = pairedDeviceList.map(device => ({
-        id: device.id,
-        address: device.address,
-        name: device.name,
-        isPaired: device.isPaired,
-        isConnected: false,
-        deviceType: isOBD2Device(device.name) ? 'ELM327' as const : 'Generic' as const,
-        compatibility: isOBD2Device(device.name) ? 0.9 : 0.3
-      }));
-      setPairedDevices(formattedDevices);
+      const pairedDeviceList = await mobileSafeBluetoothService.scanForDevices();
+      setDevices(pairedDeviceList);
     } catch (error) {
       console.error('Failed to load paired devices:', error);
-      setPairedDevices([]);
+      setDevices([]);
     }
   };
 
@@ -97,7 +86,6 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
 
     setIsScanning(true);
     setScanProgress(0);
-    setDevices([]);
 
     try {
       // Start progress animation
@@ -109,27 +97,16 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
           }
           return prev + 10;
         });
-      }, 1000);
+      }, 500);
 
-      // Discover unpaired devices
-      const discoveredDevices = await enhancedBluetoothService.discoverDevices();
+      // Scan for devices
+      const discoveredDevices = await mobileSafeBluetoothService.scanForDevices();
       
       clearInterval(progressInterval);
       setScanProgress(100);
       
-      const formattedDevices = discoveredDevices.map(device => ({
-        id: device.id,
-        address: device.address,
-        name: device.name,
-        isPaired: device.isPaired,
-        isConnected: false,
-        deviceType: isOBD2Device(device.name) ? 'ELM327' as const : 'Generic' as const,
-        compatibility: isOBD2Device(device.name) ? 0.9 : 0.3,
-        rssi: device.rssi
-      }));
-      
-      setDevices(formattedDevices);
-      toast.success(`Found ${formattedDevices.length} available devices`);
+      setDevices(discoveredDevices);
+      toast.success(`Found ${discoveredDevices.length} devices`);
       
     } catch (error) {
       console.error('Scan failed:', error);
@@ -142,49 +119,17 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
     }
   };
 
-  const pairDevice = async (device: BluetoothDevice) => {
-    setIsPairing(device.id);
-
-    try {
-      if (Capacitor.isNativePlatform() && window.bluetoothSerial) {
-        window.bluetoothSerial.pair(
-          device.address,
-          () => {
-            toast.success(`Paired with ${device.name}`);
-            setPairedDevices(prev => [...prev, { ...device, isPaired: true }]);
-            setDevices(prev => prev.filter(d => d.id !== device.id));
-            loadPairedDevices(); // Refresh paired devices list
-          },
-          (error) => {
-            console.error('Pairing failed:', error);
-            toast.error(`Failed to pair with ${device.name}: ${error}`);
-          }
-        );
-      } else {
-        toast.error('Pairing not available on web platform');
-      }
-    } catch (error) {
-      console.error('Pairing error:', error);
-      toast.error('Pairing failed');
-    } finally {
-      setIsPairing(null);
-    }
-  };
-
   const connectToDevice = async (device: BluetoothDevice) => {
     setIsConnecting(device.id);
 
     try {
-      const success = await enhancedBluetoothService.connectToDevice(device);
+      const result = await mobileSafeBluetoothService.connectToDevice(device);
       
-      if (success) {
-        // Initialize ELM327 after connection
-        await enhancedBluetoothService.initializeELM327CarScannerStyle();
-        
+      if (result.success && result.device) {
         toast.success(`Connected to ${device.name}`);
-        onDeviceConnected({ ...device, isConnected: true });
+        onDeviceConnected(result.device);
       } else {
-        toast.error(`Failed to connect to ${device.name}`);
+        toast.error(`Failed to connect to ${device.name}: ${result.error}`);
       }
     } catch (error) {
       console.error('Connection error:', error);
@@ -192,18 +137,6 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
     } finally {
       setIsConnecting(null);
     }
-  };
-
-  const isOBD2Device = (name: string) => {
-    const lowerName = name.toLowerCase();
-    return lowerName.includes('elm327') || 
-           lowerName.includes('obd') || 
-           lowerName.includes('vgate') ||
-           lowerName.includes('icar') ||
-           lowerName.includes('konnwei') ||
-           lowerName.includes('autel') ||
-           lowerName.includes('scan') ||
-           lowerName.includes('diagnostic');
   };
 
   const getDeviceIcon = (device: BluetoothDevice) => {
@@ -237,7 +170,7 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
         <CardContent>
           <div className="flex items-center space-x-2">
             <div className={`w-3 h-3 rounded-full ${bluetoothEnabled ? 'bg-green-500' : 'bg-red-500'}`} />
-            <span>{bluetoothEnabled ? 'Bluetooth Enabled' : 'Bluetooth Disabled'}</span>
+            <span>{bluetoothEnabled ? 'Bluetooth Ready' : 'Bluetooth Disabled'}</span>
           </div>
         </CardContent>
       </Card>
@@ -245,9 +178,14 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
       {/* Device Scanner */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Search className="h-5 w-5" />
-            <span>Scan for New Devices</span>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Search className="h-5 w-5" />
+              <span>Available Devices</span>
+            </div>
+            <Button onClick={scanForDevices} disabled={isScanning || !bluetoothEnabled} size="sm">
+              <RefreshCw className={`h-4 w-4 ${isScanning ? 'animate-spin' : ''}`} />
+            </Button>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -265,7 +203,7 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
             ) : (
               <>
                 <Search className="mr-2 h-4 w-4" />
-                Start Device Scan
+                Scan for Devices
               </>
             )}
           </Button>
@@ -274,17 +212,17 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
             <div className="space-y-2">
               <Progress value={scanProgress} className="w-full" />
               <p className="text-sm text-muted-foreground text-center">
-                Discovering nearby Bluetooth devices... {scanProgress}%
+                Discovering Bluetooth devices... {scanProgress}%
               </p>
             </div>
           )}
 
-          {/* Discovered Devices */}
-          {devices.length > 0 && (
+          {/* Device List */}
+          {devices.length > 0 ? (
             <div className="space-y-3">
-              <h4 className="font-semibold">Available Devices ({devices.length})</h4>
+              <h4 className="font-semibold">Found Devices ({devices.length})</h4>
               {devices.map((device) => (
-                <Card key={device.id} className="border-2 border-dashed">
+                <Card key={device.id}>
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
@@ -301,69 +239,6 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
                         <Badge variant={device.deviceType === 'ELM327' ? 'default' : 'secondary'}>
                           {device.deviceType}
                         </Badge>
-                        <Button
-                          onClick={() => pairDevice(device)}
-                          disabled={isPairing !== null}
-                          size="sm"
-                          variant="outline"
-                        >
-                          {isPairing === device.id ? (
-                            <>
-                              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                              Pairing...
-                            </>
-                          ) : (
-                            <>
-                              <Plus className="mr-1 h-3 w-3" />
-                              Pair
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Paired Devices */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <CheckCircle className="h-5 w-5" />
-              <span>Paired Devices</span>
-            </div>
-            <Button onClick={loadPairedDevices} variant="outline" size="sm">
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {pairedDevices.length === 0 ? (
-            <div className="text-center py-6 text-muted-foreground">
-              <Bluetooth className="h-8 w-8 mx-auto mb-2" />
-              <p>No paired devices found</p>
-              <p className="text-sm">Scan for devices and pair them first</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {pairedDevices.map((device) => (
-                <Card key={device.id}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        {getDeviceIcon(device)}
-                        <div>
-                          <p className="font-medium">{device.name}</p>
-                          <p className="text-sm text-muted-foreground">{device.address}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant="default">Paired</Badge>
                         <Button
                           onClick={() => connectToDevice(device)}
                           disabled={isConnecting !== null}
@@ -387,6 +262,12 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
                 </Card>
               ))}
             </div>
+          ) : (
+            <div className="text-center py-6 text-muted-foreground">
+              <Bluetooth className="h-8 w-8 mx-auto mb-2" />
+              <p>No devices found</p>
+              <p className="text-sm">Make sure your OBD2 device is powered on and try scanning</p>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -398,9 +279,8 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
           <ul className="mt-2 text-sm space-y-1">
             <li>1. Make sure your OBD2 adapter is powered on</li>
             <li>2. Enable Bluetooth on your device</li>
-            <li>3. Scan for available devices</li>
-            <li>4. Pair with your OBD2 adapter</li>
-            <li>5. Connect to start diagnostics</li>
+            <li>3. Pair your OBD2 adapter in device settings first</li>
+            <li>4. Scan and connect to start diagnostics</li>
           </ul>
         </AlertDescription>
       </Alert>
