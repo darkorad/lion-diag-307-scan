@@ -1,4 +1,4 @@
-import { REAL_DTC_CODES, MANUFACTURER_PIDS, ACTUATOR_TESTS, SERVICE_PROCEDURES, VEHICLE_CODING } from '@/constants/realDiagnosticCodes';
+import { REAL_DTC_CODES, MANUFACTURER_PIDS, ACTUATOR_TESTS, SERVICE_PROCEDURES, VEHICLE_CODING, ManufacturerPID } from '@/constants/realDiagnosticCodes';
 import { mobileSafeBluetoothService } from '@/services/MobileSafeBluetoothService';
 
 export interface DiagnosticResult {
@@ -412,8 +412,8 @@ export class WorkingDiagnosticService {
       });
     }
 
-    // Add manufacturer specific PIDs - fix the type issue with explicit typing and type guards
-    const manufacturerPids = MANUFACTURER_PIDS.filter((pid): pid is typeof pid => {
+    // Add manufacturer specific PIDs - fix the type issue with proper ManufacturerPID interface
+    const manufacturerPids = MANUFACTURER_PIDS.filter((pid): pid is ManufacturerPID => {
       return pid && 
              pid.manufacturer && 
              Array.isArray(pid.manufacturer) && 
