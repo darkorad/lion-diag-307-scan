@@ -18,6 +18,18 @@ export interface LivePIDData {
   raw: string;
 }
 
+// Type guard helper for better type safety
+function isManufacturerPID(pid: any): pid is ManufacturerPID {
+  return (
+    pid != null &&
+    typeof pid === 'object' &&
+    typeof pid.pid === 'string' &&
+    typeof pid.name === 'string' &&
+    Array.isArray(pid.manufacturer) &&
+    pid.manufacturer.every((m: any) => typeof m === 'string')
+  );
+}
+
 export class WorkingDiagnosticService {
   private static instance: WorkingDiagnosticService;
 
@@ -411,17 +423,12 @@ export class WorkingDiagnosticService {
       });
     }
 
-    // Add manufacturer specific PIDs - fix TypeScript inference by explicit typing
-    const manufacturerSpecificPids: ManufacturerPID[] = (MANUFACTURER_PIDS as ManufacturerPID[]).filter((pid: ManufacturerPID) => {
-      return pid && 
-             pid.manufacturer && 
-             Array.isArray(pid.manufacturer) && 
-             pid.manufacturer.includes(manufacturer);
-    });
-    
-    // Take first 6 matching PIDs
-    const availablePids = manufacturerSpecificPids.slice(0, 6);
-    
+    // Add manufacturer specific PIDs - Fixed with better typing
+    const availablePids = MANUFACTURER_PIDS
+      .filter(isManufacturerPID)
+      .filter(pid => pid.manufacturer.some(m => m.toLowerCase() === manufacturer.toLowerCase()))
+      .slice(0, 6); // ✅ Now works — TypeScript knows it's ManufacturerPID[]
+
     availablePids.forEach(pid => {
       functions.push({
         id: `pid_${pid.pid}`,
@@ -450,8 +457,8 @@ export class WorkingDiagnosticService {
     });
 
     // Add coding options
-    const codingKey = `${manufacturer.toUpperCase()}_CODING`;
-    if (VEHICLE_CODING[codingKey as keyof typeof VEHICLE_CODING]) {
+    const codingKey = `${manufacturer.toUpperCase()}_CODING` as keyof typeof VEHICLE_CODING;
+    if (VEHICLE_CODING[codingKey]) {
       functions.push({
         id: `coding_${manufacturer}`,
         name: 'Vehicle Coding',
