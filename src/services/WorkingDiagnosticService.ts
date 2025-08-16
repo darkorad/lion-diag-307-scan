@@ -1,4 +1,5 @@
-import { REAL_DTC_CODES, MANUFACTURER_PIDS, ACTUATOR_TESTS, SERVICE_PROCEDURES, VEHICLE_CODING, ManufacturerPID } from '@/constants/realDiagnosticCodes';
+import { REAL_DTC_CODES, MANUFACTURER_PIDS, ACTUATOR_TESTS, SERVICE_PROCEDURES, VEHICLE_CODING } from '@/constants/realDiagnosticCodes';
+import type { ManufacturerPID } from '@/constants/realDiagnosticCodes';
 import { mobileSafeBluetoothService } from '@/services/MobileSafeBluetoothService';
 
 export interface DiagnosticResult {
@@ -410,16 +411,16 @@ export class WorkingDiagnosticService {
       });
     }
 
-    // Add manufacturer specific PIDs - properly type the filtered result
-    const allPids: ManufacturerPID[] = MANUFACTURER_PIDS;
-    const manufacturerPids: ManufacturerPID[] = allPids.filter((pid: ManufacturerPID) => {
-      return pid != null && 
-             pid.manufacturer != null && 
-             Array.isArray(pid.manufacturer) && 
-             pid.manufacturer.includes(manufacturer);
-    });
+    // Add manufacturer specific PIDs - fix the TypeScript inference issue
+    const manufacturerPids = (MANUFACTURER_PIDS as ManufacturerPID[])
+      .filter((pid) => {
+        return pid && 
+               pid.manufacturer && 
+               Array.isArray(pid.manufacturer) && 
+               pid.manufacturer.includes(manufacturer);
+      });
     
-    // Add the first 6 PIDs if any are available - now slice() will work correctly
+    // Add the first 6 PIDs if any are available
     if (manufacturerPids.length > 0) {
       const availablePids = manufacturerPids.slice(0, 6);
       availablePids.forEach(pid => {
