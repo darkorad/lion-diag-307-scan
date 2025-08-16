@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle, Car, CheckCircle } from 'lucide-react';
-import { VehicleDatabase } from '@/constants/vehicleDatabase';
+import { VEHICLE_DATABASE } from '@/constants/vehicleDatabase';
 import { mobileSafeBluetoothService } from '@/services/MobileSafeBluetoothService';
 import WorkingVehicleSpecificDiagnostics from '@/components/WorkingVehicleSpecificDiagnostics';
 import BackButton from '@/components/BackButton';
@@ -27,7 +26,7 @@ const VehicleSpecific = () => {
 
   const loadVehicleInfo = () => {
     try {
-      const makeData = VehicleDatabase.find(m => m.id === make);
+      const makeData = VEHICLE_DATABASE.find(m => m.id === make);
       if (!makeData) {
         throw new Error(`Make ${make} not found`);
       }
@@ -50,12 +49,12 @@ const VehicleSpecific = () => {
       setVehicleInfo({
         manufacturer: makeData.name,
         model: modelData.name,
-        year: generationData.years,
+        year: `${generationData.yearRange.start}-${generationData.yearRange.end}`,
         generation: generationData.name,
         engine: engineData.name,
         displacement: engineData.displacement,
         power: engineData.power,
-        fuel: engineData.fuel,
+        fuel: engineData.fuelType,
         makeId: makeData.id,
         modelId: modelData.id,
         generationId: generationData.id,
@@ -70,16 +69,16 @@ const VehicleSpecific = () => {
     try {
       const status = mobileSafeBluetoothService.getConnectionStatus();
       setIsConnected(status.isConnected);
-      setConnectionStatus(status.status);
+      setConnectionStatus(status.isConnected ? 'Connected' : 'Not Connected');
     } catch (error) {
       setIsConnected(false);
-      setConnectionStatus('error');
+      setConnectionStatus('Error');
     }
   };
 
   const handleConnect = async () => {
     try {
-      const success = await mobileSafeBluetoothService.connectToDevice();
+      const success = await mobileSafeBluetoothService.connectToDevice('');
       if (success) {
         setIsConnected(true);
         setConnectionStatus('Connected');

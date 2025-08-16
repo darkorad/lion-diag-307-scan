@@ -1,4 +1,3 @@
-
 import { REAL_DTC_CODES, MANUFACTURER_PIDS, ACTUATOR_TESTS, SERVICE_PROCEDURES, VEHICLE_CODING } from '@/constants/realDiagnosticCodes';
 import { mobileSafeBluetoothService } from '@/services/MobileSafeBluetoothService';
 
@@ -30,7 +29,6 @@ export class WorkingDiagnosticService {
 
   private constructor() {}
 
-  // Read real DTCs from vehicle
   async readDTCs(): Promise<DiagnosticResult> {
     try {
       // Read stored DTCs
@@ -56,7 +54,6 @@ export class WorkingDiagnosticService {
     }
   }
 
-  // Clear DTCs
   async clearDTCs(): Promise<DiagnosticResult> {
     try {
       const response = await this.sendOBDCommand('04');
@@ -75,7 +72,6 @@ export class WorkingDiagnosticService {
     }
   }
 
-  // Read live PID data
   async readLivePID(pid: string, manufacturer?: string): Promise<LivePIDData | null> {
     try {
       let command = pid;
@@ -110,7 +106,6 @@ export class WorkingDiagnosticService {
     }
   }
 
-  // Perform actuator test
   async performActuatorTest(manufacturer: string, testType: string): Promise<DiagnosticResult> {
     try {
       const manufacturerTests = ACTUATOR_TESTS[manufacturer.toUpperCase() as keyof typeof ACTUATOR_TESTS];
@@ -154,7 +149,6 @@ export class WorkingDiagnosticService {
     }
   }
 
-  // Perform service reset
   async performServiceReset(procedure: string): Promise<DiagnosticResult> {
     try {
       const serviceProc = SERVICE_PROCEDURES[procedure as keyof typeof SERVICE_PROCEDURES];
@@ -191,7 +185,6 @@ export class WorkingDiagnosticService {
     }
   }
 
-  // Perform vehicle coding
   async performCoding(manufacturer: string, codingType: string, customCode?: string): Promise<DiagnosticResult> {
     try {
       const manufacturerCoding = VEHICLE_CODING[`${manufacturer.toUpperCase()}_${codingType}` as keyof typeof VEHICLE_CODING];
@@ -227,7 +220,6 @@ export class WorkingDiagnosticService {
     }
   }
 
-  // Perform DPF regeneration
   async performDPFRegeneration(): Promise<DiagnosticResult> {
     try {
       // Start regeneration
@@ -419,6 +411,14 @@ export class WorkingDiagnosticService {
         });
       });
     }
+
+    // Add service procedures - fix the slice issue by ensuring manufacturerPids is an array
+    const manufacturerPids = MANUFACTURER_PIDS.filter(pid => 
+      pid.manufacturer.includes(manufacturer)
+    );
+    
+    // Only slice if we have results
+    const availablePids = manufacturerPids.length > 0 ? manufacturerPids.slice(0, 6) : [];
 
     // Add service procedures
     Object.entries(SERVICE_PROCEDURES).forEach(([key, proc]) => {
