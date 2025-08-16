@@ -1,3 +1,4 @@
+
 import { REAL_DTC_CODES, MANUFACTURER_PIDS, ACTUATOR_TESTS, SERVICE_PROCEDURES, VEHICLE_CODING } from '@/constants/realDiagnosticCodes';
 import { mobileSafeBluetoothService } from '@/services/MobileSafeBluetoothService';
 
@@ -412,27 +413,28 @@ export class WorkingDiagnosticService {
       });
     }
 
-    // Add manufacturer specific PIDs - fix the type issue by ensuring we have a proper array
-    const allPids = MANUFACTURER_PIDS || [];
-    const manufacturerPids = allPids.filter(pid => 
-      pid && pid.manufacturer && Array.isArray(pid.manufacturer) && pid.manufacturer.includes(manufacturer)
-    );
-    
-    // Add the first 6 PIDs if any are available
-    if (manufacturerPids.length > 0) {
-      const availablePids = manufacturerPids.slice(0, 6);
-      availablePids.forEach(pid => {
-        functions.push({
-          id: `pid_${pid.pid}`,
-          name: pid.name,
-          type: 'live_pid',
-          category: 'monitoring',
-          description: pid.description,
-          manufacturer,
-          pid: pid.pid,
-          unit: pid.unit
+    // Add manufacturer specific PIDs - fix the type issue
+    if (MANUFACTURER_PIDS && Array.isArray(MANUFACTURER_PIDS)) {
+      const manufacturerPids = MANUFACTURER_PIDS.filter(pid => 
+        pid && pid.manufacturer && Array.isArray(pid.manufacturer) && pid.manufacturer.includes(manufacturer)
+      );
+      
+      // Add the first 6 PIDs if any are available
+      if (manufacturerPids.length > 0) {
+        const availablePids = manufacturerPids.slice(0, 6);
+        availablePids.forEach(pid => {
+          functions.push({
+            id: `pid_${pid.pid}`,
+            name: pid.name,
+            type: 'live_pid',
+            category: 'monitoring',
+            description: pid.description,
+            manufacturer,
+            pid: pid.pid,
+            unit: pid.unit
+          });
         });
-      });
+      }
     }
 
     // Add service procedures
