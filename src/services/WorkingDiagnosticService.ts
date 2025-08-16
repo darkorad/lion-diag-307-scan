@@ -329,6 +329,7 @@ export class WorkingDiagnosticService {
   getAvailableFunctions(manufacturer: string): any[] {
     const functions = [];
 
+    // Add actuator tests
     const tests = ACTUATOR_TESTS[manufacturer.toUpperCase() as keyof typeof ACTUATOR_TESTS];
     if (tests) {
       Object.keys(tests).forEach(test => {
@@ -343,23 +344,29 @@ export class WorkingDiagnosticService {
       });
     }
 
-    const manufacturerPids: ManufacturerPID[] = MANUFACTURER_PIDS.filter(isManufacturerPID);
-    const availablePids = manufacturerPids
-      .filter(pid => pid.manufacturer.some(m => m.toLowerCase() === manufacturer.toLowerCase()))
-      .slice(0, 6);
+    // Add manufacturer specific PIDs - Fixed type handling
+    try {
+      const validPids = MANUFACTURER_PIDS.filter(isManufacturerPID);
+      const manufacturerPids = validPids.filter(pid => 
+        pid.manufacturer.some(m => m.toLowerCase() === manufacturer.toLowerCase())
+      );
+      const availablePids = manufacturerPids.slice(0, 6);
 
-    availablePids.forEach(pid => {
-      functions.push({
-        id: `pid_${pid.pid}`,
-        name: pid.name,
-        type: 'live_pid',
-        category: 'monitoring',
-        description: pid.description,
-        manufacturer,
-        pid: pid.pid,
-        unit: pid.unit
+      availablePids.forEach(pid => {
+        functions.push({
+          id: `pid_${pid.pid}`,
+          name: pid.name,
+          type: 'live_pid',
+          category: 'monitoring',
+          description: pid.description,
+          manufacturer,
+          pid: pid.pid,
+          unit: pid.unit
+        });
       });
-    });
+    } catch (error) {
+      console.warn('Error processing manufacturer PIDs:', error);
+    }
 
     Object.entries(SERVICE_PROCEDURES).forEach(([key, proc]) => {
       if (key.includes(manufacturer.toUpperCase())) {

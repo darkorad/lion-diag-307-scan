@@ -70,6 +70,14 @@ const App = () => {
                 </VehicleSpecificErrorBoundary>
               } 
             />
+            <Route 
+              path="/vehicle-specific/:make/:model/:generation/:engine" 
+              element={
+                <VehicleSpecificErrorBoundary>
+                  <VehicleSpecific />
+                </VehicleSpecificErrorBoundary>
+              } 
+            />
             <Route path="/professional-diagnostics" element={<ProfessionalDiagnostics />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

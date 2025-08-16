@@ -8,6 +8,7 @@ import { VEHICLE_DATABASE } from '@/constants/vehicleDatabase';
 import { mobileSafeBluetoothService } from '@/services/MobileSafeBluetoothService';
 import WorkingVehicleSpecificDiagnostics from '@/components/WorkingVehicleSpecificDiagnostics';
 import BackButton from '@/components/BackButton';
+import { VisualVehicleSelector } from '@/components/VisualVehicleSelector';
 
 const VehicleSpecific = () => {
   const { make, model, generation, engine } = useParams();
@@ -15,8 +16,16 @@ const VehicleSpecific = () => {
   const [vehicleInfo, setVehicleInfo] = useState<any>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('');
+  const [showVehicleSelector, setShowVehicleSelector] = useState(false);
 
   useEffect(() => {
+    // If no vehicle parameters, show the vehicle selector
+    if (!make || !model || !generation || !engine) {
+      console.log('No vehicle parameters found, showing selector');
+      setShowVehicleSelector(true);
+      return;
+    }
+
     loadVehicleInfo();
     checkConnectionStatus();
     
@@ -28,22 +37,30 @@ const VehicleSpecific = () => {
     try {
       const makeData = VEHICLE_DATABASE.find(m => m.id === make);
       if (!makeData) {
-        throw new Error(`Make ${make} not found`);
+        console.error(`Make ${make} not found in database`);
+        setShowVehicleSelector(true);
+        return;
       }
 
       const modelData = makeData.models?.find(m => m.id === model);
       if (!modelData) {
-        throw new Error(`Model ${model} not found`);
+        console.error(`Model ${model} not found for make ${make}`);
+        setShowVehicleSelector(true);
+        return;
       }
 
       const generationData = modelData.generations?.find(g => g.id === generation);
       if (!generationData) {
-        throw new Error(`Generation ${generation} not found`);
+        console.error(`Generation ${generation} not found for model ${model}`);
+        setShowVehicleSelector(true);
+        return;
       }
 
       const engineData = generationData.engines?.find(e => e.id === engine);
       if (!engineData) {
-        throw new Error(`Engine ${engine} not found`);
+        console.error(`Engine ${engine} not found for generation ${generation}`);
+        setShowVehicleSelector(true);
+        return;
       }
 
       setVehicleInfo({
@@ -62,6 +79,7 @@ const VehicleSpecific = () => {
       });
     } catch (error) {
       console.error('Error loading vehicle info:', error);
+      setShowVehicleSelector(true);
     }
   };
 
@@ -98,8 +116,42 @@ const VehicleSpecific = () => {
   };
 
   const handleBack = () => {
-    navigate('/vehicle-selection');
+    navigate('/');
   };
+
+  const handleVehicleSelected = (profile: any) => {
+    // Navigate to the vehicle-specific page with the selected parameters
+    navigate(`/vehicle-specific/${profile.makeId}/${profile.modelId}/${profile.generationId}/${profile.engineId}`);
+    setShowVehicleSelector(false);
+  };
+
+  // Show vehicle selector if no vehicle is selected or if there was an error loading vehicle info
+  if (showVehicleSelector) {
+    return (
+      <div className="container mx-auto p-4">
+        <div className="flex items-center gap-4 mb-6">
+          <BackButton 
+            onBack={handleBack}
+            fallbackRoute="/"
+            variant="ghost"
+            size="sm"
+            label="Back to Home"
+            showIcon={true}
+          />
+        </div>
+        
+        <VisualVehicleSelector 
+          onVehicleSelected={handleVehicleSelected}
+          selectedProfile={null}
+          isConnected={isConnected}
+          onCommand={async (command: string) => {
+            // Mock command handler for now
+            return 'OK';
+          }}
+        />
+      </div>
+    );
+  }
 
   if (!vehicleInfo) {
     return (
@@ -107,17 +159,17 @@ const VehicleSpecific = () => {
         <div className="flex items-center gap-4 mb-6">
           <BackButton 
             onBack={handleBack}
-            fallbackRoute="/vehicle-selection"
+            fallbackRoute="/"
             variant="ghost"
             size="sm"
-            label="Back to Selection"
+            label="Back to Home"
             showIcon={true}
           />
         </div>
         <Alert>
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            Vehicle information not found. Please go back and select a vehicle.
+            Loading vehicle information...
           </AlertDescription>
         </Alert>
       </div>
