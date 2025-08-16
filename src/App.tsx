@@ -1,168 +1,108 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { navItems } from "./nav-items";
-import Dashboard from './components/Dashboard';
-import MobileConnectionScreen from './components/mobile/MobileConnectionScreen';
-import MobileErrorBoundary from './components/mobile/MobileErrorBoundary';
-import { bluetoothIntegrationService } from './services/BluetoothIntegrationService';
-import { bluetoothConnectionManager } from './services/BluetoothConnectionManager';
-import { BluetoothDevice } from './services/MasterBluetoothService';
-import { toast } from 'sonner';
-import { Capacitor } from '@capacitor/core';
+import Index from "./pages/Index";
+import NotFound from "./pages/NotFound";
+import ProfessionalDiagnostics from "./pages/ProfessionalDiagnostics";
+import MobileErrorBoundary from "./components/mobile/MobileErrorBoundary";
+import './App.css';
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
       staleTime: 5 * 60 * 1000,
+      retry: 1,
     },
   },
 });
 
-const App = () => {
-  const [isConnected, setIsConnected] = useState(false);
-  const [connectionStrength, setConnectionStrength] = useState(0);
-  const [vehicleData, setVehicleData] = useState({});
-  const [showConnectionScreen, setShowConnectionScreen] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
+function App() {
+  const [isAppReady, setIsAppReady] = useState(false);
+  const [initError, setInitError] = useState<string | null>(null);
 
   useEffect(() => {
-    let mounted = true;
-
     const initializeApp = async () => {
       try {
-        console.log('Initializing app for platform:', Capacitor.getPlatform());
+        console.log('Initializing app...');
         
-        // Subscribe to connection state changes
-        const unsubscribe = bluetoothConnectionManager.subscribe((state) => {
-          if (!mounted) return;
-          
-          setIsConnected(state.isConnected);
-          setConnectionStrength(state.connectionQuality === 'excellent' ? 100 : 
-                               state.connectionQuality === 'good' ? 75 :
-                               state.connectionQuality === 'fair' ? 50 : 25);
-        });
-
-        // Initialize Bluetooth system if on mobile
-        if (Capacitor.isNativePlatform()) {
-          try {
-            await bluetoothIntegrationService.initializeBluetoothSystem();
-            console.log('Mobile Bluetooth system initialized');
-          } catch (error) {
-            console.warn('Bluetooth initialization failed, will retry on connect:', error);
-          }
+        // Wait for Capacitor to be ready if on mobile
+        if (window.Capacitor) {
+          console.log('Waiting for Capacitor platform ready...');
+          await new Promise(resolve => {
+            document.addEventListener('deviceready', resolve, false);
+            // Fallback timeout in case deviceready doesn't fire
+            setTimeout(resolve, 3000);
+          });
+          console.log('Capacitor platform ready');
         }
 
-        if (mounted) {
-          setIsInitializing(false);
-        }
-
-        return unsubscribe;
+        // Add a small delay to ensure everything is fully initialized
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        console.log('App initialization complete');
+        setIsAppReady(true);
+        
       } catch (error) {
         console.error('App initialization failed:', error);
-        if (mounted) {
-          setIsInitializing(false);
-        }
+        setInitError(error instanceof Error ? error.message : 'Unknown initialization error');
+        // Still set app as ready to show error UI
+        setIsAppReady(true);
       }
     };
 
-    const unsubscribePromise = initializeApp();
-
-    return () => {
-      mounted = false;
-      unsubscribePromise.then(unsubscribe => {
-        if (unsubscribe) unsubscribe();
-      });
-    };
+    initializeApp();
   }, []);
 
-  const handleConnect = async (): Promise<void> => {
-    try {
-      console.log('Connect button pressed');
-      setShowConnectionScreen(true);
-    } catch (error) {
-      console.error('Connection failed:', error);
-      toast.error('Connection failed');
-    }
-  };
-
-  const handleDisconnect = async (): Promise<void> => {
-    try {
-      await bluetoothIntegrationService.disconnect();
-      toast.success('Disconnected from device');
-    } catch (error) {
-      console.error('Disconnect failed:', error);
-      toast.error('Disconnect failed');
-    }
-  };
-
-  const handleDeviceConnected = (device: BluetoothDevice) => {
-    setShowConnectionScreen(false);
-    toast.success(`Connected to ${device.name}`);
-  };
-
-  const handleBackFromConnection = () => {
-    setShowConnectionScreen(false);
-  };
-
-  if (isInitializing) {
+  if (!isAppReady) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Initializing OBD2 Diagnostic App...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Initializing OBD2 Diagnostic Tool...</p>
         </div>
       </div>
     );
   }
 
-  const AppContent = () => {
-    if (showConnectionScreen) {
-      return (
-        <MobileConnectionScreen 
-          onDeviceConnected={handleDeviceConnected}
-          onBack={handleBackFromConnection}
-        />
-      );
-    }
-
+  if (initError) {
     return (
-      <Routes>
-        <Route 
-          path="/" 
-          element={
-            <Dashboard
-              isConnected={isConnected}
-              connectionStrength={connectionStrength}
-              vehicleData={vehicleData}
-              onConnect={handleConnect}
-              onDisconnect={handleDisconnect}
-            />
-          } 
-        />
-        {navItems.map(({ to, page }) => (
-          <Route key={to} path={to} element={page} />
-        ))}
-      </Routes>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <div className="text-destructive text-6xl mb-4">⚠️</div>
+          <h1 className="text-xl font-semibold text-destructive mb-2">Initialization Error</h1>
+          <p className="text-muted-foreground mb-4">{initError}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
     );
-  };
+  }
 
   return (
-    <MobileErrorBoundary fallbackTitle="OBD2 Diagnostic App Error">
+    <MobileErrorBoundary fallbackTitle="OBD2 App Error">
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <Toaster />
-          <BrowserRouter>
-            <AppContent />
-          </BrowserRouter>
+          <Router>
+            <div className="min-h-screen bg-background">
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/professional" element={<ProfessionalDiagnostics />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </div>
+            <Toaster />
+          </Router>
         </TooltipProvider>
       </QueryClientProvider>
     </MobileErrorBoundary>
   );
-};
+}
 
 export default App;
