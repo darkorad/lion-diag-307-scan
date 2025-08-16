@@ -36,10 +36,12 @@ export class SafeMasterBluetoothService {
       // Wait for Capacitor to be ready on mobile
       if (window.Capacitor) {
         await new Promise(resolve => {
-          if (window.Capacitor?.isPluginAvailable) {
-            resolve(true);
-          } else {
+          // Check if we're on a native platform
+          if (window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+            // Wait a bit for plugins to be ready
             setTimeout(resolve, 1000);
+          } else {
+            resolve(true);
           }
         });
       }
