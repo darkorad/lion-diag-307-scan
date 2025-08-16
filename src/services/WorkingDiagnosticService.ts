@@ -1,3 +1,4 @@
+
 import { REAL_DTC_CODES, MANUFACTURER_PIDS, ACTUATOR_TESTS, SERVICE_PROCEDURES, VEHICLE_CODING, ManufacturerPID } from '@/constants/realDiagnosticCodes';
 import { mobileSafeBluetoothService } from '@/services/MobileSafeBluetoothService';
 
@@ -410,12 +411,13 @@ export class WorkingDiagnosticService {
       });
     }
 
-    // Add manufacturer specific PIDs with explicit typing
-    const manufacturerPids = (MANUFACTURER_PIDS as ManufacturerPID[]).filter(pid => {
-      return pid && 
-             pid.manufacturer && 
-             Array.isArray(pid.manufacturer) && 
-             pid.manufacturer.includes(manufacturer);
+    // Add manufacturer specific PIDs - fix the type inference issue
+    const allPids = MANUFACTURER_PIDS as ManufacturerPID[];
+    const manufacturerPids = allPids.filter(pid => {
+      if (!pid || !pid.manufacturer || !Array.isArray(pid.manufacturer)) {
+        return false;
+      }
+      return pid.manufacturer.includes(manufacturer);
     });
     
     // Add the first 6 PIDs if any are available
