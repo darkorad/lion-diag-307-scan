@@ -12,12 +12,14 @@ import {
   Radio,
   ArrowLeft,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Smartphone
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import PeugeotAlarmPanel from '@/components/PeugeotAlarmPanel';
 import BluetoothDeviceScanner from '@/components/BluetoothDeviceScanner';
 import { enhancedBluetoothService } from '@/obd2/enhanced-bluetooth-service';
+import { safeMasterBluetoothService } from '@/services/SafeMasterBluetoothService';
 import { toast } from 'sonner';
 
 const VehicleSpecific: React.FC = () => {
@@ -25,16 +27,41 @@ const VehicleSpecific: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [connectedDevice, setConnectedDevice] = useState<any>(null);
   const [selectedVehicle, setSelectedVehicle] = useState<string>('peugeot307');
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    checkConnection();
+    // Safe initialization with error handling
+    const initializePage = async () => {
+      try {
+        setIsLoading(true);
+        await checkConnection();
+      } catch (error) {
+        console.error('Page initialization error:', error);
+        toast.error('Failed to check connection status');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializePage();
   }, []);
 
-  const checkConnection = () => {
-    const connectionInfo = enhancedBluetoothService.getConnectionInfo();
-    setIsConnected(connectionInfo.isConnected);
-    if (connectionInfo.isConnected) {
-      setConnectedDevice(enhancedBluetoothService.getConnectedDevice());
+  const checkConnection = async () => {
+    try {
+      // Use safe bluetooth service to check actual connection
+      const status = await safeMasterBluetoothService.getConnectionStatus();
+      console.log('Connection status check:', status);
+      
+      setIsConnected(status.isConnected);
+      if (status.isConnected && status.device) {
+        setConnectedDevice(status.device);
+      } else {
+        setConnectedDevice(null);
+      }
+    } catch (error) {
+      console.error('Connection check failed:', error);
+      setIsConnected(false);
+      setConnectedDevice(null);
     }
   };
 
@@ -44,32 +71,40 @@ const VehicleSpecific: React.FC = () => {
         throw new Error('Not connected to OBD2 device');
       }
       
-      const response = await enhancedBluetoothService.sendObdCommand(command);
+      const response = await safeMasterBluetoothService.sendCommand(command);
       return response;
     } catch (error) {
       console.error('Command failed:', error);
-      toast.error('Command failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error('Command failed: ' + errorMessage);
       throw error;
     }
   };
 
-  const handleDeviceConnected = (device: any) => {
-    setConnectedDevice(device);
-    setIsConnected(true);
-    toast.success(`Connected to ${device.name}`);
+  const handleDeviceConnected = async (device: any) => {
+    try {
+      setConnectedDevice(device);
+      setIsConnected(true);
+      toast.success(`Connected to ${device.name || 'OBD2 Device'}`);
+    } catch (error) {
+      console.error('Device connection handling failed:', error);
+      toast.error('Failed to handle device connection');
+    }
   };
 
   const handleDisconnect = async () => {
     try {
-      await enhancedBluetoothService.disconnect();
+      await safeMasterBluetoothService.disconnect();
       setIsConnected(false);
       setConnectedDevice(null);
       toast.info('Disconnected from device');
     } catch (error) {
+      console.error('Disconnect failed:', error);
       toast.error('Disconnect failed');
     }
   };
 
+  // Safe vehicle data with error boundaries
   const vehicles = [
     { id: 'peugeot307', name: 'Peugeot 307', logo: '🦁' },
     { id: 'peugeot206', name: 'Peugeot 206', logo: '🦁' },
@@ -79,19 +114,40 @@ const VehicleSpecific: React.FC = () => {
     { id: 'audi', name: 'Audi', logo: '⭕' }
   ];
 
+  const handleVehicleSelection = (vehicleId: string) => {
+    try {
+      console.log('Selecting vehicle:', vehicleId);
+      setSelectedVehicle(vehicleId);
+    } catch (error) {
+      console.error('Vehicle selection error:', error);
+      toast.error('Failed to select vehicle');
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Smartphone className="h-12 w-12 animate-spin mx-auto mb-4" />
+          <p>Loading Vehicle Specific Features...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-background p-4">
+    <div className="min-h-screen bg-background p-4 safe-area-inset">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
+        {/* Mobile-optimized Header */}
+        <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
           <div className="flex items-center space-x-4">
             <Button variant="outline" size="sm" onClick={() => navigate('/')}>
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Home
+              Back
             </Button>
             <div>
-              <h1 className="text-3xl font-bold">Vehicle Specific Features</h1>
-              <p className="text-muted-foreground">Advanced diagnostics for specific vehicle models</p>
+              <h1 className="text-2xl md:text-3xl font-bold">Vehicle Specific</h1>
+              <p className="text-sm text-muted-foreground">Advanced diagnostics for specific models</p>
             </div>
           </div>
           
@@ -129,7 +185,7 @@ const VehicleSpecific: React.FC = () => {
                           {connectedDevice?.name || 'OBD2 Device'}
                         </p>
                         <p className="text-sm text-green-600 dark:text-green-400">
-                          Ready for vehicle diagnostics
+                          Ready for diagnostics
                         </p>
                       </div>
                     </div>
@@ -158,7 +214,7 @@ const VehicleSpecific: React.FC = () => {
           <div className="lg:col-span-2">
             <Tabs defaultValue="vehicle-selection" className="w-full">
               <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="vehicle-selection">Vehicle Selection</TabsTrigger>
+                <TabsTrigger value="vehicle-selection">Vehicles</TabsTrigger>
                 <TabsTrigger value="diagnostics">Diagnostics</TabsTrigger>
                 <TabsTrigger value="advanced">Advanced</TabsTrigger>
               </TabsList>
@@ -177,11 +233,11 @@ const VehicleSpecific: React.FC = () => {
                         <Button
                           key={vehicle.id}
                           variant={selectedVehicle === vehicle.id ? "default" : "outline"}
-                          className="h-20 flex flex-col items-center space-y-2"
-                          onClick={() => setSelectedVehicle(vehicle.id)}
+                          className="h-20 flex flex-col items-center space-y-2 text-sm"
+                          onClick={() => handleVehicleSelection(vehicle.id)}
                         >
                           <span className="text-2xl">{vehicle.logo}</span>
-                          <span className="text-sm">{vehicle.name}</span>
+                          <span className="text-xs text-center">{vehicle.name}</span>
                         </Button>
                       ))}
                     </div>

@@ -1,4 +1,3 @@
-
 import { BluetoothDevice, ConnectionResult, ConnectionStatus, ConnectionHistory } from './MasterBluetoothService';
 
 export class SafeMasterBluetoothService {
@@ -229,6 +228,7 @@ export class SafeMasterBluetoothService {
   async disconnect(): Promise<boolean> {
     try {
       if (this.currentDevice) {
+        console.log('Disconnecting from device:', this.currentDevice.name);
         this.currentDevice.isConnected = false;
         this.currentDevice = null;
       }
