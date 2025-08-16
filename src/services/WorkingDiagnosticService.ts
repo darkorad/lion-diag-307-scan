@@ -411,19 +411,17 @@ export class WorkingDiagnosticService {
       });
     }
 
-    // Add manufacturer specific PIDs - fix the type inference issue completely
-    const validManufacturerPids: ManufacturerPID[] = [];
-    
-    // Iterate through each PID and check if it matches the manufacturer
-    for (const pid of MANUFACTURER_PIDS) {
-      if (pid && pid.manufacturer && Array.isArray(pid.manufacturer) && pid.manufacturer.includes(manufacturer)) {
-        validManufacturerPids.push(pid);
-      }
-    }
+    // Add manufacturer specific PIDs - fix the typing issue completely
+    const manufacturerSpecificPids = MANUFACTURER_PIDS.filter((pid: ManufacturerPID) => {
+      return pid && 
+             pid.manufacturer && 
+             Array.isArray(pid.manufacturer) && 
+             pid.manufacturer.includes(manufacturer);
+    });
     
     // Add the first 6 PIDs if any are available
-    if (validManufacturerPids.length > 0) {
-      const availablePids = validManufacturerPids.slice(0, 6);
+    if (manufacturerSpecificPids.length > 0) {
+      const availablePids = manufacturerSpecificPids.slice(0, 6);
       availablePids.forEach(pid => {
         functions.push({
           id: `pid_${pid.pid}`,
