@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -8,9 +9,7 @@ import {
   Cog,
   Wrench,
   Bluetooth,
-  MapPin,
-  AlertTriangle,
-  HelpCircle
+  AlertTriangle
 } from "lucide-react"
 
 interface StartScreenProps {
@@ -22,35 +21,31 @@ interface StartScreenProps {
 const StartScreen: React.FC<StartScreenProps> = ({ onViewChange, isConnected, permissionsGranted }) => {
   const quickActions = [
     {
-      title: 'Connect to OBD2',
-      description: 'Connect to your vehicle\'s OBD2 port via Bluetooth for diagnostics.',
+      title: 'Connect OBD2',
+      description: 'Connect via Bluetooth',
       icon: Bluetooth,
       view: 'connection' as const,
-      category: 'connection',
       requiresConnection: false
     },
     {
-      title: 'Read Diagnostic Codes',
-      description: 'Retrieve and display diagnostic trouble codes (DTCs) from the vehicle\'s ECU.',
+      title: 'Read Codes',
+      description: 'Get diagnostic codes',
       icon: AlertTriangle,
       view: 'trouble-codes' as const,
-      category: 'diagnostics',
       requiresConnection: true
     },
     {
-      title: 'Live Data Monitoring',
-      description: 'Monitor real-time data parameters such as engine RPM, speed, and temperature.',
+      title: 'Live Data',
+      description: 'Real-time monitoring',
       icon: BarChart3,
       view: 'live-data' as const,
-      category: 'diagnostics',
       requiresConnection: true
     },
     {
-      title: 'Vehicle Information',
-      description: 'Display vehicle details such as VIN, make, model, and engine type.',
+      title: 'Vehicle Info',
+      description: 'Display vehicle details',
       icon: Car,
       view: 'vehicle-info' as const,
-      category: 'vehicle',
       requiresConnection: false
     }
   ];
@@ -58,89 +53,77 @@ const StartScreen: React.FC<StartScreenProps> = ({ onViewChange, isConnected, pe
   const diagnosticOptions = [
     {
       title: 'Readiness Status',
-      description: 'Check emission system readiness and monitor status',
+      description: 'Check emission readiness',
       icon: Car,
       view: 'readiness' as const,
-      category: 'diagnostics',
       requiresConnection: true
     },
     {
       title: 'Advanced Diagnostics',
-      description: 'Access advanced diagnostic functions and manufacturer-specific data',
+      description: 'Professional functions',
       icon: Cog,
       view: 'advanced-diagnostics' as const,
-      category: 'diagnostics',
       requiresConnection: true,
-      badge: 'Enhanced'
+      badge: 'Pro'
     },
     {
-      title: 'Settings and Preferences',
-      description: 'Configure app settings, customize data displays, and manage vehicle profiles',
+      title: 'Settings',
+      description: 'App configuration',
       icon: Cog,
       view: 'settings' as const,
-      category: 'app',
       requiresConnection: false
     }
   ];
 
   const professionalOptions = [
     {
-      title: 'Professional Diagnostics',
-      description: 'Access manufacturer-specific diagnostic tools and emulators',
+      title: 'Professional Tools',
+      description: 'Manufacturer diagnostics',
       icon: Wrench,
       view: 'professional-diagnostics' as const,
-      category: 'professional',
       requiresConnection: false,
-      badge: 'Professional'
+      badge: 'Pro'
     }
   ];
 
   return (
-    <div className="space-y-8">
-      {/* Header Section */}
-      <section className="space-y-2 text-center">
-        <h1 className="text-3xl font-bold">Vehicle Diagnostics</h1>
-        <p className="text-muted-foreground">
-          Connect to your vehicle and explore a wide range of diagnostic and monitoring options.
-        </p>
-        {!isConnected && (
-          <div className="flex items-center justify-center gap-2 text-yellow-500 bg-yellow-50/50 p-3 rounded-md">
-            <AlertTriangle className="h-4 w-4" />
-            <span>Not connected to OBD2 device</span>
-          </div>
-        )}
-        {!permissionsGranted && (
-          <div className="flex items-center justify-center gap-2 text-orange-500 bg-orange-50/50 p-3 rounded-md">
-            <AlertTriangle className="h-4 w-4" />
-            <span>Bluetooth permissions required for device connection</span>
-          </div>
-        )}
-      </section>
-
-      {/* Quick Actions Section */}
-      <section className="space-y-4">
-        <div className="flex items-center gap-2">
-          <BarChart3 className="h-5 w-5" />
-          <h2 className="text-xl font-semibold">Quick Actions</h2>
+    <div className="space-y-6 p-4 max-w-4xl mx-auto">
+      {/* Status Alerts */}
+      {!isConnected && (
+        <div className="flex items-center gap-2 text-yellow-600 bg-yellow-50 p-3 rounded-md text-sm">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+          <span>Not connected to OBD2 device</span>
         </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      )}
+
+      {!permissionsGranted && (
+        <div className="flex items-center gap-2 text-orange-600 bg-orange-50 p-3 rounded-md text-sm">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+          <span>Bluetooth permissions required</span>
+        </div>
+      )}
+
+      {/* Quick Actions */}
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Quick Actions</h2>
+        <div className="grid gap-3 sm:grid-cols-2">
           {quickActions.map((action) => {
             const IconComponent = action.icon;
             const isDisabled = action.requiresConnection && !isConnected;
             return (
               <Card
                 key={action.title}
-                className={`hover:shadow-md transition-shadow cursor-pointer group ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`cursor-pointer transition-shadow hover:shadow-md ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={() => !isDisabled && onViewChange(action.view)}
               >
-                <CardContent className="p-6">
-                  <div className="flex items-start gap-4">
-                    <div className="bg-primary/10 p-3 rounded-lg group-hover:bg-primary/20 transition-colors">
-                      <IconComponent className="h-6 w-6 text-primary" />
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-primary/10 p-2 rounded-lg flex-shrink-0">
+                      <IconComponent className="h-5 w-5 text-primary" />
                     </div>
-                    <div className="space-y-2 flex-1">
-                      <h3 className="font-semibold">{action.title}</h3>
-                      <p className="text-sm text-muted-foreground">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-medium text-sm">{action.title}</h3>
+                      <p className="text-xs text-muted-foreground truncate">
                         {action.description}
                       </p>
                     </div>
@@ -152,37 +135,34 @@ const StartScreen: React.FC<StartScreenProps> = ({ onViewChange, isConnected, pe
         </div>
       </section>
 
-      {/* Diagnostic Options Section */}
-      <section className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Car className="h-5 w-5" />
-          <h2 className="text-xl font-semibold">Diagnostic Options</h2>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {/* Diagnostic Options */}
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Diagnostics</h2>
+        <div className="grid gap-3 sm:grid-cols-2">
           {diagnosticOptions.map((option) => {
             const IconComponent = option.icon;
             const isDisabled = option.requiresConnection && !isConnected;
             return (
               <Card
                 key={option.title}
-                className={`hover:shadow-md transition-shadow cursor-pointer group ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`cursor-pointer transition-shadow hover:shadow-md ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={() => !isDisabled && onViewChange(option.view)}
               >
-                <CardContent className="p-6">
-                  <div className="flex items-start gap-4">
-                    <div className="bg-primary/10 p-3 rounded-lg group-hover:bg-primary/20 transition-colors">
-                      <IconComponent className="h-6 w-6 text-primary" />
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-primary/10 p-2 rounded-lg flex-shrink-0">
+                      <IconComponent className="h-5 w-5 text-primary" />
                     </div>
-                    <div className="space-y-2 flex-1">
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-semibold">{option.title}</h3>
+                        <h3 className="font-medium text-sm">{option.title}</h3>
                         {option.badge && (
                           <Badge variant="outline" className="text-xs">
                             {option.badge}
                           </Badge>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-xs text-muted-foreground truncate">
                         {option.description}
                       </p>
                     </div>
@@ -194,38 +174,37 @@ const StartScreen: React.FC<StartScreenProps> = ({ onViewChange, isConnected, pe
         </div>
       </section>
 
-      {/* Professional Tools Section */}
-      <section className="space-y-4">
+      {/* Professional Tools */}
+      <section className="space-y-3">
         <div className="flex items-center gap-2">
-          <Wrench className="h-5 w-5" />
-          <h2 className="text-xl font-semibold">Professional Tools</h2>
-          <Badge variant="secondary">Advanced</Badge>
+          <h2 className="text-lg font-semibold">Professional</h2>
+          <Badge variant="secondary" className="text-xs">Advanced</Badge>
         </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3">
           {professionalOptions.map((option) => {
             const IconComponent = option.icon;
             const isDisabled = option.requiresConnection && !isConnected;
             return (
               <Card 
                 key={option.view} 
-                className={`hover:shadow-md transition-shadow cursor-pointer group ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`cursor-pointer transition-shadow hover:shadow-md ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={() => !isDisabled && onViewChange(option.view)}
               >
-                <CardContent className="p-6">
-                  <div className="flex items-start gap-4">
-                    <div className="bg-primary/10 p-3 rounded-lg group-hover:bg-primary/20 transition-colors">
-                      <IconComponent className="h-6 w-6 text-primary" />
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-primary/10 p-2 rounded-lg flex-shrink-0">
+                      <IconComponent className="h-5 w-5 text-primary" />
                     </div>
-                    <div className="space-y-2 flex-1">
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-semibold">{option.title}</h3>
+                        <h3 className="font-medium text-sm">{option.title}</h3>
                         {option.badge && (
                           <Badge variant="outline" className="text-xs">
                             {option.badge}
                           </Badge>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-xs text-muted-foreground truncate">
                         {option.description}
                       </p>
                     </div>
@@ -235,14 +214,6 @@ const StartScreen: React.FC<StartScreenProps> = ({ onViewChange, isConnected, pe
             );
           })}
         </div>
-      </section>
-
-      {/* Help and Support Section */}
-      <section className="text-center">
-        <HelpCircle className="h-6 w-6 inline-block mb-2 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">
-          Need help? Check out our <Button variant="link">Help Center</Button> or <Button variant="link">Contact Support</Button>.
-        </p>
       </section>
     </div>
   );
