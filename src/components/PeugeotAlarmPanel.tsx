@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,111 +5,126 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
   Shield, 
-  ShieldOff, 
-  AlertTriangle, 
-  CheckCircle, 
-  Loader2,
-  Settings,
-  Car
+  ShieldAlert, 
+  ShieldCheck, 
+  Power, 
+  Battery, 
+  AlertTriangle,
+  CheckCircle,
+  Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { enhancedBluetoothService } from '@/obd2/enhanced-bluetooth-service';
 
-interface AlarmStatus {
-  isActive: boolean;
-  lastTriggered?: Date;
-  batteryLevel?: number;
-  sensorStatus?: 'OK' | 'WARNING' | 'ERROR';
+interface PeugeotAlarmPanelProps {
+  isConnected: boolean;
+  onSendCommand: (command: string) => Promise<string>;
 }
 
-const PeugeotAlarmPanel: React.FC = () => {
-  const [alarmStatus, setAlarmStatus] = useState<AlarmStatus>({ isActive: false });
+const PeugeotAlarmPanel: React.FC<PeugeotAlarmPanelProps> = ({ 
+  isConnected, 
+  onSendCommand 
+}) => {
+  const [alarmStatus, setAlarmStatus] = useState<'unknown' | 'enabled' | 'disabled'>('unknown');
+  const [batteryVoltage, setBatteryVoltage] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
+  const [lastOperation, setLastOperation] = useState<string>('');
 
   useEffect(() => {
-    checkConnection();
     if (isConnected) {
-      loadAlarmStatus();
+      checkAlarmStatus();
+      checkBatteryVoltage();
     }
   }, [isConnected]);
 
-  const checkConnection = () => {
-    const connected = enhancedBluetoothService.isConnected();
-    setIsConnected(connected);
-  };
-
-  const loadAlarmStatus = async () => {
+  const checkAlarmStatus = async () => {
     if (!isConnected) {
-      toast.error('OBD2 device not connected');
+      toast.error('Not connected to OBD2 adapter');
       return;
     }
 
     setIsLoading(true);
     try {
-      // Read alarm system status using Peugeot-specific PIDs
-      const alarmActiveResponse = await enhancedBluetoothService.sendObdCommand('221801'); // BSI alarm status
-      const batteryResponse = await enhancedBluetoothService.sendObdCommand('221802'); // BSI battery level
+      console.log('Checking Peugeot 307 alarm status...');
+      const response = await onSendCommand('221801');
+      console.log('Alarm status response:', response);
       
-      // Parse responses
-      const isActive = !alarmActiveResponse.includes('NO DATA') && 
-                      parseInt(alarmActiveResponse.split(' ')[3] || '0', 16) & 0x01;
-      
-      const batteryHex = batteryResponse.split(' ')[3] || '00';
-      const batteryLevel = parseInt(batteryHex, 16) * 100 / 255;
-
-      setAlarmStatus({
-        isActive: !!isActive,
-        batteryLevel: batteryLevel > 0 ? batteryLevel : undefined,
-        sensorStatus: batteryLevel > 20 ? 'OK' : 'WARNING'
-      });
-
-      console.log('Alarm status loaded:', { isActive, batteryLevel });
+      if (response.includes('621801')) {
+        const statusByte = response.split(' ')[2];
+        if (statusByte === '01') {
+          setAlarmStatus('enabled');
+          toast.success('Factory alarm is currently enabled');
+        } else if (statusByte === '00') {
+          setAlarmStatus('disabled');
+          toast.success('Factory alarm is currently disabled');
+        } else {
+          setAlarmStatus('unknown');
+          toast.warning('Alarm status unclear');
+        }
+      } else {
+        setAlarmStatus('unknown');
+        toast.error('Could not read alarm status');
+      }
     } catch (error) {
-      console.error('Failed to load alarm status:', error);
-      toast.error('Failed to read alarm status');
-      
-      // Set default status if read fails
-      setAlarmStatus({ 
-        isActive: true, // Assume active if we can't read
-        sensorStatus: 'ERROR' 
-      });
+      console.error('Failed to check alarm status:', error);
+      toast.error('Failed to check alarm status');
+      setAlarmStatus('unknown');
     } finally {
       setIsLoading(false);
     }
   };
 
+  const checkBatteryVoltage = async () => {
+    if (!isConnected) return;
+
+    try {
+      console.log('Reading battery voltage...');
+      const response = await onSendCommand('0142');
+      console.log('Battery voltage response:', response);
+      
+      if (response.includes('4142')) {
+        const hexValue = response.split(' ').slice(-2).join('');
+        const voltage = parseInt(hexValue, 16) / 1000;
+        setBatteryVoltage(voltage);
+      }
+    } catch (error) {
+      console.error('Failed to read battery voltage:', error);
+    }
+  };
+
   const disableAlarm = async () => {
     if (!isConnected) {
-      toast.error('OBD2 device not connected');
+      toast.error('Not connected to OBD2 adapter');
       return;
     }
 
     setIsLoading(true);
+    setLastOperation('Disabling factory alarm...');
+    
     try {
-      toast.info('Disabling factory alarm system...');
+      console.log('Disabling Peugeot 307 factory alarm...');
       
-      // Send Peugeot-specific command to disable alarm
-      // This uses the BSI (Body Systems Interface) to control the alarm
-      await enhancedBluetoothService.sendObdCommand('2F180100'); // Disable alarm system
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      toast.info('Sending disable command to ECU...');
+      const response = await onSendCommand('2F180100');
+      console.log('Disable alarm response:', response);
       
-      // Send additional command to disable door sensors
-      await enhancedBluetoothService.sendObdCommand('2F180200'); // Disable door sensor alerts
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Verify the alarm is disabled
-      await loadAlarmStatus();
-      
-      if (!alarmStatus.isActive) {
-        toast.success('Factory alarm disabled successfully');
+      if (response.includes('6F1801')) {
+        setAlarmStatus('disabled');
+        toast.success('Factory alarm disabled successfully!', {
+          description: 'Door indicators will no longer flash when doors are opened'
+        });
+        setLastOperation('Alarm disabled');
+        
+        setTimeout(() => {
+          checkAlarmStatus();
+        }, 2000);
       } else {
-        toast.warning('Alarm may still be partially active - check manually');
+        toast.error('Failed to disable alarm - Invalid response');
+        setLastOperation('Disable failed');
       }
-      
     } catch (error) {
       console.error('Failed to disable alarm:', error);
-      toast.error('Failed to disable alarm: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      toast.error('Failed to disable factory alarm');
+      setLastOperation('Disable failed');
     } finally {
       setIsLoading(false);
     }
@@ -118,220 +132,167 @@ const PeugeotAlarmPanel: React.FC = () => {
 
   const enableAlarm = async () => {
     if (!isConnected) {
-      toast.error('OBD2 device not connected');
+      toast.error('Not connected to OBD2 adapter');
       return;
     }
 
     setIsLoading(true);
+    setLastOperation('Enabling factory alarm...');
+    
     try {
-      toast.info('Enabling factory alarm system...');
+      console.log('Enabling Peugeot 307 factory alarm...');
       
-      // Send command to re-enable alarm
-      await enhancedBluetoothService.sendObdCommand('2F180101'); // Enable alarm system
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      toast.info('Sending enable command to ECU...');
+      const response = await onSendCommand('2F180101');
+      console.log('Enable alarm response:', response);
       
-      // Re-enable door sensors
-      await enhancedBluetoothService.sendObdCommand('2F180201'); // Enable door sensor alerts
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Verify the alarm is enabled
-      await loadAlarmStatus();
-      
-      toast.success('Factory alarm enabled successfully');
-      
+      if (response.includes('6F1801')) {
+        setAlarmStatus('enabled');
+        toast.success('Factory alarm enabled successfully!');
+        setLastOperation('Alarm enabled');
+        
+        setTimeout(() => {
+          checkAlarmStatus();
+        }, 2000);
+      } else {
+        toast.error('Failed to enable alarm - Invalid response');
+        setLastOperation('Enable failed');
+      }
     } catch (error) {
       console.error('Failed to enable alarm:', error);
-      toast.error('Failed to enable alarm: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      toast.error('Failed to enable factory alarm');
+      setLastOperation('Enable failed');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const resetAlarmHistory = async () => {
-    if (!isConnected) {
-      toast.error('OBD2 device not connected');
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      // Clear alarm history in BSI
-      await enhancedBluetoothService.sendObdCommand('2F180300'); // Clear alarm events
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      await loadAlarmStatus();
-      toast.success('Alarm history cleared');
-      
-    } catch (error) {
-      console.error('Failed to reset alarm history:', error);
-      toast.error('Failed to reset alarm history');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const getStatusColor = () => {
-    if (!isConnected) return 'bg-gray-500';
-    if (alarmStatus.isActive) return 'bg-red-500';
-    return 'bg-green-500';
-  };
-
-  const getStatusText = () => {
-    if (!isConnected) return 'Disconnected';
-    if (alarmStatus.isActive) return 'Active';
-    return 'Disabled';
-  };
+  if (!isConnected) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Shield className="h-5 w-5" />
+            <span>Peugeot 307 Factory Alarm Control</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              Please connect to your OBD2 adapter first to access alarm control functions.
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
-            <Car className="h-5 w-5" />
+            <Shield className="h-5 w-5" />
             <span>Peugeot 307 Factory Alarm Control</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!isConnected && (
-            <Alert>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                OBD2 device not connected. Please connect to your Peugeot 307 first.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {/* Alarm Status */}
-          <div className="flex items-center justify-between p-4 border rounded-lg">
-            <div className="flex items-center space-x-3">
-              <div className={`w-4 h-4 rounded-full ${getStatusColor()}`} />
-              <div>
-                <h3 className="font-semibold">Alarm Status</h3>
-                <p className="text-sm text-muted-foreground">{getStatusText()}</p>
-              </div>
-            </div>
+          {/* Current Status */}
+          <div className="flex items-center justify-between p-4 bg-secondary/20 rounded-lg">
             <div className="flex items-center space-x-2">
-              {alarmStatus.isActive ? (
-                <Badge variant="destructive" className="flex items-center space-x-1">
-                  <Shield className="h-3 w-3" />
-                  <span>Active</span>
-                </Badge>
-              ) : (
-                <Badge variant="secondary" className="flex items-center space-x-1">
-                  <ShieldOff className="h-3 w-3" />
-                  <span>Disabled</span>
-                </Badge>
-              )}
+              {alarmStatus === 'enabled' && <ShieldAlert className="h-5 w-5 text-red-500" />}
+              {alarmStatus === 'disabled' && <ShieldCheck className="h-5 w-5 text-green-500" />}
+              {alarmStatus === 'unknown' && <Shield className="h-5 w-5 text-gray-500" />}
+              <span className="font-medium">Alarm Status:</span>
             </div>
+            <Badge 
+              variant={alarmStatus === 'enabled' ? 'destructive' : alarmStatus === 'disabled' ? 'default' : 'secondary'}
+            >
+              {alarmStatus === 'enabled' && 'ENABLED'}
+              {alarmStatus === 'disabled' && 'DISABLED'}
+              {alarmStatus === 'unknown' && 'UNKNOWN'}
+            </Badge>
           </div>
 
-          {/* System Information */}
-          {isConnected && (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-3 border rounded-lg">
-                <h4 className="font-medium text-sm">Battery Level</h4>
-                <p className="text-lg font-semibold">
-                  {alarmStatus.batteryLevel ? `${Math.round(alarmStatus.batteryLevel)}%` : 'Unknown'}
-                </p>
+          {/* Battery Voltage */}
+          {batteryVoltage && (
+            <div className="flex items-center justify-between p-4 bg-secondary/10 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <Battery className="h-5 w-5 text-blue-500" />
+                <span className="font-medium">Battery Voltage:</span>
               </div>
-              <div className="p-3 border rounded-lg">
-                <h4 className="font-medium text-sm">Sensor Status</h4>
-                <div className="flex items-center space-x-2">
-                  {alarmStatus.sensorStatus === 'OK' && <CheckCircle className="h-4 w-4 text-green-500" />}
-                  {alarmStatus.sensorStatus === 'WARNING' && <AlertTriangle className="h-4 w-4 text-yellow-500" />}
-                  {alarmStatus.sensorStatus === 'ERROR' && <AlertTriangle className="h-4 w-4 text-red-500" />}
-                  <span className="text-sm">{alarmStatus.sensorStatus || 'Unknown'}</span>
-                </div>
-              </div>
+              <Badge variant="outline">
+                {batteryVoltage.toFixed(2)}V
+              </Badge>
             </div>
           )}
 
           {/* Control Buttons */}
-          <div className="grid grid-cols-1 gap-3">
-            <Button
-              onClick={loadAlarmStatus}
-              disabled={!isConnected || isLoading}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Button 
+              onClick={checkAlarmStatus}
+              disabled={isLoading}
               variant="outline"
-              className="w-full"
+              className="flex items-center space-x-2"
             >
               {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Reading Status...
-                </>
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <>
-                  <Settings className="mr-2 h-4 w-4" />
-                  Refresh Status
-                </>
+                <Shield className="h-4 w-4" />
               )}
+              <span>Check Status</span>
             </Button>
 
-            <Button
+            <Button 
               onClick={disableAlarm}
-              disabled={!isConnected || isLoading || !alarmStatus.isActive}
+              disabled={isLoading || alarmStatus === 'disabled'}
+              className="flex items-center space-x-2"
               variant="destructive"
-              className="w-full"
             >
               {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Disabling...
-                </>
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <>
-                  <ShieldOff className="mr-2 h-4 w-4" />
-                  Disable Factory Alarm
-                </>
+                <Power className="h-4 w-4" />
               )}
+              <span>Disable Alarm</span>
             </Button>
 
-            <Button
+            <Button 
               onClick={enableAlarm}
-              disabled={!isConnected || isLoading || alarmStatus.isActive}
-              variant="default"
-              className="w-full"
+              disabled={isLoading || alarmStatus === 'enabled'}
+              className="flex items-center space-x-2"
+              variant="outline"
             >
               {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Enabling...
-                </>
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <>
-                  <Shield className="mr-2 h-4 w-4" />
-                  Enable Factory Alarm
-                </>
+                <CheckCircle className="h-4 w-4" />
               )}
-            </Button>
-
-            <Button
-              onClick={resetAlarmHistory}
-              disabled={!isConnected || isLoading}
-              variant="outline"
-              className="w-full"
-            >
-              Clear Alarm History
+              <span>Enable Alarm</span>
             </Button>
           </div>
+
+          {/* Status Messages */}
+          {lastOperation && (
+            <Alert>
+              <AlertDescription>
+                {lastOperation}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Information */}
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Note:</strong> This function disables the factory alarm that causes all turn signals 
+              to flash for 20 seconds when opening doors. This is specifically for Peugeot 307 models 
+              with factory anti-theft systems.
+            </AlertDescription>
+          </Alert>
         </CardContent>
       </Card>
-
-      <Alert>
-        <AlertTriangle className="h-4 w-4" />
-        <AlertDescription>
-          <strong>Important:</strong> This function sends real commands to your vehicle's BSI (Body Systems Interface). 
-          The alarm will be genuinely disabled/enabled. Use with caution and ensure your vehicle is secure.
-          <br /><br />
-          <strong>Peugeot 307 Notes:</strong>
-          <ul className="mt-2 list-disc list-inside text-sm">
-            <li>Disabling the alarm stops turn signal flashing when doors are opened</li>
-            <li>The alarm can be re-enabled at any time</li>
-            <li>This does not affect the central locking system</li>
-            <li>Changes may persist until battery disconnect or ECU reset</li>
-          </ul>
-        </AlertDescription>
-      </Alert>
     </div>
   );
 };
