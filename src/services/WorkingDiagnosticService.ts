@@ -346,10 +346,15 @@ export class WorkingDiagnosticService {
 
     // Add manufacturer specific PIDs - Fixed type handling
     try {
-      const validPids = MANUFACTURER_PIDS.filter(isManufacturerPID);
+      // Cast MANUFACTURER_PIDS to ManufacturerPID array and filter safely
+      const allPids = MANUFACTURER_PIDS as ManufacturerPID[];
+      const validPids = allPids.filter(isManufacturerPID);
       const manufacturerPids = validPids.filter(pid => 
-        pid.manufacturer.some(m => m.toLowerCase() === manufacturer.toLowerCase())
+        Array.isArray(pid.manufacturer) && 
+        pid.manufacturer.some(m => typeof m === 'string' && m.toLowerCase() === manufacturer.toLowerCase())
       );
+      
+      // Safely slice the array - now TypeScript knows it's ManufacturerPID[]
       const availablePids = manufacturerPids.slice(0, 6);
 
       availablePids.forEach(pid => {
