@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,8 +7,15 @@ import { Car, Settings, Database, Wrench } from 'lucide-react';
 import { VisualVehicleSelector } from '@/components/VisualVehicleSelector';
 import PeugeotComprehensiveDiagnostics from '@/components/PeugeotComprehensiveDiagnostics';
 import PeugeotECUCodingPanel from '@/components/PeugeotECUCodingPanel';
+import { VehicleProfile } from '@/types/vehicle';
 
 const VehicleSpecific: React.FC = () => {
+  const [selectedProfile, setSelectedProfile] = useState<VehicleProfile | null>(null);
+
+  const handleVehicleSelected = (profile: VehicleProfile) => {
+    setSelectedProfile(profile);
+  };
+
   return (
     <div className="p-4 space-y-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between">
@@ -42,7 +49,10 @@ const VehicleSpecific: React.FC = () => {
         </TabsList>
 
         <TabsContent value="selector" className="space-y-4">
-          <VisualVehicleSelector />
+          <VisualVehicleSelector 
+            onVehicleSelected={handleVehicleSelected}
+            selectedProfile={selectedProfile}
+          />
         </TabsContent>
 
         <TabsContent value="diagnostics" className="space-y-4">
