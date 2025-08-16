@@ -16,6 +16,18 @@ declare global {
       removeAllListeners(): void;
       exitApp(): void;
       minimizeApp(): void;
+      openUrl(options: { url: string }): Promise<void>;
+    };
+    Device?: {
+      getInfo(): Promise<{
+        platform: string;
+        model: string;
+        operatingSystem: string;
+        osVersion: string;
+        manufacturer: string;
+        isVirtual: boolean;
+        webViewVersion: string;
+      }>;
     };
     Geolocation?: any;
     BluetoothLe?: any;

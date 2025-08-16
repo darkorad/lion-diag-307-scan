@@ -97,6 +97,18 @@ class MobilePermissionsService {
             status.bluetoothScan = true;
             status.bluetoothConnect = true;
           }
+        } else {
+          // Fallback: assume permissions based on platform detection
+          const userAgent = navigator.userAgent.toLowerCase();
+          if (userAgent.includes('android')) {
+            status.bluetooth = status.location;
+            status.bluetoothScan = status.location;
+            status.bluetoothConnect = status.location;
+          } else {
+            status.bluetooth = true;
+            status.bluetoothScan = true;
+            status.bluetoothConnect = true;
+          }
         }
       } catch (error) {
         console.warn('Bluetooth permission check failed:', error);
