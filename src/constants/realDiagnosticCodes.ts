@@ -1,4 +1,3 @@
-
 // Real OBD2 and manufacturer-specific diagnostic codes and PIDs
 export interface DiagnosticCode {
   code: string;
@@ -129,7 +128,7 @@ export const REAL_DTC_CODES: DiagnosticCode[] = [
   }
 ];
 
-// Real Manufacturer-Specific PIDs
+// Real Manufacturer-Specific PIDs - Now explicitly typed
 export const MANUFACTURER_PIDS: ManufacturerPID[] = [
   // Peugeot/Citroën PSA PIDs
   {
