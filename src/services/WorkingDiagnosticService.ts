@@ -343,11 +343,9 @@ export class WorkingDiagnosticService {
       });
     }
 
-    const availablePids = MANUFACTURER_PIDS
-      .filter((pid): pid is ManufacturerPID => {
-        if (!isManufacturerPID(pid)) return false;
-        return pid.manufacturer.some(m => m.toLowerCase() === manufacturer.toLowerCase());
-      })
+    const manufacturerPids: ManufacturerPID[] = MANUFACTURER_PIDS.filter(isManufacturerPID);
+    const availablePids = manufacturerPids
+      .filter(pid => pid.manufacturer.some(m => m.toLowerCase() === manufacturer.toLowerCase()))
       .slice(0, 6);
 
     availablePids.forEach(pid => {
