@@ -10,49 +10,66 @@ import NotFound from "./pages/NotFound";
 import VehicleSpecific from "./pages/VehicleSpecific";
 import ProfessionalDiagnostics from "./pages/ProfessionalDiagnostics";
 import MobilePermissionDialog from "./components/MobilePermissionDialog";
-import { mobilePermissionsService } from "./services/MobilePermissionsService";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    },
+  },
+});
 
 const App = () => {
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
-  const [permissionsGranted, setPermissionsGranted] = useState(false);
+  const [permissionsGranted, setPermissionsGranted] = useState(true); // Start as true to prevent blocking
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    // Check if we're on mobile and need permissions
-    const checkMobilePermissions = async () => {
+    const initializeApp = async () => {
       try {
-        // Detect if we're on a mobile platform
+        console.log('Initializing app...');
+        
+        // Add a small delay to ensure native plugins are ready
+        if (window.Capacitor?.isNativePlatform?.()) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
+        // Check if we're on mobile and might need permissions
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
                          window.innerWidth <= 768 ||
                          window.Capacitor?.isNativePlatform?.();
 
         if (isMobile) {
-          console.log('Mobile platform detected, checking permissions...');
+          console.log('Mobile platform detected');
           
-          // Check current permission status
-          const status = await mobilePermissionsService.checkAllPermissionStatus();
-          const hasEssentialPermissions = status.bluetooth && status.location;
-          
-          if (!hasEssentialPermissions) {
-            console.log('Essential permissions missing, showing dialog');
-            setShowPermissionDialog(true);
-          } else {
-            console.log('Permissions already granted');
-            setPermissionsGranted(true);
+          // Only check permissions if services are available
+          try {
+            const { mobilePermissionsService } = await import('./services/MobilePermissionsService');
+            const status = await mobilePermissionsService.checkAllPermissionStatus();
+            const hasEssentialPermissions = status.bluetooth && status.location;
+            
+            if (!hasEssentialPermissions) {
+              console.log('Essential permissions missing, showing dialog');
+              setShowPermissionDialog(true);
+              setPermissionsGranted(false);
+            }
+          } catch (error) {
+            console.warn('Permission check failed, continuing anyway:', error);
+            // Don't block the app if permission checking fails
           }
         } else {
-          console.log('Desktop platform detected, skipping mobile permissions');
-          setPermissionsGranted(true);
+          console.log('Desktop platform detected');
         }
       } catch (error) {
-        console.error('Error checking mobile permissions:', error);
-        // On error, still allow app to continue
-        setPermissionsGranted(true);
+        console.error('App initialization error (non-critical):', error);
+        // Don't block the app for initialization errors
+      } finally {
+        setIsInitialized(true);
       }
     };
 
-    checkMobilePermissions();
+    initializeApp();
   }, []);
 
   const handlePermissionsGranted = () => {
@@ -63,9 +80,21 @@ const App = () => {
 
   const handlePermissionDialogClose = () => {
     setShowPermissionDialog(false);
-    // Even if user closes dialog, still allow app to continue
+    // Allow app to continue even if user closes dialog
     setPermissionsGranted(true);
   };
+
+  // Show loading state until initialized
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Starting OBD2 Diagnostics...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <QueryClientProvider client={queryClient}>
