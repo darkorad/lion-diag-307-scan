@@ -22,6 +22,11 @@ import renaultLogo from '@/assets/logos/renault-logo.png';
 import skodaLogo from '@/assets/logos/skoda-logo.png';
 import toyotaLogo from '@/assets/logos/toyota-logo.png';
 import audiLogo from '@/assets/logos/audi-logo.png';
+import bmwLogo from '@/assets/logos/bmw-logo.png';
+import mercedesLogo from '@/assets/logos/mercedes-logo.png';
+import fordLogo from '@/assets/logos/ford-logo.png';
+import opelLogo from '@/assets/logos/opel-logo.png';
+import fiatLogo from '@/assets/logos/fiat-logo.png';
 
 const logoMap: { [key: string]: string } = {
   '/src/assets/logos/peugeot-logo.png': peugeotLogo,
@@ -31,6 +36,11 @@ const logoMap: { [key: string]: string } = {
   '/src/assets/logos/skoda-logo.png': skodaLogo,
   '/src/assets/logos/toyota-logo.png': toyotaLogo,
   '/src/assets/logos/audi-logo.png': audiLogo,
+  '/src/assets/logos/bmw-logo.png': bmwLogo,
+  '/src/assets/logos/mercedes-logo.png': mercedesLogo,
+  '/src/assets/logos/ford-logo.png': fordLogo,
+  '/src/assets/logos/opel-logo.png': opelLogo,
+  '/src/assets/logos/fiat-logo.png': fiatLogo,
 };
 
 interface VisualVehicleSelectorProps {
@@ -190,7 +200,7 @@ export function VisualVehicleSelector({ onVehicleSelected, selectedProfile, isCo
             <CardContent className="p-6 text-center">
               <div className="mb-4 flex justify-center">
                 <img 
-                  src={logoMap[make.logo]} 
+                  src={logoMap[make.logo] || make.logo} 
                   alt={`${make.name} logo`}
                   className="w-16 h-16 object-contain"
                 />
@@ -224,7 +234,7 @@ export function VisualVehicleSelector({ onVehicleSelected, selectedProfile, isCo
             <CardContent className="p-6">
               <div className="flex items-center gap-3 mb-3">
                 <img 
-                  src={logoMap[selection.selectedMake!.logo]} 
+                  src={logoMap[selection.selectedMake!.logo] || selection.selectedMake!.logo} 
                   alt={`${selection.selectedMake!.name} logo`}
                   className="w-8 h-8 object-contain"
                 />
@@ -389,7 +399,7 @@ export function VisualVehicleSelector({ onVehicleSelected, selectedProfile, isCo
         <CardHeader>
           <div className="flex items-center gap-4">
             <img 
-              src={logoMap[selection.selectedMake!.logo]} 
+              src={logoMap[selection.selectedMake!.logo] || selection.selectedMake!.logo} 
               alt={`${selection.selectedMake!.name} logo`}
               className="w-12 h-12 object-contain"
             />
