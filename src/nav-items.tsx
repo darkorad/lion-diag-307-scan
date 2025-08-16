@@ -6,6 +6,8 @@ import VehicleSpecific from "./pages/VehicleSpecific";
 import ConnectionScreen from "./components/ConnectionScreen";
 import LiveDataMonitor from "./components/LiveDataMonitor";
 import SettingsPage from "./pages/SettingsPage";
+import ConnectionsPage from "./components/ConnectionsPage";
+import LiveDataPage from "./pages/LiveDataPage";
 
 export const navItems = [
   {
@@ -30,13 +32,13 @@ export const navItems = [
     title: "Connections",
     to: "/connections",
     icon: <Bluetooth className="h-4 w-4" />,
-    page: <ConnectionScreen />,
+    page: <ConnectionsPage />,
   },
   {
     title: "Live Data",
     to: "/live-data",
     icon: <Activity className="h-4 w-4" />,
-    page: <LiveDataMonitor isConnected={false} vehicleInfo={{ make: 'Unknown', model: 'Unknown' }} />,
+    page: <LiveDataPage />,
   },
   {
     title: "Settings",
