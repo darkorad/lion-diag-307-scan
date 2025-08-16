@@ -1,3 +1,4 @@
+
 // Enhanced Bluetooth Service for OBD2 scanning and connection management
 
 export interface BluetoothDevice {
@@ -5,7 +6,6 @@ export interface BluetoothDevice {
   name: string;
   address: string;
   isPaired: boolean;
-  class?: number;
   rssi?: number;
 }
 
@@ -58,7 +58,7 @@ export class EnhancedBluetoothService {
         return new Promise((resolve, reject) => {
           window.bluetoothSerial.list(
             (devices) => {
-              console.log('Found devices:', devices);
+              console.log('Found paired devices:', devices);
               this.isScanning = false;
               const bluetoothDevices = devices.map(device => ({
                 id: device.address,
@@ -72,7 +72,7 @@ export class EnhancedBluetoothService {
             (error) => {
               console.error('Bluetooth scan error:', error);
               this.isScanning = false;
-              reject(error);
+              reject(new Error(error));
             }
           );
         });
@@ -84,7 +84,7 @@ export class EnhancedBluetoothService {
     } catch (error) {
       console.error('Error during Bluetooth scan:', error);
       this.isScanning = false;
-      return [];
+      throw error;
     }
   }
 
@@ -107,6 +107,7 @@ export class EnhancedBluetoothService {
         window.bluetoothSerial.discoverUnpaired(
           (devices) => {
             clearTimeout(timeout);
+            console.log('Discovered unpaired devices:', devices);
             const bluetoothDevices = devices.map(device => ({
               id: device.address,
               name: device.name || 'Unknown Device',
@@ -118,25 +119,29 @@ export class EnhancedBluetoothService {
           },
           (error) => {
             clearTimeout(timeout);
-            reject(error);
+            console.error('Discovery error:', error);
+            reject(new Error(error));
           }
         );
       });
     }
-    return [];
+    throw new Error('Device discovery not available');
   }
 
   async getAllDevices(): Promise<BluetoothDevice[]> {
     try {
-      const [pairedDevices, discoveredDevices] = await Promise.all([
+      const [pairedDevices, discoveredDevices] = await Promise.allSettled([
         this.getPairedDevices(),
         this.discoverDevices()
       ]);
       
-      const allDevices = [...pairedDevices];
+      const paired = pairedDevices.status === 'fulfilled' ? pairedDevices.value : [];
+      const discovered = discoveredDevices.status === 'fulfilled' ? discoveredDevices.value : [];
+      
+      const allDevices = [...paired];
       
       // Add discovered devices that aren't already paired
-      discoveredDevices.forEach(device => {
+      discovered.forEach(device => {
         if (!allDevices.find(d => d.address === device.address)) {
           allDevices.push(device);
         }
@@ -155,32 +160,38 @@ export class EnhancedBluetoothService {
     
     console.log('Connecting to device:', deviceAddress);
 
-    if (window.bluetoothSerial) {
-      return new Promise((resolve) => {
-        window.bluetoothSerial.connect(
-          deviceAddress,
-          () => {
-            console.log('Successfully connected to device');
-            this.connectedDevice = typeof device === 'string' 
-              ? { id: deviceAddress, name: deviceName, address: deviceAddress, isPaired: true }
-              : device;
-            this.connectionInfo = {
-              isConnected: true,
-              deviceName,
-              deviceAddress,
-              connectionTime: new Date()
-            };
-            resolve(true);
-          },
-          (error) => {
-            console.error('Failed to connect to device:', error);
-            resolve(false);
-          }
-        );
-      });
+    if (!window.bluetoothSerial) {
+      throw new Error('Bluetooth Serial not available');
     }
 
-    return false;
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Connection timeout'));
+      }, 30000);
+
+      window.bluetoothSerial.connect(
+        deviceAddress,
+        () => {
+          clearTimeout(timeout);
+          console.log('Successfully connected to device:', deviceAddress);
+          this.connectedDevice = typeof device === 'string' 
+            ? { id: deviceAddress, name: deviceName, address: deviceAddress, isPaired: true }
+            : device;
+          this.connectionInfo = {
+            isConnected: true,
+            deviceName,
+            deviceAddress,
+            connectionTime: new Date()
+          };
+          resolve(true);
+        },
+        (error) => {
+          clearTimeout(timeout);
+          console.error('Failed to connect to device:', error);
+          reject(new Error(error));
+        }
+      );
+    });
   }
 
   async disconnect(): Promise<void> {
@@ -207,6 +218,10 @@ export class EnhancedBluetoothService {
   async initializeELM327CarScannerStyle(): Promise<void> {
     console.log('Initializing ELM327 in car scanner style...');
     
+    if (!this.isConnected()) {
+      throw new Error('Device not connected');
+    }
+    
     const initCommands = [
       'ATZ\r',        // Reset
       'ATE0\r',       // Echo off
@@ -219,10 +234,12 @@ export class EnhancedBluetoothService {
 
     for (const command of initCommands) {
       try {
+        console.log(`Sending init command: ${command.trim()}`);
         await this.sendRawCommand(command);
         await new Promise(resolve => setTimeout(resolve, 300));
       } catch (error) {
-        console.warn(`Init command ${command} failed:`, error);
+        console.warn(`Init command ${command.trim()} failed:`, error);
+        // Continue with other commands even if one fails
       }
     }
 
@@ -233,7 +250,10 @@ export class EnhancedBluetoothService {
       console.log('ELM327 Version:', this.elmVersion);
     } catch (error) {
       console.warn('Failed to get ELM version:', error);
+      this.elmVersion = 'Unknown';
     }
+
+    console.log('ELM327 initialization completed');
   }
 
   async sendObdCommand(command: string, timeout: number = 5000): Promise<string> {
@@ -244,7 +264,10 @@ export class EnhancedBluetoothService {
     const formattedCommand = command.endsWith('\r') ? command : command + '\r';
     
     try {
-      return await this.sendRawCommand(formattedCommand, timeout);
+      console.log(`Sending OBD command: ${command}`);
+      const response = await this.sendRawCommand(formattedCommand, timeout);
+      console.log(`OBD response: ${response}`);
+      return response;
     } catch (error) {
       console.error('OBD command failed:', error);
       throw error;
@@ -258,31 +281,50 @@ export class EnhancedBluetoothService {
 
     return new Promise((resolve, reject) => {
       const timeoutId = setTimeout(() => {
+        window.bluetoothSerial.unsubscribe(() => {}, () => {});
         reject(new Error('Command timeout'));
       }, timeout);
 
       let responseData = '';
+      let responseComplete = false;
 
       const onData = (data: string) => {
         responseData += data;
-        if (data.includes('>') || data.includes('NO DATA') || data.includes('ERROR')) {
-          clearTimeout(timeoutId);
-          window.bluetoothSerial.unsubscribe(() => {}, () => {});
-          resolve(responseData.trim());
+        console.log(`Received data chunk: "${data}"`);
+        
+        // Check if response is complete
+        if (data.includes('>') || data.includes('NO DATA') || data.includes('ERROR') || data.includes('?')) {
+          if (!responseComplete) {
+            responseComplete = true;
+            clearTimeout(timeoutId);
+            window.bluetoothSerial.unsubscribe(() => {}, () => {});
+            resolve(responseData.trim());
+          }
         }
       };
 
-      window.bluetoothSerial.subscribe('\r', onData, (error) => {
-        clearTimeout(timeoutId);
-        reject(error);
-      });
+      const onError = (error: string) => {
+        if (!responseComplete) {
+          responseComplete = true;
+          clearTimeout(timeoutId);
+          window.bluetoothSerial.unsubscribe(() => {}, () => {});
+          reject(new Error(error));
+        }
+      };
 
+      // Subscribe to data
+      window.bluetoothSerial.subscribe('\r', onData, onError);
+
+      // Send command
       window.bluetoothSerial.write(command, () => {
-        console.log('Command sent:', command.trim());
+        console.log(`Command sent: ${command.trim()}`);
       }, (error) => {
-        clearTimeout(timeoutId);
-        window.bluetoothSerial.unsubscribe(() => {}, () => {});
-        reject(error);
+        if (!responseComplete) {
+          responseComplete = true;
+          clearTimeout(timeoutId);
+          window.bluetoothSerial.unsubscribe(() => {}, () => {});
+          reject(new Error(error));
+        }
       });
     });
   }

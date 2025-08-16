@@ -18,6 +18,7 @@ import {
 import { BluetoothDevice } from '@/services/MasterBluetoothService';
 import { toast } from 'sonner';
 import { Capacitor } from '@capacitor/core';
+import { enhancedBluetoothService } from '@/obd2/enhanced-bluetooth-service';
 
 interface BluetoothDeviceScannerProps {
   onDeviceConnected: (device: BluetoothDevice) => void;
@@ -39,17 +40,11 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
 
   const checkBluetoothStatus = async () => {
     try {
-      if (Capacitor.isNativePlatform() && window.bluetoothSerial) {
-        window.bluetoothSerial.isEnabled(
-          () => setBluetoothEnabled(true),
-          () => setBluetoothEnabled(false)
-        );
-      } else {
-        // Web fallback - assume enabled
-        setBluetoothEnabled(true);
-      }
+      const isEnabled = await enhancedBluetoothService.checkBluetoothStatus();
+      setBluetoothEnabled(isEnabled);
     } catch (error) {
       console.error('Error checking Bluetooth status:', error);
+      setBluetoothEnabled(false);
     }
   };
 
@@ -66,48 +61,31 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
             toast.error('Failed to enable Bluetooth');
           }
         );
+      } else {
+        toast.info('Bluetooth management not available on web platform');
       }
     } catch (error) {
       console.error('Error enabling Bluetooth:', error);
+      toast.error('Error enabling Bluetooth');
     }
   };
 
   const loadPairedDevices = async () => {
     try {
-      if (Capacitor.isNativePlatform() && window.bluetoothSerial) {
-        window.bluetoothSerial.list(
-          (devices) => {
-            const pairedDeviceList = devices.map((device: any) => ({
-              id: device.id || device.address,
-              address: device.address,
-              name: device.name || 'Unknown Device',
-              isPaired: true,
-              isConnected: false,
-              deviceType: isOBD2Device(device.name) ? 'ELM327' as const : 'Generic' as const,
-              compatibility: isOBD2Device(device.name) ? 0.9 : 0.3
-            }));
-            setPairedDevices(pairedDeviceList);
-          },
-          (error) => {
-            console.error('Failed to get paired devices:', error);
-          }
-        );
-      } else {
-        // Web fallback with mock data
-        setPairedDevices([
-          {
-            id: 'mock-paired-1',
-            address: '00:1D:A5:68:98:8B',
-            name: 'ELM327 OBD2',
-            isPaired: true,
-            isConnected: false,
-            deviceType: 'ELM327' as const,
-            compatibility: 0.95
-          }
-        ]);
-      }
+      const pairedDeviceList = await enhancedBluetoothService.getPairedDevices();
+      const formattedDevices = pairedDeviceList.map(device => ({
+        id: device.id,
+        address: device.address,
+        name: device.name,
+        isPaired: device.isPaired,
+        isConnected: false,
+        deviceType: isOBD2Device(device.name) ? 'ELM327' as const : 'Generic' as const,
+        compatibility: isOBD2Device(device.name) ? 0.9 : 0.3
+      }));
+      setPairedDevices(formattedDevices);
     } catch (error) {
-      console.error('Error loading paired devices:', error);
+      console.error('Failed to load paired devices:', error);
+      setPairedDevices([]);
     }
   };
 
@@ -122,7 +100,7 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
     setDevices([]);
 
     try {
-      // Progress simulation
+      // Start progress animation
       const progressInterval = setInterval(() => {
         setScanProgress(prev => {
           if (prev >= 90) {
@@ -133,70 +111,34 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
         });
       }, 1000);
 
-      if (Capacitor.isNativePlatform() && window.bluetoothSerial) {
-        window.bluetoothSerial.discoverUnpaired(
-          (devices) => {
-            clearInterval(progressInterval);
-            setScanProgress(100);
-            
-            const deviceList = devices.map((device: any) => ({
-              id: device.id || device.address,
-              address: device.address,
-              name: device.name || 'Unknown Device',
-              isPaired: false,
-              isConnected: false,
-              deviceType: isOBD2Device(device.name) ? 'ELM327' as const : 'Generic' as const,
-              compatibility: isOBD2Device(device.name) ? 0.9 : 0.3,
-              rssi: device.rssi
-            }));
-            
-            setDevices(deviceList);
-            toast.success(`Found ${deviceList.length} available devices`);
-          },
-          (error) => {
-            clearInterval(progressInterval);
-            console.error('Scan failed:', error);
-            toast.error('Device scan failed');
-          }
-        );
-      } else {
-        // Web fallback with mock data
-        setTimeout(() => {
-          clearInterval(progressInterval);
-          setScanProgress(100);
-          setDevices([
-            {
-              id: 'mock-unpaired-1',
-              address: '00:1D:A5:68:98:8C',
-              name: 'Vgate iCar Pro',
-              isPaired: false,
-              isConnected: false,
-              deviceType: 'OBD2' as const,
-              compatibility: 0.85,
-              rssi: -60
-            },
-            {
-              id: 'mock-unpaired-2',
-              address: '98:D3:31:F5:A2:BC',
-              name: 'ELM327-WiFi',
-              isPaired: false,
-              isConnected: false,
-              deviceType: 'ELM327' as const,
-              compatibility: 0.92,
-              rssi: -45
-            }
-          ]);
-          toast.success('Found 2 available devices');
-        }, 3000);
-      }
+      // Discover unpaired devices
+      const discoveredDevices = await enhancedBluetoothService.discoverDevices();
+      
+      clearInterval(progressInterval);
+      setScanProgress(100);
+      
+      const formattedDevices = discoveredDevices.map(device => ({
+        id: device.id,
+        address: device.address,
+        name: device.name,
+        isPaired: device.isPaired,
+        isConnected: false,
+        deviceType: isOBD2Device(device.name) ? 'ELM327' as const : 'Generic' as const,
+        compatibility: isOBD2Device(device.name) ? 0.9 : 0.3,
+        rssi: device.rssi
+      }));
+      
+      setDevices(formattedDevices);
+      toast.success(`Found ${formattedDevices.length} available devices`);
+      
     } catch (error) {
-      console.error('Scan error:', error);
-      toast.error('Failed to scan for devices');
+      console.error('Scan failed:', error);
+      toast.error('Device scan failed');
     } finally {
       setTimeout(() => {
         setIsScanning(false);
         setScanProgress(0);
-      }, 4000);
+      }, 1000);
     }
   };
 
@@ -209,22 +151,17 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
           device.address,
           () => {
             toast.success(`Paired with ${device.name}`);
-            // Move device to paired list
             setPairedDevices(prev => [...prev, { ...device, isPaired: true }]);
             setDevices(prev => prev.filter(d => d.id !== device.id));
+            loadPairedDevices(); // Refresh paired devices list
           },
           (error) => {
             console.error('Pairing failed:', error);
-            toast.error(`Failed to pair with ${device.name}`);
+            toast.error(`Failed to pair with ${device.name}: ${error}`);
           }
         );
       } else {
-        // Web fallback
-        setTimeout(() => {
-          toast.success(`Paired with ${device.name}`);
-          setPairedDevices(prev => [...prev, { ...device, isPaired: true }]);
-          setDevices(prev => prev.filter(d => d.id !== device.id));
-        }, 2000);
+        toast.error('Pairing not available on web platform');
       }
     } catch (error) {
       console.error('Pairing error:', error);
@@ -238,28 +175,20 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
     setIsConnecting(device.id);
 
     try {
-      if (Capacitor.isNativePlatform() && window.bluetoothSerial) {
-        window.bluetoothSerial.connect(
-          device.address,
-          () => {
-            toast.success(`Connected to ${device.name}`);
-            onDeviceConnected({ ...device, isConnected: true });
-          },
-          (error) => {
-            console.error('Connection failed:', error);
-            toast.error(`Failed to connect to ${device.name}`);
-          }
-        );
+      const success = await enhancedBluetoothService.connectToDevice(device);
+      
+      if (success) {
+        // Initialize ELM327 after connection
+        await enhancedBluetoothService.initializeELM327CarScannerStyle();
+        
+        toast.success(`Connected to ${device.name}`);
+        onDeviceConnected({ ...device, isConnected: true });
       } else {
-        // Web fallback
-        setTimeout(() => {
-          toast.success(`Connected to ${device.name}`);
-          onDeviceConnected({ ...device, isConnected: true });
-        }, 2000);
+        toast.error(`Failed to connect to ${device.name}`);
       }
     } catch (error) {
       console.error('Connection error:', error);
-      toast.error('Connection failed');
+      toast.error(`Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsConnecting(null);
     }
@@ -272,7 +201,9 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
            lowerName.includes('vgate') ||
            lowerName.includes('icar') ||
            lowerName.includes('konnwei') ||
-           lowerName.includes('autel');
+           lowerName.includes('autel') ||
+           lowerName.includes('scan') ||
+           lowerName.includes('diagnostic');
   };
 
   const getDeviceIcon = (device: BluetoothDevice) => {
