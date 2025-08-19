@@ -467,6 +467,15 @@ export class SeatIbizaDiagnosticService {
     const levelRaw = parseInt(data.substr(4, 2), 16);
     return Math.round((levelRaw / 255) * 100);
   }
+
+  async getEngineRpm(): Promise<number> {
+    const response = await this.sendCommand('010C');
+    if (response.includes('NO DATA')) throw new Error('No RPM data');
+
+    const data = response.replace(/\s/g, '');
+    const rpmRaw = parseInt(data.substr(4, 4), 16);
+    return Math.round(rpmRaw / 4);
+  }
 }
 
 export const seatIbizaDiagnosticService = new SeatIbizaDiagnosticService(

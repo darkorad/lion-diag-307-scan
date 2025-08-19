@@ -29,6 +29,7 @@ import { MANUFACTURER_PIDS } from '@/constants/realDiagnosticCodes';
 import { toast } from 'sonner';
 import BackButton from './BackButton';
 import SeatIbizaAdvancedPanel from './SeatIbizaAdvancedPanel';
+import VwGolfAdvancedPanel from './VwGolfAdvancedPanel';
 
 interface WorkingVehicleSpecificDiagnosticsProps {
   vehicleInfo: {
@@ -241,6 +242,9 @@ const WorkingVehicleSpecificDiagnostics: React.FC<WorkingVehicleSpecificDiagnost
           <TabsTrigger value="coding">Coding</TabsTrigger>
           {vehicleInfo.manufacturer === 'Seat' && (
             <TabsTrigger value="seat-ibiza-advanced">Seat Ibiza</TabsTrigger>
+          )}
+          {vehicleInfo.manufacturer === 'VW' && (
+            <TabsTrigger value="vw-golf-advanced">VW Golf</TabsTrigger>
           )}
         </TabsList>
 
@@ -518,6 +522,11 @@ const WorkingVehicleSpecificDiagnostics: React.FC<WorkingVehicleSpecificDiagnost
         {vehicleInfo.manufacturer === 'Seat' && (
           <TabsContent value="seat-ibiza-advanced">
             <SeatIbizaAdvancedPanel isConnected={isConnected} />
+          </TabsContent>
+        )}
+        {vehicleInfo.manufacturer === 'VW' && (
+          <TabsContent value="vw-golf-advanced">
+            <VwGolfAdvancedPanel isConnected={isConnected} />
           </TabsContent>
         )}
       </Tabs>

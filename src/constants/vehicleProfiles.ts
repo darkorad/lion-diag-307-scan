@@ -1,6 +1,7 @@
 import { VehicleProfile } from '@/types/vehicle';
 import { SEAT_IBIZA_PROFILES } from './seatIbizaDatabase';
 import { PEUGEOT_307_PROFILES } from './peugeot307Database';
+import { VW_GOLF_PROFILES } from './vwGolfDatabase';
 
 export const VEHICLE_PROFILES: VehicleProfile[] = [
   {
@@ -125,6 +126,8 @@ export const VEHICLE_PROFILES: VehicleProfile[] = [
   ...SEAT_IBIZA_PROFILES,
   // Add all Peugeot 307 profiles
   ...PEUGEOT_307_PROFILES,
+  // Add all VW Golf profiles
+  ...VW_GOLF_PROFILES,
   {
     id: 'seat-ibiza-2010-diesel',
     make: 'Seat',

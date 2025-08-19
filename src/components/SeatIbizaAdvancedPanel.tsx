@@ -11,6 +11,7 @@ interface SeatIbizaAdvancedPanelProps {
 
 const SeatIbizaAdvancedPanel: React.FC<SeatIbizaAdvancedPanelProps> = ({ isConnected, onBack }) => {
   const [fuelLevel, setFuelLevel] = useState<number | null>(null);
+  const [engineRpm, setEngineRpm] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleGetFuelLevel = async () => {
@@ -34,6 +35,27 @@ const SeatIbizaAdvancedPanel: React.FC<SeatIbizaAdvancedPanelProps> = ({ isConne
     }
   };
 
+  const handleGetEngineRpm = async () => {
+    if (!isConnected) {
+      toast.error('Not connected to OBD2 device');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const rpm = await seatIbizaDiagnosticService.getEngineRpm();
+      setEngineRpm(rpm);
+      if (rpm !== null) {
+        toast.success(`Engine RPM: ${rpm}`);
+      } else {
+        toast.error('Failed to get engine RPM');
+      }
+    } catch (error) {
+      toast.error('Failed to get engine RPM');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -50,6 +72,17 @@ const SeatIbizaAdvancedPanel: React.FC<SeatIbizaAdvancedPanelProps> = ({ isConne
             </div>
             <Button onClick={handleGetFuelLevel} disabled={!isConnected || isLoading}>
               {isLoading ? 'Reading...' : 'Read Fuel Level'}
+            </Button>
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="font-medium">Engine RPM</h4>
+              <p className="text-sm text-muted-foreground">
+                {engineRpm !== null ? `${engineRpm} RPM` : 'N/A'}
+              </p>
+            </div>
+            <Button onClick={handleGetEngineRpm} disabled={!isConnected || isLoading}>
+              {isLoading ? 'Reading...' : 'Read RPM'}
             </Button>
           </div>
         </CardContent>
