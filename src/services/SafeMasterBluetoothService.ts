@@ -149,6 +149,32 @@ export class SafeMasterBluetoothService {
     }
   }
 
+  async enableBluetooth(): Promise<boolean> {
+    try {
+      await this.ensureInitialized();
+
+      if (typeof window !== 'undefined' && window.bluetoothSerial) {
+        return new Promise((resolve) => {
+          window.bluetoothSerial.enable(
+            () => {
+              console.log('Bluetooth enabled successfully');
+              resolve(true);
+            },
+            () => {
+              console.error('Failed to enable Bluetooth: User denied');
+              resolve(false);
+            }
+          );
+        });
+      }
+
+      return true; // Fallback for web
+    } catch (error) {
+      console.error('Error enabling Bluetooth:', error);
+      return false;
+    }
+  }
+
   async scanForDevices(): Promise<BluetoothDevice[]> {
     try {
       await this.ensureInitialized();

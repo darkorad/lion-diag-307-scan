@@ -102,6 +102,36 @@ export const SEAT_IBIZA_PIDS: SeatIbizaPID[] = [
     formula: 'A*100/255',
     category: 'engine'
   },
+  {
+    id: 'intake_air_temp',
+    name: 'Intake Air Temperature',
+    pid: '010F',
+    module: 'Engine ECU',
+    description: 'Intake air temperature sensor',
+    unit: '°C',
+    formula: 'A-40',
+    category: 'engine'
+  },
+  {
+    id: 'throttle_position',
+    name: 'Throttle Position',
+    pid: '0111',
+    module: 'Engine ECU',
+    description: 'Absolute throttle position',
+    unit: '%',
+    formula: 'A*100/255',
+    category: 'engine'
+  },
+  {
+    id: 'fuel_level',
+    name: 'Fuel Level',
+    pid: '012F',
+    module: 'Engine ECU',
+    description: 'Fuel tank level input',
+    unit: '%',
+    formula: 'A*100/255',
+    category: 'fuel'
+  },
 
   // BODY CONTROL MODULE PIDS
   {

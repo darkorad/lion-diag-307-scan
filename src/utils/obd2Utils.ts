@@ -54,6 +54,18 @@ export const parseObdResponse = (pid: string, rawData: string): { value: any; un
     case '0104': // Calculated Engine Load
       // Formula: A * 100 / 255
       return { value: data[0] * 100 / 255, unit: '%' };
+    case '221C80': // Engine Oil Temperature
+      // Formula: A*0.75-48
+      return { value: data[0] * 0.75 - 48, unit: '°C' };
+    case '221C34': // DPF Soot Load
+      // Formula: (A*256+B)/100
+      return { value: (data[0] * 256 + data[1]) / 100, unit: 'g' };
+    case '015C': // Engine Oil Temperature
+      // Formula: A-40
+      return { value: data[0] - 40, unit: '°C' };
+    case '22F603': // DPF Soot Mass (VAG)
+      // Formula: (A*256+B)*0.1
+      return { value: (data[0] * 256 + data[1]) * 0.1, unit: 'g' };
     default:
       // Return raw hex for unhandled PIDs
       return { value: data.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase(), unit: 'raw' };
