@@ -49,6 +49,13 @@ export const SEAT_IBIZA_MODULES: VehicleModule[] = [
         description: 'Perform EGR valve position learning',
         command: '31010E',
         requiredLevel: 'advanced'
+      },
+      {
+        id: 'fuel-level-read',
+        name: 'Read Fuel Level',
+        type: 'read',
+        description: 'Read fuel tank level from ECU',
+        command: '012F'
       }
     ]
   },

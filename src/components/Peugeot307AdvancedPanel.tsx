@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { enhancedOBD2Service } from '@/services/EnhancedOBD2Service';
+import { peugeotDiagnosticService } from '@/services/PeugeotDiagnosticService';
 
 interface Peugeot307AdvancedPanelProps {
   isConnected: boolean;
@@ -111,6 +112,28 @@ const Peugeot307AdvancedPanel: React.FC<Peugeot307AdvancedPanelProps> = ({ isCon
   const [isDpfRegenerating, setIsDpfRegenerating] = useState(false);
   const [egrTestResult, setEgrTestResult] = useState<any>(null);
   const [isEgrTesting, setIsEgrTesting] = useState(false);
+  const [oilTemp, setOilTemp] = useState<number | null>(null);
+
+  const handleGetOilTemp = async () => {
+    if (!isConnected) {
+      toast.error('Not connected to OBD2 device');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const temp = await peugeotDiagnosticService.getOilTemperature('peugeot-307-2004-2.0-hdi');
+      setOilTemp(temp);
+      if (temp !== null) {
+        toast.success(`Engine oil temperature: ${temp}°C`);
+      } else {
+        toast.error('Failed to get engine oil temperature');
+      }
+    } catch (error) {
+      toast.error('Failed to get engine oil temperature');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Enhanced PID list for Peugeot 307
   const peugeot307PIDs = [
@@ -890,6 +913,24 @@ const Peugeot307AdvancedPanel: React.FC<Peugeot307AdvancedPanelProps> = ({ isCon
         </TabsContent>
 
         <TabsContent value="pids" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Specific Readings</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-medium">Engine Oil Temperature</h4>
+                  <p className="text-sm text-muted-foreground">
+                    {oilTemp !== null ? `${oilTemp}°C` : 'N/A'}
+                  </p>
+                </div>
+                <Button onClick={handleGetOilTemp} disabled={!isConnected || isLoading}>
+                  {isLoading ? 'Reading...' : 'Read Oil Temp'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

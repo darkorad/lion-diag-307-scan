@@ -28,6 +28,7 @@ import { workingDiagnosticService, DiagnosticResult, LivePIDData } from '@/servi
 import { MANUFACTURER_PIDS } from '@/constants/realDiagnosticCodes';
 import { toast } from 'sonner';
 import BackButton from './BackButton';
+import SeatIbizaAdvancedPanel from './SeatIbizaAdvancedPanel';
 
 interface WorkingVehicleSpecificDiagnosticsProps {
   vehicleInfo: {
@@ -238,6 +239,9 @@ const WorkingVehicleSpecificDiagnostics: React.FC<WorkingVehicleSpecificDiagnost
           <TabsTrigger value="actuator-tests">Tests</TabsTrigger>
           <TabsTrigger value="service-functions">Service</TabsTrigger>
           <TabsTrigger value="coding">Coding</TabsTrigger>
+          {vehicleInfo.manufacturer === 'Seat' && (
+            <TabsTrigger value="seat-ibiza-advanced">Seat Ibiza</TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="live-data" className="space-y-4">
@@ -510,6 +514,12 @@ const WorkingVehicleSpecificDiagnostics: React.FC<WorkingVehicleSpecificDiagnost
             </CardContent>
           </Card>
         </TabsContent>
+
+        {vehicleInfo.manufacturer === 'Seat' && (
+          <TabsContent value="seat-ibiza-advanced">
+            <SeatIbizaAdvancedPanel isConnected={isConnected} />
+          </TabsContent>
+        )}
       </Tabs>
 
       {!isConnected && (
