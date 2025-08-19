@@ -403,7 +403,7 @@ export class SafeMasterBluetoothService {
     }
 
     const rawResponse = await this.sendCommand(`${pid}\r`);
-    const parsedResponse = parseObdResponse(pid, rawResponse);
+    const parsedResponse = parseObdResponse(pid, rawResponse, 'AUTO'); // Added the missing third parameter
 
     return {
       pid,

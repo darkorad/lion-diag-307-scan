@@ -1,163 +1,222 @@
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { List, ListItem } from '@/components/ui/list';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { 
+  Car, 
+  Bluetooth, 
+  Search, 
+  Settings,
+  BarChart3,
+  AlertTriangle,
+  Loader2,
+  XCircle
+} from 'lucide-react';
 import { obd2Service } from '@/services/OBD2Service';
 import { toast } from 'sonner';
-import { OBD2_PIDS } from '@/constants/obd2Pids';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useNavigate } from 'react-router-dom';
 
-const Diagnostics = () => {
-  const navigate = useNavigate();
-  const [dtcs, setDtcs] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [selectedPid, setSelectedPid] = useState<string | null>(null);
-  const [pidData, setPidData] = useState<{ name: string; value: string; unit: string } | null>(null);
+const Diagnostics: React.FC = () => {
+  const [liveData, setLiveData] = useState<any[]>([]);
+  const [troubleCodes, setTroubleCodes] = useState<any[]>([]);
+  const [isReading, setIsReading] = useState(false);
+  const [isReadingCodes, setIsReadingCodes] = useState(false);
 
-  const obd2Pids = Object.entries(OBD2_PIDS).map(([name, pid]) => ({ name, pid }));
+  const readLiveData = async () => {
+    setIsReading(true);
+    setLiveData([]);
 
-  const handleReadPid = async () => {
-    if (!selectedPid) return;
-    setIsLoading(true);
-    toast.info(`Reading PID: ${selectedPid}`);
     try {
-      const pidInfo = obd2Pids.find(p => p.pid === selectedPid);
-      if (!pidInfo) throw new Error('PID not found');
+      const commonPids = ['010C', '010D', '0105', '0110', '0111'];
+      const results = [];
 
-      // Note: The obd2Service.readPID method might need adjustment
-      // if it doesn't return a simple value.
-      // For now, we assume it returns a string representation of the value.
-      const result = await obd2Service.readPID(selectedPid);
+      for (const pid of commonPids) {
+        try {
+          const response = await obd2Service.sendCommand(`${pid}\r`); // Changed from readPID
+          if (response && !response.includes('NO DATA')) {
+            results.push({
+              pid,
+              name: getPidName(pid),
+              value: response,
+              timestamp: new Date()
+            });
+          }
+        } catch (error) {
+          console.warn(`Failed to read PID ${pid}:`, error);
+        }
+      }
 
-      // We don't have unit info in the new OBD2_PIDS object, so we'll omit it for now.
-      setPidData({
-        name: pidInfo.name,
-        value: result,
-        unit: '',
-      });
-      toast.success(`Successfully read PID: ${pidInfo.name}`);
+      setLiveData(results);
+      toast.success(`Read ${results.length} parameters`);
     } catch (error) {
-      toast.error('Failed to read PID.');
+      console.error('Live data reading failed:', error);
+      toast.error('Failed to read live data');
     } finally {
-      setIsLoading(false);
+      setIsReading(false);
     }
   };
 
-  const handleReadDtcs = async () => {
-    setIsLoading(true);
-    toast.info('Reading DTCs...');
+  const readTroubleCodes = async () => {
+    setIsReadingCodes(true);
+    setTroubleCodes([]);
+
     try {
-      const result = await obd2Service.getDTCs();
-      setDtcs(result);
-      toast.success(`Found ${result.length} DTCs.`);
+      const response = await obd2Service.sendCommand('03\r'); // Changed from getDTCs
+      
+      if (response && !response.includes('NO DATA')) {
+        // Parse DTC response (simplified)
+        const codes = response.split(' ').filter(code => code.length >= 4);
+        const formattedCodes = codes.map(code => ({
+          code,
+          description: `Diagnostic Trouble Code: ${code}`,
+          status: 'Active' as const
+        }));
+        
+        setTroubleCodes(formattedCodes);
+        toast.success(`Found ${formattedCodes.length} trouble codes`);
+      } else {
+        toast.success('No trouble codes found');
+      }
     } catch (error) {
-      toast.error('Failed to read DTCs.');
+      console.error('DTC reading failed:', error);
+      toast.error('Failed to read trouble codes');
     } finally {
-      setIsLoading(false);
+      setIsReadingCodes(false);
     }
   };
 
-  const handleClearDtcs = async () => {
-    setIsLoading(true);
-    toast.info('Clearing DTCs...');
+  const clearTroubleCodes = async () => {
     try {
-      await obd2Service.clearDTCs();
-      setDtcs([]);
-      toast.success('DTCs cleared successfully.');
+      await obd2Service.sendCommand('04\r'); // Changed from clearDTCs
+      setTroubleCodes([]);
+      toast.success('Trouble codes cleared successfully');
     } catch (error) {
-      toast.error('Failed to clear DTCs.');
-    } finally {
-      setIsLoading(false);
+      console.error('Failed to clear codes:', error);
+      toast.error('Failed to clear trouble codes');
+    }
+  };
+
+  const getPidName = (pid: string) => {
+    switch (pid) {
+      case '010C': return 'Engine RPM';
+      case '010D': return 'Vehicle Speed';
+      case '0105': return 'Engine Coolant Temperature';
+      case '0110': return 'MAF Air Flow Rate';
+      case '0111': return 'Throttle Position';
+      default: return 'Unknown PID';
     }
   };
 
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Diagnostics</h1>
-      <Tabs defaultValue="dtcs">
-        <TabsList>
-          <TabsTrigger value="dtcs">DTCs</TabsTrigger>
-          <TabsTrigger value="live-data">Live Data</TabsTrigger>
-          <TabsTrigger value="advanced">Advanced</TabsTrigger>
-        </TabsList>
-        <TabsContent value="dtcs">
-          <Card>
-            <CardHeader>
-              <CardTitle>Diagnostic Trouble Codes (DTCs)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-x-2 mb-4">
-                <Button onClick={handleReadDtcs} disabled={isLoading}>
-                  {isLoading ? 'Reading...' : 'Read DTCs'}
-                </Button>
-                <Button onClick={handleClearDtcs} disabled={isLoading} variant="destructive">
-                  Clear DTCs
-                </Button>
-              </div>
-              <div className="mt-4 space-y-2">
-                {dtcs.map((dtc, index) => (
-                  <div key={index} className="p-2 border rounded-md">
-                    <p className="font-semibold">{dtc}</p>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="live-data">
-          <Card>
-            <CardHeader>
-              <CardTitle>Live Data</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-4 mb-4">
-                <Select onValueChange={setSelectedPid}>
-                  <SelectTrigger className="w-[280px]">
-                    <SelectValue placeholder="Select a PID" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {obd2Pids.map((pid) => (
-                      <SelectItem key={pid.pid} value={pid.pid}>
-                        {pid.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button onClick={handleReadPid} disabled={!selectedPid || isLoading}>
-                  Read PID
-                </Button>
-              </div>
-              {pidData && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>{pidData.name}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-4xl font-bold">{pidData.value} <span className="text-lg font-normal">{pidData.unit}</span></p>
-                  </CardContent>
-                </Card>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="advanced">
-          <Card>
-            <CardHeader>
-              <CardTitle>Advanced Functions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p>
-                Advanced functions are specific to your vehicle's make and model.
-                Select your vehicle to access these functions.
-              </p>
-              <Button onClick={() => navigate('/vehicle-selection')} className="mt-4">
-                Go to Vehicle Selection
+    <div className="min-h-screen bg-gradient-to-br from-background to-muted/20 p-4">
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="text-center space-y-4">
+          <div className="flex items-center justify-center gap-3 mb-6">
+            <Search className="h-8 w-8 text-primary" />
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+              Vehicle Diagnostics
+            </h1>
+          </div>
+          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+            Run comprehensive diagnostic scans and read real-time engine data.
+          </p>
+        </div>
+
+        {/* Live Data */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                Live Data
+              </span>
+              <Button onClick={readLiveData} disabled={isReading} size="sm">
+                {isReading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Reading...
+                  </>
+                ) : (
+                  <>
+                    <Search className="mr-2 h-4 w-4" />
+                    Read Live Data
+                  </>
+                )}
               </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {liveData.length > 0 ? (
+              <List>
+                {liveData.map((item, index) => (
+                  <ListItem key={index} className="flex items-center justify-between">
+                    <span>{item.name} ({item.pid})</span>
+                    <Badge variant="secondary">{item.value}</Badge>
+                  </ListItem>
+                ))}
+              </List>
+            ) : (
+              <Alert>
+                <AlertDescription>
+                  No live data available. Click "Read Live Data" to fetch real-time engine parameters.
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Trouble Codes */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5" />
+                Trouble Codes
+              </span>
+              <div className="flex items-center space-x-2">
+                <Button onClick={readTroubleCodes} disabled={isReadingCodes} size="sm">
+                  {isReadingCodes ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Reading...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="mr-2 h-4 w-4" />
+                      Read Codes
+                    </>
+                  )}
+                </Button>
+                <Button onClick={clearTroubleCodes} disabled={troubleCodes.length === 0} variant="outline" size="sm">
+                  Clear Codes
+                </Button>
+              </div>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {troubleCodes.length > 0 ? (
+              <List>
+                {troubleCodes.map((code, index) => (
+                  <ListItem key={index} className="flex items-center justify-between">
+                    <span>{code.code}</span>
+                    <Badge variant="destructive">{code.status}</Badge>
+                  </ListItem>
+                ))}
+              </List>
+            ) : (
+              <Alert>
+                <AlertDescription>
+                  No trouble codes found. Click "Read Codes" to scan for diagnostic trouble codes (DTCs).
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
