@@ -1,3 +1,4 @@
+
 import { safeMasterBluetoothService } from './SafeMasterBluetoothService';
 
 export class OBD2Service {
@@ -31,6 +32,11 @@ export class OBD2Service {
         }
       }, Math.random() * 500 + 200);
     });
+  }
+
+  // Add the public method that other services expect
+  async sendCommandPublic(command: string): Promise<string> {
+    return this.sendCommand(command);
   }
 }
 
