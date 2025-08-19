@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { obd2Service } from '@/services/OBD2Service';
 import { toast } from 'sonner';
-import { obd2Pids } from '@/constants/obd2Pids';
+import { OBD2_PIDS } from '@/constants/obd2Pids';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNavigate } from 'react-router-dom';
 
@@ -15,6 +15,8 @@ const Diagnostics = () => {
   const [selectedPid, setSelectedPid] = useState<string | null>(null);
   const [pidData, setPidData] = useState<{ name: string; value: string; unit: string } | null>(null);
 
+  const obd2Pids = Object.entries(OBD2_PIDS).map(([name, pid]) => ({ name, pid }));
+
   const handleReadPid = async () => {
     if (!selectedPid) return;
     setIsLoading(true);
@@ -23,11 +25,16 @@ const Diagnostics = () => {
       const pidInfo = obd2Pids.find(p => p.pid === selectedPid);
       if (!pidInfo) throw new Error('PID not found');
 
+      // Note: The obd2Service.readPID method might need adjustment
+      // if it doesn't return a simple value.
+      // For now, we assume it returns a string representation of the value.
       const result = await obd2Service.readPID(selectedPid);
+
+      // We don't have unit info in the new OBD2_PIDS object, so we'll omit it for now.
       setPidData({
         name: pidInfo.name,
         value: result,
-        unit: pidInfo.unit,
+        unit: '',
       });
       toast.success(`Successfully read PID: ${pidInfo.name}`);
     } catch (error) {
