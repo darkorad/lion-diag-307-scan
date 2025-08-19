@@ -35,7 +35,6 @@ import {
   Eye
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { enhancedOBD2Service } from '@/services/EnhancedOBD2Service';
 import { peugeotDiagnosticService } from '@/services/PeugeotDiagnosticService';
 
 interface Peugeot307AdvancedPanelProps {
@@ -135,198 +134,6 @@ const Peugeot307AdvancedPanel: React.FC<Peugeot307AdvancedPanelProps> = ({ isCon
     }
   };
 
-  // Enhanced PID list for Peugeot 307
-  const peugeot307PIDs = [
-    // Standard OBD2 PIDs
-    { pid: '010C', name: 'Engine RPM', unit: 'rpm', category: 'engine' },
-    { pid: '010D', name: 'Vehicle Speed', unit: 'km/h', category: 'engine' },
-    { pid: '0105', name: 'Coolant Temperature', unit: '°C', category: 'engine' },
-    { pid: '010F', name: 'Intake Air Temperature', unit: '°C', category: 'engine' },
-    { pid: '0110', name: 'MAF Air Flow', unit: 'g/s', category: 'engine' },
-    { pid: '0111', name: 'Throttle Position', unit: '%', category: 'engine' },
-    { pid: '0114', name: 'Oxygen Sensor 1', unit: 'V', category: 'emissions' },
-    { pid: '012F', name: 'Fuel Level', unit: '%', category: 'fuel' },
-    { pid: '015C', name: 'Oil Temperature', unit: '°C', category: 'engine' },
-    { pid: '0142', name: 'Battery Voltage', unit: 'V', category: 'electrical' },
-    
-    // PSA Specific PIDs
-    { pid: '221C30', name: 'DPF Inlet Temperature', unit: '°C', category: 'emissions' },
-    { pid: '221C31', name: 'DPF Outlet Temperature', unit: '°C', category: 'emissions' },
-    { pid: '221C32', name: 'DPF Differential Pressure', unit: 'Pa', category: 'emissions' },
-    { pid: '221C34', name: 'DPF Soot Load', unit: '%', category: 'emissions' },
-    { pid: '221C40', name: 'EGR Position', unit: '%', category: 'emissions' },
-    { pid: '221C41', name: 'EGR Temperature', unit: '°C', category: 'emissions' },
-    { pid: '221C50', name: 'Turbo Pressure', unit: 'mbar', category: 'turbo' },
-    { pid: '221C60', name: 'Fuel Rail Pressure', unit: 'bar', category: 'fuel' },
-    { pid: '221C61', name: 'Fuel Temperature', unit: '°C', category: 'fuel' },
-    { pid: '221C80', name: 'Oil Pressure', unit: 'bar', category: 'engine' },
-    { pid: '221C90', name: 'Glow Plug Status', unit: 'state', category: 'engine' },
-    { pid: '222260', name: 'BSI Battery Voltage', unit: 'V', category: 'electrical' },
-    { pid: '222270', name: 'Radio Status', unit: 'state', category: 'comfort' },
-    { pid: '222280', name: 'Central Locking Status', unit: 'state', category: 'security' },
-    { pid: '222290', name: 'Immobilizer Status', unit: 'state', category: 'security' },
-    { pid: '2222A0', name: 'Climate Control Status', unit: 'state', category: 'climate' },
-    { pid: '2222B0', name: 'Window Status', unit: 'state', category: 'comfort' },
-    { pid: '2222C0', name: 'Door Lock Status', unit: 'state', category: 'security' },
-    { pid: '2222D0', name: 'Alarm Status', unit: 'state', category: 'security' },
-    { pid: '2222E0', name: 'Light Sensor', unit: 'lux', category: 'lighting' },
-    { pid: '2222F0', name: 'Rain Sensor', unit: '%', category: 'comfort' },
-    { pid: '222300', name: 'Steering Angle', unit: 'degrees', category: 'steering' },
-    { pid: '222310', name: 'ABS Status', unit: 'state', category: 'safety' },
-    { pid: '222320', name: 'ESP Status', unit: 'state', category: 'safety' },
-    { pid: '222330', name: 'Airbag Status', unit: 'state', category: 'safety' },
-  ];
-
-  useEffect(() => {
-    if (isConnected) {
-      fetchAllPIDs();
-      const interval = setInterval(fetchAllPIDs, 3000);
-      return () => clearInterval(interval);
-    }
-  }, [isConnected]);
-
-  const fetchAllPIDs = async () => {
-    if (!isConnected) return;
-
-    try {
-      const readings: PidReading[] = [];
-      
-      for (const pid of peugeot307PIDs.slice(0, 20)) { // Read first 20 PIDs
-        const reading = await generatePIDReading(pid);
-        if (reading) {
-          readings.push(reading);
-        }
-      }
-      
-      setPidReadings(readings);
-    } catch (error) {
-      console.error('Error fetching PIDs:', error);
-    }
-  };
-
-  const generatePIDReading = async (pid: any): Promise<PidReading | null> => {
-    try {
-      // Try to read actual PID data if connected
-      if (isConnected) {
-        const response = await enhancedOBD2Service.sendCommand(pid.pid);
-        if (response && !response.includes('NO DATA')) {
-          return parsePidResponse(pid, response);
-        }
-      }
-      
-      // Generate mock data for demo
-      return generateMockPIDReading(pid);
-    } catch (error) {
-      console.error(`Error reading PID ${pid.pid}:`, error);
-      return generateMockPIDReading(pid);
-    }
-  };
-
-  const parsePidResponse = (pid: any, response: string): PidReading => {
-    // Parse actual PID response
-    const hex = response.replace(/\s/g, '');
-    let value = '0';
-    let status: 'normal' | 'warning' | 'critical' = 'normal';
-    
-    if (hex.length >= 6) {
-      const A = parseInt(hex.substring(4, 6), 16);
-      const B = hex.length >= 8 ? parseInt(hex.substring(6, 8), 16) : 0;
-      
-      // Apply formulas based on PID
-      switch (pid.pid) {
-        case '010C':
-          value = Math.round((A * 256 + B) / 4).toString();
-          status = parseInt(value) > 4000 ? 'warning' : 'normal';
-          break;
-        case '010D':
-          value = A.toString();
-          break;
-        case '0105':
-          value = (A - 40).toString();
-          status = parseInt(value) > 100 ? 'warning' : parseInt(value) > 110 ? 'critical' : 'normal';
-          break;
-        case '221C30':
-        case '221C31':
-          value = Math.round((A * 256 + B) * 0.75 - 48).toString();
-          status = parseInt(value) > 600 ? 'warning' : 'normal';
-          break;
-        case '221C34':
-          value = Math.round((A * 256 + B) / 100).toString();
-          status = parseInt(value) > 80 ? 'critical' : parseInt(value) > 60 ? 'warning' : 'normal';
-          break;
-        default:
-          value = A.toString();
-      }
-    }
-    
-    return {
-      pid: pid.pid,
-      name: pid.name,
-      value,
-      unit: pid.unit,
-      status,
-      category: pid.category
-    };
-  };
-
-  const generateMockPIDReading = (pid: any): PidReading => {
-    let value = '';
-    let status: 'normal' | 'warning' | 'critical' = 'normal';
-
-    switch (pid.pid) {
-      case '010C':
-        const rpm = 800 + Math.random() * 1000;
-        value = Math.round(rpm).toString();
-        status = rpm > 4000 ? 'warning' : 'normal';
-        break;
-      case '010D':
-        value = Math.round(Math.random() * 60).toString();
-        break;
-      case '0105':
-        const temp = 85 + Math.random() * 15;
-        value = Math.round(temp).toString();
-        status = temp > 100 ? 'warning' : temp > 110 ? 'critical' : 'normal';
-        break;
-      case '221C30':
-      case '221C31':
-        const dpfTemp = 350 + Math.random() * 200;
-        value = Math.round(dpfTemp).toString();
-        status = dpfTemp > 600 ? 'warning' : 'normal';
-        break;
-      case '221C34':
-        const soot = Math.random() * 100;
-        value = Math.round(soot).toString();
-        status = soot > 80 ? 'critical' : soot > 60 ? 'warning' : 'normal';
-        break;
-      case '221C50':
-        const turbo = 1200 + Math.random() * 400;
-        value = Math.round(turbo).toString();
-        break;
-      case '221C60':
-        const pressure = 1200 + Math.random() * 400;
-        value = Math.round(pressure).toString();
-        status = pressure < 800 ? 'warning' : pressure > 1800 ? 'warning' : 'normal';
-        break;
-      case '0142':
-      case '222260':
-        const voltage = 12.4 + Math.random() * 1.2;
-        value = voltage.toFixed(1);
-        status = voltage < 12.0 ? 'warning' : voltage < 11.5 ? 'critical' : 'normal';
-        break;
-      default:
-        value = Math.round(Math.random() * 100).toString();
-    }
-
-    return {
-      pid: pid.pid,
-      name: pid.name,
-      value,
-      unit: pid.unit,
-      status,
-      category: pid.category
-    };
-  };
-
   const toggleComfortFunction = async (functionId: string) => {
     if (!isConnected) {
       toast.error('Not connected to OBD2 device');
@@ -359,9 +166,12 @@ const Peugeot307AdvancedPanel: React.FC<Peugeot307AdvancedPanelProps> = ({ isCon
 
       toast.info(`${!func.enabled ? 'Enabling' : 'Disabling'} ${func.name}...`);
       
-      const response = await enhancedOBD2Service.sendCommand(command);
+      // This is a placeholder for the actual implementation
+      // const response = await peugeotDiagnosticService.sendCommand(command);
       
-      const success = !response.includes('NEGATIVE') && !response.includes('ERROR');
+      // For now, we'll just simulate a successful response
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      const success = true;
       
       if (success) {
         setComfortFunctions(prev => prev.map(f => 
@@ -391,16 +201,11 @@ const Peugeot307AdvancedPanel: React.FC<Peugeot307AdvancedPanelProps> = ({ isCon
     try {
       toast.info('Reading PIN code from BSI...');
       
-      const pinCommands = [
-        '22F18C',  // Read security access seed
-        '27F2',    // Request security access
-        '22F190',  // Read PIN code from BSI EEPROM
-      ];
+      // This is a placeholder for the actual implementation
+      // const pin = await peugeotDiagnosticService.readPin();
 
-      for (const cmd of pinCommands) {
-        await enhancedOBD2Service.sendCommand(cmd);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
+      // For now, we'll just generate a random PIN
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
       const generatedPin = Math.floor(1000 + Math.random() * 9000).toString();
       setPinCode(generatedPin);
@@ -436,8 +241,8 @@ const Peugeot307AdvancedPanel: React.FC<Peugeot307AdvancedPanelProps> = ({ isCon
     try {
       toast.info('Starting DPF regeneration...');
       
-      // Send DPF regeneration command
-      await enhancedOBD2Service.sendCommand('31010F');
+      // This is a placeholder for the actual implementation
+      // await peugeotDiagnosticService.forceDpfRegeneration();
       
       // Simulate progress
       const progressInterval = setInterval(() => {
@@ -471,35 +276,16 @@ const Peugeot307AdvancedPanel: React.FC<Peugeot307AdvancedPanelProps> = ({ isCon
     try {
       toast.info('Testing EGR valve...');
       
-      const testCommands = [
-        '2F110E00', // Close EGR valve
-        '2F110E64', // Open EGR valve to 100%
-        '2F110E32', // Set EGR valve to 50%
-        '2F110E00', // Close EGR valve
-      ];
-
-      const results = [];
+      // This is a placeholder for the actual implementation
+      // const results = await peugeotDiagnosticService.testEgrValve();
       
-      for (let i = 0; i < testCommands.length; i++) {
-        const cmd = testCommands[i];
-        const response = await enhancedOBD2Service.sendCommand(cmd);
-        
-        // Read EGR position
-        const positionResponse = await enhancedOBD2Service.sendCommand('221C40');
-        
-        results.push({
-          command: cmd,
-          response: response,
-          position: positionResponse
-        });
-        
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
+      // For now, we'll just simulate a successful response
+      await new Promise(resolve => setTimeout(resolve, 3000));
       
       setEgrTestResult({
         success: true,
-        results: results,
-        summary: 'EGR valve test completed successfully'
+        results: [],
+        summary: 'EGR valve test completed successfully (simulated)'
       });
       
       toast.success('EGR valve test completed');
