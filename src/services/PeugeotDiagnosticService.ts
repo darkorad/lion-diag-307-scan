@@ -1,3 +1,4 @@
+
 import { PEUGEOT_307_PROFILES } from '../constants/peugeot307Database';
 import { obd2Service } from './OBD2Service';
 import { parseObdResponse } from '../utils/obd2Utils';
@@ -21,7 +22,9 @@ export class PeugeotDiagnosticService {
     try {
       const rawData = await this.sendCommand(pid);
       const parsed = parseObdResponse(pid, rawData);
-      return parsed.value;
+      // Ensure we return a number, not string
+      const value = typeof parsed.value === 'number' ? parsed.value : parseFloat(parsed.value.toString());
+      return isNaN(value) ? null : value;
     } catch (error) {
       console.error('Failed to get oil temperature:', error);
       return null;
@@ -44,7 +47,9 @@ export class PeugeotDiagnosticService {
     try {
       const rawData = await this.sendCommand(pid);
       const parsed = parseObdResponse(pid, rawData);
-      return parsed.value;
+      // Ensure we return a number, not string
+      const value = typeof parsed.value === 'number' ? parsed.value : parseFloat(parsed.value.toString());
+      return isNaN(value) ? null : value;
     } catch (error) {
       console.error('Failed to get DPF soot load:', error);
       return null;

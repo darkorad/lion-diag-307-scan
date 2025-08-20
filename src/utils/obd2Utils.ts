@@ -6,6 +6,29 @@ export interface ParsedOBDResponse {
   unit: string;
 }
 
+// Parse hex response to byte array
+export const parseHexResponse = (response: string): number[] => {
+  // Remove whitespace and convert to uppercase
+  const cleanResponse = response.replace(/\s+/g, '').toUpperCase();
+  
+  // Extract hex values (remove '>' and other non-hex characters)
+  const hexValues = cleanResponse.replace('>', '').trim();
+  
+  const data: number[] = [];
+  for (let i = 0; i < hexValues.length; i += 2) {
+    const hexByte = hexValues.substr(i, 2);
+    if (/^[0-9A-F]{2}$/.test(hexByte)) {
+      data.push(parseInt(hexByte, 16));
+    }
+  }
+  return data;
+};
+
+// Delay utility function
+export const delay = (ms: number): Promise<void> => {
+  return new Promise(resolve => setTimeout(resolve, ms));
+};
+
 // Parse OBD2 response based on PID
 export const parseObdResponse = (pid: string, rawResponse: string): ParsedOBDResponse => {
   // Remove whitespace and convert to uppercase
