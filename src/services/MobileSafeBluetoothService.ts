@@ -225,7 +225,7 @@ export class MobileSafeBluetoothService {
         }
       }
 
-      // 2. Discover Unpaired Devices
+      // 2. Discover Unpaired Devices - with safe optional method access
       if (window.bluetoothSerial?.discoverUnpaired) {
         console.log('Starting discovery for unpaired devices...');
         try {
@@ -234,45 +234,64 @@ export class MobileSafeBluetoothService {
 
             const discoveryTimeout = setTimeout(() => {
               console.warn('Discovery timeout reached.');
+              // Safely clear listener if method exists
               if (window.bluetoothSerial.clearDeviceDiscoveredListener) {
-                window.bluetoothSerial.clearDeviceDiscoveredListener();
+                try {
+                  window.bluetoothSerial.clearDeviceDiscoveredListener();
+                } catch (error) {
+                  console.warn('Error clearing device listener:', error);
+                }
               }
               resolve(discovered);
             }, 20000);
 
+            // Safely set discovery listener if method exists
             if (window.bluetoothSerial.setDeviceDiscoveredListener) {
+              try {
                 window.bluetoothSerial.setDeviceDiscoveredListener((device: any) => {
-                console.log('Discovered unpaired device:', device);
-                if (device.address && !allDevices.has(device.address)) {
+                  console.log('Discovered unpaired device:', device);
+                  if (device.address && !allDevices.has(device.address)) {
                     const newDevice: BluetoothDevice = {
-                        id: device.address || device.id,
-                        name: device.name || 'Unknown Device',
-                        address: device.address || device.id,
-                        isPaired: false,
-                        deviceType: this.identifyDeviceType(device.name) as 'ELM327' | 'OBD2' | 'Generic',
-                        compatibility: this.getCompatibilityScore(device.name),
-                        rssi: device.rssi
+                      id: device.address || device.id,
+                      name: device.name || 'Unknown Device',
+                      address: device.address || device.id,
+                      isPaired: false,
+                      deviceType: this.identifyDeviceType(device.name) as 'ELM327' | 'OBD2' | 'Generic',
+                      compatibility: this.getCompatibilityScore(device.name),
+                      rssi: device.rssi
                     };
                     discovered.push(newDevice);
-                }
-              });
+                  }
+                });
+              } catch (error) {
+                console.warn('Error setting device discovery listener:', error);
+              }
             }
-
 
             window.bluetoothSerial.discoverUnpaired(
               () => {
                 clearTimeout(discoveryTimeout);
                 console.log('Discovery finished.');
+                // Safely clear listener if method exists
                 if (window.bluetoothSerial.clearDeviceDiscoveredListener) {
-                  window.bluetoothSerial.clearDeviceDiscoveredListener();
+                  try {
+                    window.bluetoothSerial.clearDeviceDiscoveredListener();
+                  } catch (error) {
+                    console.warn('Error clearing device listener after discovery:', error);
+                  }
                 }
                 resolve(discovered);
               },
               (error: any) => {
                 clearTimeout(discoveryTimeout);
                 console.error('Error during device discovery:', error);
+                // Safely clear listener if method exists
                 if (window.bluetoothSerial.clearDeviceDiscoveredListener) {
-                  window.bluetoothSerial.clearDeviceDiscoveredListener();
+                  try {
+                    window.bluetoothSerial.clearDeviceDiscoveredListener();
+                  } catch (error) {
+                    console.warn('Error clearing device listener after error:', error);
+                  }
                 }
                 resolve(discovered);
               }

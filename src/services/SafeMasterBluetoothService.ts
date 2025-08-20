@@ -403,7 +403,7 @@ export class SafeMasterBluetoothService {
     }
 
     const rawResponse = await this.sendCommand(`${pid}\r`);
-    // Fix the parseObdResponse call - it expects 2 arguments: pid and rawResponse
+    // Use the correct parseObdResponse signature with 2 arguments
     const parsedResponse = parseObdResponse(pid, rawResponse);
 
     return {
