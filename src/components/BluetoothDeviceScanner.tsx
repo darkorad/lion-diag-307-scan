@@ -46,16 +46,16 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
     }
   }, [mounted]);
 
-  const loadPairedDevices = useCallback(async () => {
+  const loadDevices = useCallback(async () => {
     if (!mounted) return;
     
     try {
-      const pairedDeviceList = await mobileSafeBluetoothService.scanForDevices();
+      const deviceList = await mobileSafeBluetoothService.scanForDevices();
       if (mounted) {
-        setDevices(pairedDeviceList);
+        setDevices(deviceList);
       }
     } catch (error) {
-      console.error('Failed to load paired devices:', error);
+      console.error('Failed to load devices:', error);
       if (mounted) {
         setDevices([]);
       }
@@ -65,12 +65,12 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
   useEffect(() => {
     setMounted(true);
     checkBluetoothStatus();
-    loadPairedDevices();
+    loadDevices();
 
     return () => {
       setMounted(false);
     };
-  }, [checkBluetoothStatus, loadPairedDevices]);
+  }, [checkBluetoothStatus, loadDevices]);
 
   const enableBluetooth = useCallback(async () => {
     if (!mounted) return;
