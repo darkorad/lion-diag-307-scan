@@ -1,11 +1,12 @@
-
 import { Capacitor } from '@capacitor/core';
+import { BluetoothSerial, BluetoothState, BluetoothScanResult, BluetoothConnectOptions, BluetoothReadResult, BluetoothWriteOptions } from '@e-is/capacitor-bluetooth-serial';
 
 export interface BluetoothDevice {
-  id: string;
+  id: string; // mac address
   name: string;
-  address: string;
-  isPaired: boolean;
+  address: string; // mac address
+  class?: number; // Class of device
+  isPaired?: boolean; // not provided by new plugin, will need to manage this
   isConnected?: boolean;
   deviceType?: 'ELM327' | 'OBD2' | 'Generic';
   compatibility?: number;
@@ -31,7 +32,10 @@ export class MobileSafeBluetoothService {
   private isInitialized = false;
   private initPromise: Promise<boolean> | null = null;
   private isNative = false;
-  private isSafeToAccessBluetooth = false;
+  private dataListener: any = null; // To hold the listener instance
+  private incomingDataBuffer: string = "";
+  private resolveCommand: ((value: string | PromiseLike<string>) => void) | null = null;
+
 
   static getInstance(): MobileSafeBluetoothService {
     if (!MobileSafeBluetoothService.instance) {
@@ -41,269 +45,100 @@ export class MobileSafeBluetoothService {
   }
 
   private constructor() {
-    try {
-      this.isNative = Capacitor.isNativePlatform();
-      console.log(`MobileSafeBluetoothService - Platform: ${Capacitor.getPlatform()}, Native: ${this.isNative}`);
-    } catch (error) {
-      console.warn('Error detecting platform:', error);
-      this.isNative = false;
-    }
+    this.isNative = Capacitor.isNativePlatform();
+    console.log(`MobileSafeBluetoothService - Platform: ${Capacitor.getPlatform()}, Native: ${this.isNative}`);
+    this.initialize();
   }
 
   async initialize(): Promise<boolean> {
     if (this.isInitialized) {
       return true;
     }
-
     if (this.initPromise) {
       return this.initPromise;
     }
-
     this.initPromise = this.performInitialization();
     return this.initPromise;
   }
 
   private async performInitialization(): Promise<boolean> {
-    try {
-      console.log('Initializing MobileSafeBluetoothService safely...');
-      
-      if (this.isNative) {
-        console.log('Native platform detected, checking Bluetooth availability...');
-        
-        // Wait longer for native platform to be ready
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        
-        // Safely check if bluetooth serial is available
-        try {
-          if (typeof window !== 'undefined' && window.bluetoothSerial) {
-            console.log('Bluetooth Serial plugin detected');
-            this.isSafeToAccessBluetooth = true;
-          } else {
-            console.warn('Bluetooth Serial plugin not available');
-            this.isSafeToAccessBluetooth = false;
-          }
-        } catch (error) {
-          console.warn('Error checking Bluetooth Serial plugin:', error);
-          this.isSafeToAccessBluetooth = false;
-        }
-      } else {
-        console.log('Web platform detected');
-        this.isSafeToAccessBluetooth = true; // Web Bluetooth API handles its own errors
-      }
-
-      this.isInitialized = true;
-      console.log('MobileSafeBluetoothService initialized successfully');
-      return true;
-    } catch (error) {
-      console.error('MobileSafeBluetoothService initialization failed safely:', error);
-      this.initPromise = null;
-      this.isInitialized = true; // Mark as initialized even if failed
-      return false;
+    if (!this.isNative) {
+        this.isInitialized = true;
+        return true;
     }
+    console.log('Initializing MobileSafeBluetoothService...');
+    // The new plugin doesn't require explicit initialization call.
+    // We can set up listeners here if needed.
+    this.isInitialized = true;
+    console.log('MobileSafeBluetoothService initialized successfully.');
+    return true;
+  }
+
+  private setupDataListener() {
+    if (this.dataListener) {
+      this.dataListener.remove();
+    }
+    this.dataListener = BluetoothSerial.addListener('onRead', (data: { value: string }) => {
+        console.log('Received data from bluetooth:', data.value);
+        this.incomingDataBuffer += data.value;
+
+        // If there is a pending command, check if the response is complete
+        if (this.resolveCommand) {
+            // This is a simplified response handling. In a real OBD2 app, this would be more complex.
+            // We'll assume the response ends with a '>' character.
+            if (this.incomingDataBuffer.includes('>')) {
+                const response = this.incomingDataBuffer;
+                this.incomingDataBuffer = "";
+                this.resolveCommand(response);
+                this.resolveCommand = null;
+            }
+        }
+    });
   }
 
   async isBluetoothEnabled(): Promise<boolean> {
+    if (!this.isNative) return true;
     try {
-      await this.initialize();
-      
-      if (this.isNative && this.isSafeToAccessBluetooth && window.bluetoothSerial?.isEnabled) {
-        return new Promise((resolve) => {
-          const timeout = setTimeout(() => {
-            console.warn('Bluetooth enabled check timeout');
-            resolve(false);
-          }, 5000);
-
-          try {
-            window.bluetoothSerial.isEnabled(
-              () => {
-                clearTimeout(timeout);
-                resolve(true);
-              },
-              () => {
-                clearTimeout(timeout);
-                resolve(false);
-              }
-            );
-          } catch (error) {
-            clearTimeout(timeout);
-            console.warn('Bluetooth enabled check error:', error);
-            resolve(false);
-          }
-        });
-      }
-      
-      // Return true for web to avoid blocking
-      return true;
+      const result = await BluetoothSerial.isEnabled();
+      return result.enabled;
     } catch (error) {
-      console.warn('Error checking Bluetooth status safely:', error);
+      console.error('Error checking bluetooth status', error);
       return false;
     }
   }
 
   async enableBluetooth(): Promise<boolean> {
+    if (!this.isNative) return true;
     try {
-      await this.initialize();
-      
-      if (this.isNative && this.isSafeToAccessBluetooth && window.bluetoothSerial?.enable) {
-        return new Promise((resolve) => {
-          const timeout = setTimeout(() => {
-            console.warn('Bluetooth enable timeout');
-            resolve(false);
-          }, 10000);
-
-          try {
-            window.bluetoothSerial.enable(
-              () => {
-                clearTimeout(timeout);
-                console.log('Bluetooth enabled successfully');
-                resolve(true);
-              },
-              (error) => {
-                clearTimeout(timeout);
-                console.error('Failed to enable Bluetooth:', error);
-                resolve(false);
-              }
-            );
-          } catch (error) {
-            clearTimeout(timeout);
-            console.warn('Bluetooth enable error:', error);
-            resolve(false);
-          }
-        });
-      }
-      
-      return true;
+      const result = await BluetoothSerial.enable();
+      return result.enabled;
     } catch (error) {
-      console.error('Error enabling Bluetooth safely:', error);
+      console.error('Error enabling bluetooth', error);
       return false;
     }
   }
 
   async scanForDevices(): Promise<BluetoothDevice[]> {
+    if (!this.isNative) return [];
     try {
-      await this.initialize();
-      console.log('Scanning for Bluetooth devices safely...');
-
-      if (!this.isNative || !this.isSafeToAccessBluetooth) {
-        console.log('Bluetooth not available on this platform or not initialized');
-        return [];
-      }
-
-      // Use a Map to store devices and prevent duplicates
-      const allDevices = new Map<string, BluetoothDevice>();
-
-      // 1. Get Paired Devices
-      if (window.bluetoothSerial?.list) {
-        try {
-          const pairedDevices = await new Promise<BluetoothDevice[]>((resolve, reject) => {
-            window.bluetoothSerial.list(
-              (devices: any[]) => {
-                const bluetoothDevices = devices.map(device => ({
-                  id: device.address || device.id,
-                  name: device.name || 'Unknown Device',
-                  address: device.address || device.id,
-                  isPaired: true,
-                  deviceType: this.identifyDeviceType(device.name) as 'ELM327' | 'OBD2' | 'Generic',
-                  compatibility: this.getCompatibilityScore(device.name),
-                  rssi: device.rssi
-                }));
-                resolve(bluetoothDevices);
-              },
-              (error: any) => {
-                console.warn('Could not list paired devices', error);
-                // Don't reject, just resolve with empty array
-                resolve([]);
-              }
-            );
-          });
-
-          pairedDevices.forEach(device => allDevices.set(device.address, device));
-          console.log(`Found ${pairedDevices.length} paired devices.`);
-
-        } catch (error) {
-          console.error('Error listing paired devices:', error);
-        }
-      }
-
-      // 2. Discover Unpaired Devices
-      if (window.bluetoothSerial?.discoverUnpaired) {
-        console.log('Starting discovery for unpaired devices...');
-        try {
-          const unpairedDevices = await new Promise<BluetoothDevice[]>((resolve, reject) => {
-            const discovered: BluetoothDevice[] = [];
-
-            const discoveryTimeout = setTimeout(() => {
-              console.warn('Discovery timeout reached.');
-              if (window.bluetoothSerial.clearDeviceDiscoveredListener) {
-                window.bluetoothSerial.clearDeviceDiscoveredListener();
-              }
-              resolve(discovered);
-            }, 20000);
-
-            if (window.bluetoothSerial.setDeviceDiscoveredListener) {
-                window.bluetoothSerial.setDeviceDiscoveredListener((device: any) => {
-                console.log('Discovered unpaired device:', device);
-                if (device.address && !allDevices.has(device.address)) {
-                    const newDevice: BluetoothDevice = {
-                        id: device.address || device.id,
-                        name: device.name || 'Unknown Device',
-                        address: device.address || device.id,
-                        isPaired: false,
-                        deviceType: this.identifyDeviceType(device.name) as 'ELM327' | 'OBD2' | 'Generic',
-                        compatibility: this.getCompatibilityScore(device.name),
-                        rssi: device.rssi
-                    };
-                    discovered.push(newDevice);
-                }
-              });
-            }
-
-
-            window.bluetoothSerial.discoverUnpaired(
-              () => {
-                clearTimeout(discoveryTimeout);
-                console.log('Discovery finished.');
-                if (window.bluetoothSerial.clearDeviceDiscoveredListener) {
-                  window.bluetoothSerial.clearDeviceDiscoveredListener();
-                }
-                resolve(discovered);
-              },
-              (error: any) => {
-                clearTimeout(discoveryTimeout);
-                console.error('Error during device discovery:', error);
-                if (window.bluetoothSerial.clearDeviceDiscoveredListener) {
-                  window.bluetoothSerial.clearDeviceDiscoveredListener();
-                }
-                resolve(discovered);
-              }
-            );
-          });
-
-          unpairedDevices.forEach(device => {
-            if (!allDevices.has(device.address)) {
-              allDevices.set(device.address, device);
-            }
-          });
-          console.log(`Found ${unpairedDevices.length} new unpaired devices.`);
-
-        } catch (error) {
-          console.error('Error discovering unpaired devices:', error);
-        }
-      }
-
-      const finalDeviceList = Array.from(allDevices.values());
-      console.log(`Total unique devices found: ${finalDeviceList.length}`);
-      return finalDeviceList;
-
+      const result: BluetoothScanResult = await BluetoothSerial.scan();
+      return result.devices.map(d => ({
+        id: d.id,
+        address: d.id, // The new plugin uses 'id' for the mac address
+        name: d.name || 'Unknown Device',
+        class: d.class,
+        isPaired: false, // This information is not available from the new plugin's scan
+        deviceType: this.identifyDeviceType(d.name),
+        compatibility: this.getCompatibilityScore(d.name),
+      }));
     } catch (error) {
-      console.error('Device scan failed safely:', error);
+      console.error('Error scanning for devices', error);
       return [];
     }
   }
 
   private identifyDeviceType(name: string): string {
     if (!name) return 'Generic';
-    
     const lowerName = name.toLowerCase();
     if (lowerName.includes('elm327') || lowerName.includes('obd') || lowerName.includes('vgate') || 
         lowerName.includes('icar') || lowerName.includes('viecar') || lowerName.includes('konnwei')) {
@@ -317,7 +152,6 @@ export class MobileSafeBluetoothService {
 
   private getCompatibilityScore(name: string): number {
     if (!name) return 0.3;
-    
     const lowerName = name.toLowerCase();
     if (lowerName.includes('elm327') || lowerName.includes('obd')) {
       return 0.9;
@@ -329,108 +163,34 @@ export class MobileSafeBluetoothService {
   }
 
   async connectToDevice(device: BluetoothDevice): Promise<ConnectionResult> {
-    try {
-      await this.initialize();
-      console.log(`Connecting to device safely: ${device.name} (${device.address})`);
-      
-      if (this.isNative && this.isSafeToAccessBluetooth && window.bluetoothSerial?.connect) {
-        return new Promise((resolve) => {
-          const timeout = setTimeout(() => {
-            console.error('Connection timeout for device:', device.address);
-            resolve({
-              success: false,
-              error: 'Connection timeout'
-            });
-          }, 30000);
-
-          try {
-            const connectMethod = device.isPaired ? 'connect' : 'connectInsecure';
-            
-            window.bluetoothSerial[connectMethod](
-              device.address,
-              () => {
-                clearTimeout(timeout);
-                console.log('Successfully connected to device:', device.address);
-                this.currentDevice = { ...device, isConnected: true };
-                resolve({
-                  success: true,
-                  device: this.currentDevice
-                });
-              },
-              (error) => {
-                clearTimeout(timeout);
-                console.error('Failed to connect to device:', error);
-                resolve({
-                  success: false,
-                  error: error || 'Connection failed'
-                });
-              }
-            );
-          } catch (error) {
-            clearTimeout(timeout);
-            console.error('Connection exception:', error);
-            resolve({
-              success: false,
-              error: error instanceof Error ? error.message : 'Connection failed'
-            });
-          }
-        });
-      }
-      
-      // Mock success for web
+    if (!this.isNative) {
       this.currentDevice = { ...device, isConnected: true };
-      return {
-        success: true,
-        device: this.currentDevice
-      };
+      return { success: true, device: this.currentDevice };
+    }
+    try {
+      // The new plugin doesn't have a separate 'connectInsecure'. We assume 'connect' handles both cases.
+      await BluetoothSerial.connect({ address: device.address });
+      this.currentDevice = { ...device, isConnected: true };
+      this.setupDataListener(); // Setup listener after successful connection
+      return { success: true, device: this.currentDevice };
     } catch (error) {
-      console.error('Connection failed safely:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Connection failed'
-      };
+      console.error(`Error connecting to ${device.address}`, error);
+      return { success: false, error: (error as Error).message };
     }
   }
 
   async disconnect(): Promise<boolean> {
+    if (!this.isNative || !this.currentDevice) return true;
     try {
-      if (this.isNative && this.isSafeToAccessBluetooth && window.bluetoothSerial?.disconnect && this.currentDevice) {
-        return new Promise((resolve) => {
-          const timeout = setTimeout(() => {
-            console.warn('Disconnect timeout');
-            this.currentDevice = null;
-            resolve(false);
-          }, 5000);
-
-          try {
-            window.bluetoothSerial.disconnect(
-              () => {
-                clearTimeout(timeout);
-                console.log('Disconnected from device');
-                this.currentDevice = null;
-                resolve(true);
-              },
-              (error) => {
-                clearTimeout(timeout);
-                console.error('Disconnect error:', error);
-                this.currentDevice = null;
-                resolve(false);
-              }
-            );
-          } catch (error) {
-            clearTimeout(timeout);
-            console.error('Disconnect exception:', error);
-            this.currentDevice = null;
-            resolve(false);
-          }
-        });
+      await BluetoothSerial.disconnect({ address: this.currentDevice.address });
+      if (this.dataListener) {
+        this.dataListener.remove();
+        this.dataListener = null;
       }
-      
       this.currentDevice = null;
       return true;
     } catch (error) {
-      console.error('Disconnect failed safely:', error);
-      this.currentDevice = null;
+      console.error('Error disconnecting', error);
       return false;
     }
   }
@@ -439,59 +199,30 @@ export class MobileSafeBluetoothService {
     if (!this.currentDevice?.isConnected) {
       throw new Error('Not connected to device');
     }
-    
-    console.log(`Sending command safely: ${command}`);
-    
-    if (this.isNative && this.isSafeToAccessBluetooth && window.bluetoothSerial?.write) {
-      return new Promise((resolve, reject) => {
-        let responseData = '';
-        const timeout = setTimeout(() => {
-          try {
-            if (window.bluetoothSerial?.unsubscribe) {
-              window.bluetoothSerial.unsubscribe(() => {}, () => {});
-            }
-          } catch (error) {
-            console.warn('Error unsubscribing:', error);
-          }
-          reject(new Error('Command timeout'));
-        }, 5000);
 
-        const onData = (data: string) => {
-          responseData += data;
-          if (data.includes('>') || data.includes('NO DATA') || data.includes('ERROR')) {
-            clearTimeout(timeout);
-            try {
-              if (window.bluetoothSerial?.unsubscribe) {
-                window.bluetoothSerial.unsubscribe(() => {}, () => {});
-              }
-            } catch (error) {
-              console.warn('Error unsubscribing after data:', error);
-            }
-            resolve(responseData.trim());
-          }
-        };
-
+    if (this.isNative) {
+      return new Promise(async (resolve, reject) => {
         try {
-          if (window.bluetoothSerial.subscribe) {
-            window.bluetoothSerial.subscribe('\r', onData, (error) => {
-              clearTimeout(timeout);
-              reject(new Error(error));
-            });
-          }
+          this.resolveCommand = resolve;
+          this.incomingDataBuffer = ""; // Clear buffer before sending new command
+          await BluetoothSerial.write({ address: this.currentDevice!.address, value: command + '\r' });
 
-          window.bluetoothSerial.write(command + '\r', () => {
-            console.log(`Command sent safely: ${command}`);
-          }, (error) => {
-            clearTimeout(timeout);
-            reject(new Error(error));
-          });
+          // Set a timeout for the command response
+          setTimeout(() => {
+            if (this.resolveCommand) {
+              this.resolveCommand = null;
+              reject(new Error('Command timeout'));
+            }
+          }, 5000); // 5 second timeout
+
         } catch (error) {
-          clearTimeout(timeout);
-          reject(new Error(error instanceof Error ? error.message : 'Send command failed'));
+          console.error('Error writing to device', error);
+          this.resolveCommand = null;
+          reject(error);
         }
       });
     }
-    
+
     // Mock response for web
     await new Promise(resolve => setTimeout(resolve, 100));
     return `41 ${command.substring(2)} FF FF`;
