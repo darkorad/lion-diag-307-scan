@@ -183,23 +183,25 @@ export class MobileSafeBluetoothService {
     try {
       await this.initialize();
       console.log('Scanning for Bluetooth devices safely...');
-      
-      if (this.isNative && this.isSafeToAccessBluetooth && window.bluetoothSerial?.list) {
-        const pairedDevices = await new Promise<BluetoothDevice[]>((resolve) => {
-          const timeout = setTimeout(() => {
-            console.warn('Device scan timeout');
-            resolve([]);
-          }, 15000);
 
-          try {
+      if (!this.isNative || !this.isSafeToAccessBluetooth) {
+        console.log('Bluetooth not available on this platform or not initialized');
+        return [];
+      }
+
+      // Use a Map to store devices and prevent duplicates
+      const allDevices = new Map<string, BluetoothDevice>();
+
+      // 1. Get Paired Devices
+      if (window.bluetoothSerial?.list) {
+        try {
+          const pairedDevices = await new Promise<BluetoothDevice[]>((resolve, reject) => {
             window.bluetoothSerial.list(
-              (devices) => {
-                clearTimeout(timeout);
-                console.log('Found paired devices:', devices);
+              (devices: any[]) => {
                 const bluetoothDevices = devices.map(device => ({
-                  id: device.address || device.id || 'unknown',
+                  id: device.address || device.id,
                   name: device.name || 'Unknown Device',
-                  address: device.address || device.id || 'unknown',
+                  address: device.address || device.id,
                   isPaired: true,
                   deviceType: this.identifyDeviceType(device.name) as 'ELM327' | 'OBD2' | 'Generic',
                   compatibility: this.getCompatibilityScore(device.name),
@@ -207,25 +209,92 @@ export class MobileSafeBluetoothService {
                 }));
                 resolve(bluetoothDevices);
               },
-              (error) => {
-                clearTimeout(timeout);
-                console.warn('Bluetooth scan error:', error);
+              (error: any) => {
+                console.warn('Could not list paired devices', error);
+                // Don't reject, just resolve with empty array
                 resolve([]);
               }
             );
-          } catch (error) {
-            clearTimeout(timeout);
-            console.warn('Bluetooth scan exception:', error);
-            resolve([]);
-          }
-        });
+          });
 
-        return pairedDevices;
+          pairedDevices.forEach(device => allDevices.set(device.address, device));
+          console.log(`Found ${pairedDevices.length} paired devices.`);
+
+        } catch (error) {
+          console.error('Error listing paired devices:', error);
+        }
       }
-      
-      // Return empty array for web or when Bluetooth not available
-      console.log('Bluetooth not available on this platform or not initialized');
-      return [];
+
+      // 2. Discover Unpaired Devices
+      if (window.bluetoothSerial?.discoverUnpaired) {
+        console.log('Starting discovery for unpaired devices...');
+        try {
+          const unpairedDevices = await new Promise<BluetoothDevice[]>((resolve, reject) => {
+            const discovered: BluetoothDevice[] = [];
+
+            const discoveryTimeout = setTimeout(() => {
+              console.warn('Discovery timeout reached.');
+              if (window.bluetoothSerial.clearDeviceDiscoveredListener) {
+                window.bluetoothSerial.clearDeviceDiscoveredListener();
+              }
+              resolve(discovered);
+            }, 20000);
+
+            if (window.bluetoothSerial.setDeviceDiscoveredListener) {
+                window.bluetoothSerial.setDeviceDiscoveredListener((device: any) => {
+                console.log('Discovered unpaired device:', device);
+                if (device.address && !allDevices.has(device.address)) {
+                    const newDevice: BluetoothDevice = {
+                        id: device.address || device.id,
+                        name: device.name || 'Unknown Device',
+                        address: device.address || device.id,
+                        isPaired: false,
+                        deviceType: this.identifyDeviceType(device.name) as 'ELM327' | 'OBD2' | 'Generic',
+                        compatibility: this.getCompatibilityScore(device.name),
+                        rssi: device.rssi
+                    };
+                    discovered.push(newDevice);
+                }
+              });
+            }
+
+
+            window.bluetoothSerial.discoverUnpaired(
+              () => {
+                clearTimeout(discoveryTimeout);
+                console.log('Discovery finished.');
+                if (window.bluetoothSerial.clearDeviceDiscoveredListener) {
+                  window.bluetoothSerial.clearDeviceDiscoveredListener();
+                }
+                resolve(discovered);
+              },
+              (error: any) => {
+                clearTimeout(discoveryTimeout);
+                console.error('Error during device discovery:', error);
+                if (window.bluetoothSerial.clearDeviceDiscoveredListener) {
+                  window.bluetoothSerial.clearDeviceDiscoveredListener();
+                }
+                resolve(discovered);
+              }
+            );
+          });
+
+          unpairedDevices.forEach(device => {
+            if (!allDevices.has(device.address)) {
+              allDevices.set(device.address, device);
+            }
+          });
+          console.log(`Found ${unpairedDevices.length} new unpaired devices.`);
+
+        } catch (error) {
+          console.error('Error discovering unpaired devices:', error);
+        }
+      }
+
+      const finalDeviceList = Array.from(allDevices.values());
+      console.log(`Total unique devices found: ${finalDeviceList.length}`);
+      return finalDeviceList;
+
     } catch (error) {
       console.error('Device scan failed safely:', error);
       return [];
