@@ -1,5 +1,7 @@
 include ':app'
 include ':capacitor-cordova-android-plugins'
 project(':capacitor-cordova-android-plugins').projectDir = new File('./capacitor-cordova-android-plugins/')
+include ':cordova-plugin-bluetooth-serial'
+project(':cordova-plugin-bluetooth-serial').projectDir = new File('../node_modules/cordova-plugin-bluetooth-serial/src/android')
 
 apply from: 'capacitor.settings.gradle'

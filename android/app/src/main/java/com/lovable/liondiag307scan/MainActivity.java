@@ -1,7 +1,6 @@
 
 package com.lovable.liondiag307scan;
 
-import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
