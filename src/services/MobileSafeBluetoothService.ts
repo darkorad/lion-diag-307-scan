@@ -31,6 +31,7 @@ export class MobileSafeBluetoothService {
   private isInitialized = false;
   private initPromise: Promise<boolean> | null = null;
   private isNative = false;
+  private isSafeToAccessBluetooth = false;
 
   static getInstance(): MobileSafeBluetoothService {
     if (!MobileSafeBluetoothService.instance) {
@@ -40,8 +41,13 @@ export class MobileSafeBluetoothService {
   }
 
   private constructor() {
-    this.isNative = Capacitor.isNativePlatform();
-    console.log(`MobileSafeBluetoothService - Platform: ${Capacitor.getPlatform()}, Native: ${this.isNative}`);
+    try {
+      this.isNative = Capacitor.isNativePlatform();
+      console.log(`MobileSafeBluetoothService - Platform: ${Capacitor.getPlatform()}, Native: ${this.isNative}`);
+    } catch (error) {
+      console.warn('Error detecting platform:', error);
+      this.isNative = false;
+    }
   }
 
   async initialize(): Promise<boolean> {
@@ -59,30 +65,39 @@ export class MobileSafeBluetoothService {
 
   private async performInitialization(): Promise<boolean> {
     try {
-      console.log('Initializing MobileSafeBluetoothService...');
+      console.log('Initializing MobileSafeBluetoothService safely...');
       
       if (this.isNative) {
-        console.log('Running on native platform, checking Bluetooth Serial plugin...');
+        console.log('Native platform detected, checking Bluetooth availability...');
         
-        // Wait for native platform to be ready
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Wait longer for native platform to be ready
+        await new Promise(resolve => setTimeout(resolve, 3000));
         
-        // Check if bluetooth serial is available
-        if (typeof window !== 'undefined' && window.bluetoothSerial) {
-          console.log('Bluetooth Serial plugin detected');
-        } else {
-          console.warn('Bluetooth Serial plugin not available');
+        // Safely check if bluetooth serial is available
+        try {
+          if (typeof window !== 'undefined' && window.bluetoothSerial) {
+            console.log('Bluetooth Serial plugin detected');
+            this.isSafeToAccessBluetooth = true;
+          } else {
+            console.warn('Bluetooth Serial plugin not available');
+            this.isSafeToAccessBluetooth = false;
+          }
+        } catch (error) {
+          console.warn('Error checking Bluetooth Serial plugin:', error);
+          this.isSafeToAccessBluetooth = false;
         }
       } else {
-        console.log('Running on web platform');
+        console.log('Web platform detected');
+        this.isSafeToAccessBluetooth = true; // Web Bluetooth API handles its own errors
       }
 
       this.isInitialized = true;
       console.log('MobileSafeBluetoothService initialized successfully');
       return true;
     } catch (error) {
-      console.error('MobileSafeBluetoothService initialization failed:', error);
+      console.error('MobileSafeBluetoothService initialization failed safely:', error);
       this.initPromise = null;
+      this.isInitialized = true; // Mark as initialized even if failed
       return false;
     }
   }
@@ -91,30 +106,36 @@ export class MobileSafeBluetoothService {
     try {
       await this.initialize();
       
-      if (this.isNative && typeof window !== 'undefined' && window.bluetoothSerial?.isEnabled) {
+      if (this.isNative && this.isSafeToAccessBluetooth && window.bluetoothSerial?.isEnabled) {
         return new Promise((resolve) => {
           const timeout = setTimeout(() => {
             console.warn('Bluetooth enabled check timeout');
             resolve(false);
           }, 5000);
 
-          window.bluetoothSerial.isEnabled(
-            () => {
-              clearTimeout(timeout);
-              resolve(true);
-            },
-            () => {
-              clearTimeout(timeout);
-              resolve(false);
-            }
-          );
+          try {
+            window.bluetoothSerial.isEnabled(
+              () => {
+                clearTimeout(timeout);
+                resolve(true);
+              },
+              () => {
+                clearTimeout(timeout);
+                resolve(false);
+              }
+            );
+          } catch (error) {
+            clearTimeout(timeout);
+            console.warn('Bluetooth enabled check error:', error);
+            resolve(false);
+          }
         });
       }
       
       // Return true for web to avoid blocking
       return true;
     } catch (error) {
-      console.warn('Error checking Bluetooth status:', error);
+      console.warn('Error checking Bluetooth status safely:', error);
       return false;
     }
   }
@@ -123,31 +144,37 @@ export class MobileSafeBluetoothService {
     try {
       await this.initialize();
       
-      if (this.isNative && typeof window !== 'undefined' && window.bluetoothSerial?.enable) {
+      if (this.isNative && this.isSafeToAccessBluetooth && window.bluetoothSerial?.enable) {
         return new Promise((resolve) => {
           const timeout = setTimeout(() => {
             console.warn('Bluetooth enable timeout');
             resolve(false);
           }, 10000);
 
-          window.bluetoothSerial.enable(
-            () => {
-              clearTimeout(timeout);
-              console.log('Bluetooth enabled successfully');
-              resolve(true);
-            },
-            (error) => {
-              clearTimeout(timeout);
-              console.error('Failed to enable Bluetooth:', error);
-              resolve(false);
-            }
-          );
+          try {
+            window.bluetoothSerial.enable(
+              () => {
+                clearTimeout(timeout);
+                console.log('Bluetooth enabled successfully');
+                resolve(true);
+              },
+              (error) => {
+                clearTimeout(timeout);
+                console.error('Failed to enable Bluetooth:', error);
+                resolve(false);
+              }
+            );
+          } catch (error) {
+            clearTimeout(timeout);
+            console.warn('Bluetooth enable error:', error);
+            resolve(false);
+          }
         });
       }
       
       return true;
     } catch (error) {
-      console.error('Error enabling Bluetooth:', error);
+      console.error('Error enabling Bluetooth safely:', error);
       return false;
     }
   }
@@ -155,82 +182,52 @@ export class MobileSafeBluetoothService {
   async scanForDevices(): Promise<BluetoothDevice[]> {
     try {
       await this.initialize();
-      console.log('Scanning for Bluetooth devices...');
+      console.log('Scanning for Bluetooth devices safely...');
       
-      if (this.isNative && typeof window !== 'undefined' && window.bluetoothSerial?.list) {
+      if (this.isNative && this.isSafeToAccessBluetooth && window.bluetoothSerial?.list) {
         const pairedDevices = await new Promise<BluetoothDevice[]>((resolve) => {
           const timeout = setTimeout(() => {
             console.warn('Device scan timeout');
             resolve([]);
           }, 15000);
 
-          window.bluetoothSerial.list(
-            (devices) => {
-              clearTimeout(timeout);
-              console.log('Found paired devices:', devices);
-              const bluetoothDevices = devices.map(device => ({
-                id: device.address,
-                name: device.name || 'Unknown Device',
-                address: device.address,
-                isPaired: true,
-                deviceType: this.identifyDeviceType(device.name) as 'ELM327' | 'OBD2' | 'Generic',
-                compatibility: this.getCompatibilityScore(device.name),
-                rssi: device.rssi
-              }));
-              resolve(bluetoothDevices);
-            },
-            (error) => {
-              clearTimeout(timeout);
-              console.warn('Bluetooth scan error:', error);
-              resolve([]);
-            }
-          );
-        });
-
-        // Also try to discover unpaired devices
-        if (window.bluetoothSerial.discoverUnpaired) {
           try {
-            const unpairedDevices = await new Promise<BluetoothDevice[]>((resolve) => {
-              const timeout = setTimeout(() => resolve([]), 10000);
-
-              window.bluetoothSerial.discoverUnpaired(
-                (devices) => {
-                  clearTimeout(timeout);
-                  console.log('Found unpaired devices:', devices);
-                  const bluetoothDevices = devices.map(device => ({
-                    id: device.address,
-                    name: device.name || 'Unknown Device',
-                    address: device.address,
-                    isPaired: false,
-                    deviceType: this.identifyDeviceType(device.name) as 'ELM327' | 'OBD2' | 'Generic',
-                    compatibility: this.getCompatibilityScore(device.name),
-                    rssi: device.rssi
-                  }));
-                  resolve(bluetoothDevices);
-                },
-                (error) => {
-                  clearTimeout(timeout);
-                  console.warn('Unpaired device discovery error:', error);
-                  resolve([]);
-                }
-              );
-            });
-
-            return [...pairedDevices, ...unpairedDevices];
+            window.bluetoothSerial.list(
+              (devices) => {
+                clearTimeout(timeout);
+                console.log('Found paired devices:', devices);
+                const bluetoothDevices = devices.map(device => ({
+                  id: device.address || device.id || 'unknown',
+                  name: device.name || 'Unknown Device',
+                  address: device.address || device.id || 'unknown',
+                  isPaired: true,
+                  deviceType: this.identifyDeviceType(device.name) as 'ELM327' | 'OBD2' | 'Generic',
+                  compatibility: this.getCompatibilityScore(device.name),
+                  rssi: device.rssi
+                }));
+                resolve(bluetoothDevices);
+              },
+              (error) => {
+                clearTimeout(timeout);
+                console.warn('Bluetooth scan error:', error);
+                resolve([]);
+              }
+            );
           } catch (error) {
-            console.warn('Unpaired device discovery failed:', error);
-            return pairedDevices;
+            clearTimeout(timeout);
+            console.warn('Bluetooth scan exception:', error);
+            resolve([]);
           }
-        }
+        });
 
         return pairedDevices;
       }
       
-      // Return empty array for web
-      console.log('Bluetooth not available on this platform');
+      // Return empty array for web or when Bluetooth not available
+      console.log('Bluetooth not available on this platform or not initialized');
       return [];
     } catch (error) {
-      console.error('Device scan failed:', error);
+      console.error('Device scan failed safely:', error);
       return [];
     }
   }
@@ -265,9 +262,9 @@ export class MobileSafeBluetoothService {
   async connectToDevice(device: BluetoothDevice): Promise<ConnectionResult> {
     try {
       await this.initialize();
-      console.log(`Connecting to device: ${device.name} (${device.address})`);
+      console.log(`Connecting to device safely: ${device.name} (${device.address})`);
       
-      if (this.isNative && typeof window !== 'undefined' && window.bluetoothSerial?.connect) {
+      if (this.isNative && this.isSafeToAccessBluetooth && window.bluetoothSerial?.connect) {
         return new Promise((resolve) => {
           const timeout = setTimeout(() => {
             console.error('Connection timeout for device:', device.address);
@@ -277,28 +274,37 @@ export class MobileSafeBluetoothService {
             });
           }, 30000);
 
-          const connectMethod = device.isPaired ? 'connect' : 'connectInsecure';
-          
-          window.bluetoothSerial[connectMethod](
-            device.address,
-            () => {
-              clearTimeout(timeout);
-              console.log('Successfully connected to device:', device.address);
-              this.currentDevice = { ...device, isConnected: true };
-              resolve({
-                success: true,
-                device: this.currentDevice
-              });
-            },
-            (error) => {
-              clearTimeout(timeout);
-              console.error('Failed to connect to device:', error);
-              resolve({
-                success: false,
-                error: error || 'Connection failed'
-              });
-            }
-          );
+          try {
+            const connectMethod = device.isPaired ? 'connect' : 'connectInsecure';
+            
+            window.bluetoothSerial[connectMethod](
+              device.address,
+              () => {
+                clearTimeout(timeout);
+                console.log('Successfully connected to device:', device.address);
+                this.currentDevice = { ...device, isConnected: true };
+                resolve({
+                  success: true,
+                  device: this.currentDevice
+                });
+              },
+              (error) => {
+                clearTimeout(timeout);
+                console.error('Failed to connect to device:', error);
+                resolve({
+                  success: false,
+                  error: error || 'Connection failed'
+                });
+              }
+            );
+          } catch (error) {
+            clearTimeout(timeout);
+            console.error('Connection exception:', error);
+            resolve({
+              success: false,
+              error: error instanceof Error ? error.message : 'Connection failed'
+            });
+          }
         });
       }
       
@@ -309,7 +315,7 @@ export class MobileSafeBluetoothService {
         device: this.currentDevice
       };
     } catch (error) {
-      console.error('Connection failed:', error);
+      console.error('Connection failed safely:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Connection failed'
@@ -319,7 +325,7 @@ export class MobileSafeBluetoothService {
 
   async disconnect(): Promise<boolean> {
     try {
-      if (this.isNative && typeof window !== 'undefined' && window.bluetoothSerial?.disconnect && this.currentDevice) {
+      if (this.isNative && this.isSafeToAccessBluetooth && window.bluetoothSerial?.disconnect && this.currentDevice) {
         return new Promise((resolve) => {
           const timeout = setTimeout(() => {
             console.warn('Disconnect timeout');
@@ -327,27 +333,34 @@ export class MobileSafeBluetoothService {
             resolve(false);
           }, 5000);
 
-          window.bluetoothSerial.disconnect(
-            () => {
-              clearTimeout(timeout);
-              console.log('Disconnected from device');
-              this.currentDevice = null;
-              resolve(true);
-            },
-            (error) => {
-              clearTimeout(timeout);
-              console.error('Disconnect error:', error);
-              this.currentDevice = null;
-              resolve(false);
-            }
-          );
+          try {
+            window.bluetoothSerial.disconnect(
+              () => {
+                clearTimeout(timeout);
+                console.log('Disconnected from device');
+                this.currentDevice = null;
+                resolve(true);
+              },
+              (error) => {
+                clearTimeout(timeout);
+                console.error('Disconnect error:', error);
+                this.currentDevice = null;
+                resolve(false);
+              }
+            );
+          } catch (error) {
+            clearTimeout(timeout);
+            console.error('Disconnect exception:', error);
+            this.currentDevice = null;
+            resolve(false);
+          }
         });
       }
       
       this.currentDevice = null;
       return true;
     } catch (error) {
-      console.error('Disconnect failed:', error);
+      console.error('Disconnect failed safely:', error);
       this.currentDevice = null;
       return false;
     }
@@ -358,14 +371,18 @@ export class MobileSafeBluetoothService {
       throw new Error('Not connected to device');
     }
     
-    console.log(`Sending command: ${command}`);
+    console.log(`Sending command safely: ${command}`);
     
-    if (this.isNative && typeof window !== 'undefined' && window.bluetoothSerial?.write) {
+    if (this.isNative && this.isSafeToAccessBluetooth && window.bluetoothSerial?.write) {
       return new Promise((resolve, reject) => {
         let responseData = '';
         const timeout = setTimeout(() => {
-          if (window.bluetoothSerial?.unsubscribe) {
-            window.bluetoothSerial.unsubscribe(() => {}, () => {});
+          try {
+            if (window.bluetoothSerial?.unsubscribe) {
+              window.bluetoothSerial.unsubscribe(() => {}, () => {});
+            }
+          } catch (error) {
+            console.warn('Error unsubscribing:', error);
           }
           reject(new Error('Command timeout'));
         }, 5000);
@@ -374,26 +391,35 @@ export class MobileSafeBluetoothService {
           responseData += data;
           if (data.includes('>') || data.includes('NO DATA') || data.includes('ERROR')) {
             clearTimeout(timeout);
-            if (window.bluetoothSerial?.unsubscribe) {
-              window.bluetoothSerial.unsubscribe(() => {}, () => {});
+            try {
+              if (window.bluetoothSerial?.unsubscribe) {
+                window.bluetoothSerial.unsubscribe(() => {}, () => {});
+              }
+            } catch (error) {
+              console.warn('Error unsubscribing after data:', error);
             }
             resolve(responseData.trim());
           }
         };
 
-        if (window.bluetoothSerial.subscribe) {
-          window.bluetoothSerial.subscribe('\r', onData, (error) => {
+        try {
+          if (window.bluetoothSerial.subscribe) {
+            window.bluetoothSerial.subscribe('\r', onData, (error) => {
+              clearTimeout(timeout);
+              reject(new Error(error));
+            });
+          }
+
+          window.bluetoothSerial.write(command + '\r', () => {
+            console.log(`Command sent safely: ${command}`);
+          }, (error) => {
             clearTimeout(timeout);
             reject(new Error(error));
           });
-        }
-
-        window.bluetoothSerial.write(command + '\r', () => {
-          console.log(`Command sent: ${command}`);
-        }, (error) => {
+        } catch (error) {
           clearTimeout(timeout);
-          reject(new Error(error));
-        });
+          reject(new Error(error instanceof Error ? error.message : 'Send command failed'));
+        }
       });
     }
     

@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import './index.css';
 
-// Enhanced error handling for mobile
+// Enhanced error handling for mobile with better crash prevention
 const handleGlobalError = (error: ErrorEvent) => {
   console.error('Global error caught:', error);
   // Prevent the error from crashing the app
@@ -17,79 +17,104 @@ const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
   event.preventDefault();
 };
 
-// Set up global error handlers before anything else
+// Set up global error handlers immediately
 window.addEventListener('error', handleGlobalError);
 window.addEventListener('unhandledrejection', handleUnhandledRejection);
 
-// Simple startup function with error handling
+// Mobile-safe startup function
 const startApp = () => {
   try {
-    console.log('Starting OBD2 Diagnostic App...');
+    console.log('Starting OBD2 Diagnostic App for mobile...');
     
     // Ensure root element exists
-    const rootElement = document.getElementById("root");
+    let rootElement = document.getElementById("root");
     if (!rootElement) {
-      console.error("Root element not found - creating fallback");
+      console.warn("Root element not found - creating fallback");
       const fallbackRoot = document.createElement('div');
       fallbackRoot.id = 'root';
       fallbackRoot.style.width = '100%';
       fallbackRoot.style.height = '100vh';
+      fallbackRoot.style.margin = '0';
+      fallbackRoot.style.padding = '0';
       document.body.appendChild(fallbackRoot);
+      rootElement = fallbackRoot;
     }
 
-    const root = createRoot(rootElement || document.getElementById('root')!);
+    const root = createRoot(rootElement);
 
-    // Render app with comprehensive error handling
+    // Render app with comprehensive mobile error handling
     root.render(
       <React.StrictMode>
         <App />
       </React.StrictMode>
     );
     
-    console.log('App rendered successfully');
+    console.log('App rendered successfully for mobile');
   } catch (error) {
-    console.error('Critical startup error:', error);
+    console.error('Critical mobile startup error:', error);
     
-    // Create emergency fallback UI
+    // Create mobile-friendly emergency fallback UI
     const emergency = document.createElement('div');
     emergency.innerHTML = `
       <div style="
         padding: 20px; 
         text-align: center; 
-        font-family: system-ui, sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
         height: 100vh;
         display: flex;
         flex-direction: column;
         justify-content: center;
         background-color: #f8f9fa;
+        margin: 0;
+        box-sizing: border-box;
       ">
-        <h1 style="color: #dc3545; margin-bottom: 16px;">Startup Error</h1>
-        <p style="color: #6c757d; margin-bottom: 24px;">
-          The OBD2 Diagnostic Tool failed to start.
-        </p>
-        <button 
-          onclick="window.location.reload()"
-          style="
-            padding: 12px 24px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-          "
-        >
-          Restart Application
-        </button>
+        <div style="max-width: 300px; margin: 0 auto;">
+          <h1 style="color: #dc3545; margin-bottom: 16px; font-size: 18px;">OBD2 App Error</h1>
+          <p style="color: #6c757d; margin-bottom: 24px; font-size: 14px;">
+            The diagnostic app failed to start. This may be due to missing permissions or device compatibility.
+          </p>
+          <button 
+            onclick="window.location.reload()"
+            style="
+              padding: 12px 24px;
+              background-color: #007bff;
+              color: white;
+              border: none;
+              border-radius: 8px;
+              cursor: pointer;
+              font-size: 16px;
+              width: 100%;
+            "
+          >
+            Restart App
+          </button>
+          <p style="margin-top: 16px; font-size: 12px; color: #999;">
+            If this problem persists, please check your device permissions and try again.
+          </p>
+        </div>
       </div>
     `;
+    document.body.innerHTML = '';
     document.body.appendChild(emergency);
+  }
+};
+
+// Wait for DOM and potential mobile platform to be ready
+const initializeForMobile = () => {
+  // Additional wait time for mobile platforms
+  if (typeof window !== 'undefined' && 
+      (window.cordova || window.Capacitor || 
+       /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent))) {
+    console.log('Mobile platform detected, waiting longer for initialization...');
+    setTimeout(startApp, 1000);
+  } else {
+    startApp();
   }
 };
 
 // Wait for DOM to be ready before starting
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', startApp);
+  document.addEventListener('DOMContentLoaded', initializeForMobile);
 } else {
-  startApp();
+  initializeForMobile();
 }
