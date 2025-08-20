@@ -260,17 +260,9 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
                         <div>
                           <p className="font-medium">{device.name}</p>
                           <p className="text-sm text-muted-foreground">{device.address}</p>
-                          {device.rssi && (
-                            <p className="text-xs text-muted-foreground">Signal: {device.rssi}dBm</p>
-                          )}
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
-                        {device.isPaired && (
-                          <Badge variant="outline" className="text-xs border-green-300 text-green-700">
-                            Paired
-                          </Badge>
-                        )}
                         <Badge variant={device.deviceType === 'ELM327' ? 'default' : 'secondary'}>
                           {device.deviceType}
                         </Badge>
