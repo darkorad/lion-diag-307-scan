@@ -1,4 +1,3 @@
-
 import { BluetoothDevice, ConnectionResult, ConnectionStatus, ConnectionHistory } from './MasterBluetoothService';
 import { parseObdResponse } from '../utils/obd2Utils';
 
