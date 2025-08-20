@@ -1,4 +1,3 @@
-
 import { BluetoothDevice, ConnectionResult, ConnectionStatus, ConnectionHistory } from './MasterBluetoothService';
 import { parseObdResponse } from '../utils/obd2Utils';
 
@@ -403,7 +402,6 @@ export class SafeMasterBluetoothService {
     }
 
     const rawResponse = await this.sendCommand(`${pid}\r`);
-    // Fix the parseObdResponse call - it expects 2 arguments: pid and rawResponse
     const parsedResponse = parseObdResponse(pid, rawResponse);
 
     return {

@@ -66,6 +66,13 @@ declare global {
         successCallback: () => void,
         errorCallback: (error: string) => void
       ) => void;
+
+      // Add the missing discovery methods
+      setDeviceDiscoveredListener?: (
+        callback: (device: BluetoothSerialDevice) => void
+      ) => void;
+      
+      clearDeviceDiscoveredListener?: () => void;
     };
   }
 
