@@ -47,7 +47,6 @@ export class MobileSafeBluetoothService {
   private constructor() {
     this.isNative = Capacitor.isNativePlatform();
     console.log(`MobileSafeBluetoothService - Platform: ${Capacitor.getPlatform()}, Native: ${this.isNative}`);
-    this.initialize();
   }
 
   async initialize(): Promise<boolean> {

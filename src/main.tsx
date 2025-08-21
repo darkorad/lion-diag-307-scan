@@ -99,22 +99,22 @@ const startApp = () => {
   }
 };
 
-// Wait for DOM and potential mobile platform to be ready
-const initializeForMobile = () => {
-  // Additional wait time for mobile platforms
-  if (typeof window !== 'undefined' && 
-      (window.cordova || window.Capacitor || 
-       /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent))) {
-    console.log('Mobile platform detected, waiting longer for initialization...');
-    setTimeout(startApp, 1000);
+import { mobileSafeBluetoothService } from './services/MobileSafeBluetoothService';
+
+// Wait for the deviceready event to ensure all plugins are loaded
+const initializeApp = () => {
+  console.log('Starting app initialization...');
+  if (typeof window !== 'undefined' && (window.cordova || window.Capacitor)) {
+    console.log('Native platform detected, waiting for Capacitor...');
+    document.addEventListener('deviceready', () => {
+      mobileSafeBluetoothService.initialize();
+      startApp();
+    }, false);
   } else {
+    console.log('Web platform detected, starting app immediately.');
+    mobileSafeBluetoothService.initialize();
     startApp();
   }
 };
 
-// Wait for DOM to be ready before starting
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initializeForMobile);
-} else {
-  initializeForMobile();
-}
+initializeApp();
