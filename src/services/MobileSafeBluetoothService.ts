@@ -136,7 +136,7 @@ export class MobileSafeBluetoothService {
     }
   }
 
-  private identifyDeviceType(name: string): 'ELM327' | 'OBD2' | 'Generic' {
+  private identifyDeviceType(name: string): string {
     if (!name) return 'Generic';
     const lowerName = name.toLowerCase();
     if (lowerName.includes('elm327') || lowerName.includes('obd') || lowerName.includes('vgate') || 

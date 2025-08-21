@@ -1,8 +1,8 @@
 
 import {
   BluetoothDevice,
-  masterBluetoothService
 } from './MasterBluetoothService';
+import { safeMasterBluetoothService } from './SafeMasterBluetoothService';
 
 export type { BluetoothDevice };
 
@@ -75,9 +75,9 @@ export class ComprehensiveBluetoothService {
   async requestAllBluetoothPermissions(): Promise<boolean> {
     try {
       // Check if bluetooth is enabled
-      const isEnabled = await masterBluetoothService.isBluetoothEnabled();
+      const isEnabled = await safeMasterBluetoothService.isBluetoothEnabled();
       if (!isEnabled) {
-        await masterBluetoothService.enableBluetooth();
+        await safeMasterBluetoothService.enableBluetooth();
       }
       return true;
     } catch (error) {
@@ -142,7 +142,7 @@ export class ComprehensiveBluetoothService {
   // Enhanced Device Discovery
   async discoverOBD2Devices(signal?: AbortSignal): Promise<DeviceCompatibility[]> {
     try {
-      const devices = await masterBluetoothService.scanForDevices();
+      const devices = await safeMasterBluetoothService.scanForDevices();
 
       const compatibilityList: DeviceCompatibility[] = devices.map(device => {
         const { deviceType, compatibility } = this.identifyDeviceType(device);
@@ -167,7 +167,7 @@ export class ComprehensiveBluetoothService {
 
   async discoverAllDevices(signal?: AbortSignal): Promise<BluetoothDiscoveryResult> {
     try {
-      const devices = await masterBluetoothService.scanForDevices();
+      const devices = await safeMasterBluetoothService.scanForDevices();
 
       const enhancedDevices: BluetoothDevice[] = devices.map(device => {
         const { deviceType, compatibility } = this.identifyDeviceType(device);
@@ -220,7 +220,7 @@ export class ComprehensiveBluetoothService {
     console.log(`Attempting direct connection to ${device.name}...`);
 
     try {
-      const result = await masterBluetoothService.connectToDevice(device);
+      const result = await safeMasterBluetoothService.connectToDevice(device);
       
       if (result.success) {
         return {
