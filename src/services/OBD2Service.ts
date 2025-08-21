@@ -1,5 +1,5 @@
 
-import { safeMasterBluetoothService } from './SafeMasterBluetoothService';
+import { unifiedBluetoothService } from './UnifiedBluetoothService';
 
 export class OBD2Service {
   private isBluetoothEnabled: boolean = false;
@@ -10,7 +10,7 @@ export class OBD2Service {
   }
 
   private async init() {
-    this.isBluetoothEnabled = await safeMasterBluetoothService.isBluetoothEnabled();
+    this.isBluetoothEnabled = await unifiedBluetoothService.isBluetoothEnabled();
   }
 
   // Make sendCommand public so it can be used by other components

@@ -2,7 +2,7 @@
 import { BluetoothDevice } from './MasterBluetoothService';
 import { ConnectionStateManager, ConnectionState, ConnectionHistory } from './bluetooth/ConnectionState';
 import { HeartbeatManager } from './bluetooth/HeartbeatManager';
-import { safeMasterBluetoothService } from './SafeMasterBluetoothService';
+import { unifiedBluetoothService } from './UnifiedBluetoothService';
 
 export class BluetoothConnectionManager {
   private static instance: BluetoothConnectionManager;
@@ -81,7 +81,7 @@ export class BluetoothConnectionManager {
     try {
       console.log('Refreshing connection state...');
       // Use safe bluetooth service to check actual connection status
-      const status = safeMasterBluetoothService.getConnectionStatus();
+      const status = unifiedBluetoothService.getConnectionStatus();
       
       if (status.isConnected && status.device) {
         this.setConnected(status.device);
