@@ -1,4 +1,3 @@
-
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
@@ -22,5 +21,13 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+  },
+  build: {
+    rollupOptions: {
+      external: ["@e-is/capacitor-bluetooth-serial"],
+    },
+  },
+  optimizeDeps: {
+    exclude: ["@e-is/capacitor-bluetooth-serial"],
   },
 }));
