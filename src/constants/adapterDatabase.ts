@@ -212,6 +212,40 @@ export const OBD2_ADAPTERS: OBD2Adapter[] = [
     price: '$80-120',
     defaultPin: '0000'
   },
+  {
+    id: 'innova-1000',
+    name: 'Innova 1000',
+    brand: 'Innova',
+    model: '1000',
+    connectionType: 'bluetooth',
+    description: '2024 Bluetooth-powered diagnostic dongle with RepairSolutions2 app integration.',
+    features: [
+      'All System Scan',
+      'Reads Trans Temp',
+      'Resets Service Lights',
+      'Bluetooth 5.0'
+    ],
+    compatibility: ['OBD2', 'EOBD', 'JOBD', 'CAN', 'Manufacturer Specific'],
+    price: '$100-150',
+    defaultPin: '0000'
+  },
+  {
+    id: 'innova-3215rs',
+    name: 'Innova FixAssist 3215RS',
+    brand: 'Innova',
+    model: '3215RS',
+    connectionType: 'bluetooth',
+    description: 'Turns any smartphone into an advanced OBD2 diagnostic scan tool.',
+    features: [
+      'FixAssist technology',
+      'Bluetooth connectivity',
+      'Advanced diagnostics',
+      'Smartphone integration'
+    ],
+    compatibility: ['OBD2', 'EOBD', 'JOBD', 'CAN'],
+    price: '$120-180',
+    defaultPin: '0000'
+  },
 
   // ===== BAFX BLUETOOTH ADAPTERS =====
   {
