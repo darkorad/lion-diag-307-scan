@@ -2,7 +2,7 @@
 import {
   BluetoothDevice,
 } from './MasterBluetoothService';
-import { safeMasterBluetoothService } from './SafeMasterBluetoothService';
+import { unifiedBluetoothService } from './UnifiedBluetoothService';
 
 export type { BluetoothDevice };
 
@@ -75,9 +75,9 @@ export class ComprehensiveBluetoothService {
   async requestAllBluetoothPermissions(): Promise<boolean> {
     try {
       // Check if bluetooth is enabled
-      const isEnabled = await safeMasterBluetoothService.isBluetoothEnabled();
+      const isEnabled = await unifiedBluetoothService.isBluetoothEnabled();
       if (!isEnabled) {
-        await safeMasterBluetoothService.enableBluetooth();
+        await unifiedBluetoothService.enableBluetooth();
       }
       return true;
     } catch (error) {
@@ -142,7 +142,7 @@ export class ComprehensiveBluetoothService {
   // Enhanced Device Discovery
   async discoverOBD2Devices(signal?: AbortSignal): Promise<DeviceCompatibility[]> {
     try {
-      const devices = await safeMasterBluetoothService.scanForDevices();
+      const devices = await unifiedBluetoothService.scanForDevices();
 
       const compatibilityList: DeviceCompatibility[] = devices.map(device => {
         const { deviceType, compatibility } = this.identifyDeviceType(device);
@@ -167,7 +167,7 @@ export class ComprehensiveBluetoothService {
 
   async discoverAllDevices(signal?: AbortSignal): Promise<BluetoothDiscoveryResult> {
     try {
-      const devices = await safeMasterBluetoothService.scanForDevices();
+      const devices = await unifiedBluetoothService.scanForDevices();
 
       const enhancedDevices: BluetoothDevice[] = devices.map(device => {
         const { deviceType, compatibility } = this.identifyDeviceType(device);
@@ -220,7 +220,7 @@ export class ComprehensiveBluetoothService {
     console.log(`Attempting direct connection to ${device.name}...`);
 
     try {
-      const result = await safeMasterBluetoothService.connectToDevice(device);
+      const result = await unifiedBluetoothService.connectToDevice(device);
       
       if (result.success) {
         return {

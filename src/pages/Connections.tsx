@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { safeMasterBluetoothService } from '@/services/SafeMasterBluetoothService';
+import { unifiedBluetoothService } from '@/services/UnifiedBluetoothService';
 import { BluetoothDevice } from '@/services/MasterBluetoothService';
 import { toast } from 'sonner';
 
@@ -13,7 +13,7 @@ const Connections = () => {
     setIsScanning(true);
     toast.info('Scanning for devices...');
     try {
-      const foundDevices = await safeMasterBluetoothService.scanForDevices();
+      const foundDevices = await unifiedBluetoothService.scanForDevices();
       setDevices(foundDevices);
       toast.success(`Found ${foundDevices.length} devices.`);
     } catch (error) {

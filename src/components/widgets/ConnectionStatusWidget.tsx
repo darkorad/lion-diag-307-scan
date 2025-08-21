@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Bluetooth, CheckCircle, XCircle } from 'lucide-react';
-import { safeMasterBluetoothService } from '@/services/SafeMasterBluetoothService';
+import { unifiedBluetoothService } from '@/services/UnifiedBluetoothService';
 
 const ConnectionStatusWidget = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -10,7 +10,7 @@ const ConnectionStatusWidget = () => {
 
   useEffect(() => {
     const checkStatus = () => {
-      const status = safeMasterBluetoothService.getConnectionStatus();
+      const status = unifiedBluetoothService.getConnectionStatus();
       setIsConnected(status.isConnected);
       setDeviceName(status.device?.name || null);
     };

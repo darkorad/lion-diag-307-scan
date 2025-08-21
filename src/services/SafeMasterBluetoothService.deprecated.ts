@@ -65,7 +65,7 @@ export class SafeMasterBluetoothService {
       if (typeof window === 'undefined' || !window.localStorage) {
         return;
       }
-      
+
       const stored = localStorage.getItem('bluetooth_connection_history');
       if (stored) {
         const data = JSON.parse(stored);
@@ -82,7 +82,7 @@ export class SafeMasterBluetoothService {
       if (typeof window === 'undefined' || !window.localStorage) {
         return;
       }
-      
+
       const data = {
         history: this.connectionHistory.slice(0, 50), // Keep last 50 entries
         timestamp: Date.now()
