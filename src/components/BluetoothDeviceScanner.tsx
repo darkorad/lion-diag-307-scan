@@ -30,22 +30,6 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
   const [bluetoothEnabled, setBluetoothEnabled] = useState(false);
   const [mounted, setMounted] = useState(true);
 
-  const checkBluetoothStatus = useCallback(async () => {
-    if (!mounted) return;
-    
-    try {
-      const isEnabled = await mobileSafeBluetoothService.isBluetoothEnabled();
-      if (mounted) {
-        setBluetoothEnabled(isEnabled);
-      }
-    } catch (error) {
-      console.error('Error checking Bluetooth status:', error);
-      if (mounted) {
-        setBluetoothEnabled(false);
-      }
-    }
-  }, [mounted]);
-
   const loadDevices = useCallback(async () => {
     if (!mounted) return;
     
@@ -64,13 +48,35 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
 
   useEffect(() => {
     setMounted(true);
-    checkBluetoothStatus();
-    loadDevices();
+    const initBluetooth = async () => {
+      if (!mounted) return;
+      try {
+        // This will request permissions if not granted
+        const enabled = await mobileSafeBluetoothService.enableBluetooth();
+        if (mounted) {
+          setBluetoothEnabled(enabled);
+          if (enabled) {
+            // Only scan for devices if bluetooth is successfully enabled
+            await loadDevices();
+          } else {
+            // Optionally inform the user that bluetooth is required
+            toast.info("Please enable Bluetooth to scan for devices.");
+          }
+        }
+      } catch (error) {
+        console.error("Error initializing Bluetooth:", error);
+        if (mounted) {
+          toast.error("Failed to initialize Bluetooth.");
+        }
+      }
+    };
+
+    initBluetooth();
 
     return () => {
       setMounted(false);
     };
-  }, [checkBluetoothStatus, loadDevices]);
+  }, [loadDevices]);
 
   const enableBluetooth = useCallback(async () => {
     if (!mounted) return;
@@ -81,6 +87,7 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
         setBluetoothEnabled(enabled);
         if (enabled) {
           toast.success('Bluetooth enabled');
+          await loadDevices(); // Automatically scan after enabling
         } else {
           toast.error('Failed to enable Bluetooth');
         }
@@ -91,7 +98,7 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
         toast.error('Error enabling Bluetooth');
       }
     }
-  }, [mounted]);
+  }, [mounted, loadDevices]);
 
   const scanForDevices = useCallback(async () => {
     if (!mounted || !bluetoothEnabled) {
