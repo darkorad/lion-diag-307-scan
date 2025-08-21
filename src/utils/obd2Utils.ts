@@ -1,73 +1,167 @@
 
+// OBD2 utility functions for parsing responses and managing PIDs
+
+export interface ParsedOBDResponse {
+  value: number | string;
+  unit: string;
+}
+
+// Parse hex response to byte array
 export const parseHexResponse = (response: string): number[] => {
-  // Remove spaces and convert hex pairs to numbers
-  const cleanResponse = response.replace(/\s+/g, '').replace(/[^0-9A-Fa-f]/g, '');
-  const bytes: number[] = [];
+  // Remove whitespace and convert to uppercase
+  const cleanResponse = response.replace(/\s+/g, '').toUpperCase();
   
-  for (let i = 0; i < cleanResponse.length; i += 2) {
-    const hexByte = cleanResponse.substring(i, i + 2);
-    if (hexByte.length === 2) {
-      bytes.push(parseInt(hexByte, 16));
+  // Extract hex values (remove '>' and other non-hex characters)
+  const hexValues = cleanResponse.replace('>', '').trim();
+  
+  const data: number[] = [];
+  for (let i = 0; i < hexValues.length; i += 2) {
+    const hexByte = hexValues.substr(i, 2);
+    if (/^[0-9A-F]{2}$/.test(hexByte)) {
+      data.push(parseInt(hexByte, 16));
     }
   }
-  
-  return bytes;
+  return data;
 };
 
+// Delay utility function
 export const delay = (ms: number): Promise<void> => {
   return new Promise(resolve => setTimeout(resolve, ms));
 };
 
-export const parseObdResponse = (pid: string, rawData: string): { value: any; unit: string } => {
-  // Assuming the response is in the format "41 0C 1A B3"
-  const bytes = parseHexResponse(rawData);
-
-  // Expecting at least 3 bytes for a valid response (e.g., 41 0C 1A)
-  if (bytes.length < 3 || bytes[0] !== 0x41) {
-    // 0x41 is the response mode for "Show current data"
-    throw new Error('Invalid or unsupported OBD2 response');
+// Parse OBD2 response based on PID
+export const parseObdResponse = (pid: string, rawResponse: string): ParsedOBDResponse => {
+  // Remove whitespace and convert to uppercase
+  const cleanResponse = rawResponse.replace(/\s+/g, '').toUpperCase();
+  
+  // Extract hex values (remove PID echo and '>')
+  const hexValues = cleanResponse.replace(pid.toUpperCase(), '').replace('>', '').trim();
+  
+  // Default response
+  let result: ParsedOBDResponse = { value: 0, unit: '' };
+  
+  try {
+    const bytes = hexValues.match(/.{1,2}/g) || [];
+    const byteValues = bytes.map(byte => parseInt(byte, 16));
+    
+    switch (pid.toUpperCase()) {
+      case '010C': // Engine RPM
+        if (byteValues.length >= 2) {
+          result = {
+            value: ((byteValues[0] * 256) + byteValues[1]) / 4,
+            unit: 'RPM'
+          };
+        }
+        break;
+        
+      case '010D': // Vehicle Speed
+        if (byteValues.length >= 1) {
+          result = {
+            value: byteValues[0],
+            unit: 'km/h'
+          };
+        }
+        break;
+        
+      case '0105': // Engine Coolant Temperature
+        if (byteValues.length >= 1) {
+          result = {
+            value: byteValues[0] - 40,
+            unit: '°C'
+          };
+        }
+        break;
+        
+      case '0142': // Control Module Voltage
+        if (byteValues.length >= 2) {
+          result = {
+            value: ((byteValues[0] * 256) + byteValues[1]) / 1000,
+            unit: 'V'
+          };
+        }
+        break;
+        
+      case '0104': // Engine Load
+        if (byteValues.length >= 1) {
+          result = {
+            value: (byteValues[0] * 100) / 255,
+            unit: '%'
+          };
+        }
+        break;
+        
+      case '0110': // Mass Air Flow
+        if (byteValues.length >= 2) {
+          result = {
+            value: ((byteValues[0] * 256) + byteValues[1]) / 100,
+            unit: 'g/s'
+          };
+        }
+        break;
+        
+      case '012F': // Fuel Level
+        if (byteValues.length >= 1) {
+          result = {
+            value: (byteValues[0] * 100) / 255,
+            unit: '%'
+          };
+        }
+        break;
+        
+      default:
+        result = {
+          value: rawResponse,
+          unit: 'raw'
+        };
+    }
+  } catch (error) {
+    console.error('Error parsing OBD response:', error);
+    result = {
+      value: rawResponse,
+      unit: 'error'
+    };
   }
+  
+  return result;
+};
 
-  const returnedPid = bytes[1].toString(16).padStart(2, '0').toUpperCase();
-  const expectedPidCode = pid.substring(2).toUpperCase();
-
-  if (returnedPid !== expectedPidCode) {
-    console.warn(`PID mismatch in response. Expected ${expectedPidCode}, got ${returnedPid}`);
-    // Depending on strictness, you might want to throw an error here.
+// Convert DTC hex code to readable format
+export const formatDTCCode = (hexCode: string): string => {
+  if (hexCode.length !== 4) return hexCode;
+  
+  const firstChar = parseInt(hexCode.charAt(0), 16);
+  const secondChar = hexCode.charAt(1);
+  const lastTwoChars = hexCode.substring(2);
+  
+  let prefix = '';
+  switch (firstChar >> 2) {
+    case 0: prefix = 'P'; break; // Powertrain
+    case 1: prefix = 'C'; break; // Chassis
+    case 2: prefix = 'B'; break; // Body
+    case 3: prefix = 'U'; break; // Network
+    default: prefix = 'P'; break;
   }
+  
+  return prefix + (firstChar & 0x03) + secondChar + lastTwoChars;
+};
 
-  const data = bytes.slice(2); // Get the actual data bytes
+// Validate OBD2 PID format
+export const isValidPID = (pid: string): boolean => {
+  const cleanPid = pid.replace(/\s+/g, '').toUpperCase();
+  return /^[0-9A-F]{4}$/.test(cleanPid);
+};
 
-  switch (pid.toUpperCase()) {
-    case '010C': // Engine RPM
-      // Formula: ((A * 256) + B) / 4
-      return { value: ((data[0] * 256) + data[1]) / 4, unit: 'rpm' };
-    case '010D': // Vehicle Speed
-      // Formula: A
-      return { value: data[0], unit: 'km/h' };
-    case '0110': // MAF air flow rate
-      // Formula: ((A * 256) + B) / 100
-      return { value: ((data[0] * 256) + data[1]) / 100, unit: 'g/s' };
-    case '0105': // Engine Coolant Temperature
-      // Formula: A - 40
-      return { value: data[0] - 40, unit: '°C' };
-    case '0104': // Calculated Engine Load
-      // Formula: A * 100 / 255
-      return { value: data[0] * 100 / 255, unit: '%' };
-    case '221C80': // Engine Oil Temperature
-      // Formula: A*0.75-48
-      return { value: data[0] * 0.75 - 48, unit: '°C' };
-    case '221C34': // DPF Soot Load
-      // Formula: (A*256+B)/100
-      return { value: (data[0] * 256 + data[1]) / 100, unit: 'g' };
-    case '015C': // Engine Oil Temperature
-      // Formula: A-40
-      return { value: data[0] - 40, unit: '°C' };
-    case '22F603': // DPF Soot Mass (VAG)
-      // Formula: (A*256+B)*0.1
-      return { value: (data[0] * 256 + data[1]) * 0.1, unit: 'g' };
-    default:
-      // Return raw hex for unhandled PIDs
-      return { value: data.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase(), unit: 'raw' };
-  }
+// Get PID description
+export const getPIDDescription = (pid: string): string => {
+  const descriptions: Record<string, string> = {
+    '010C': 'Engine RPM',
+    '010D': 'Vehicle Speed',
+    '0105': 'Engine Coolant Temperature',
+    '0142': 'Control Module Voltage',
+    '0104': 'Engine Load',
+    '0110': 'Mass Air Flow',
+    '012F': 'Fuel Level Input'
+  };
+  
+  return descriptions[pid.toUpperCase()] || 'Unknown PID';
 };

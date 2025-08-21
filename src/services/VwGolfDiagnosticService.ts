@@ -1,3 +1,4 @@
+
 import { obd2Service } from './OBD2Service';
 import { VW_GOLF_PROFILES } from '../constants/vwGolfDatabase';
 import { parseObdResponse } from '../utils/obd2Utils';
@@ -21,7 +22,9 @@ export class VwGolfDiagnosticService {
     try {
       const rawData = await this.sendCommand(pid);
       const parsed = parseObdResponse(pid, rawData);
-      return parsed.value;
+      // Ensure we return a number, not string
+      const value = typeof parsed.value === 'number' ? parsed.value : parseFloat(parsed.value.toString());
+      return isNaN(value) ? null : value;
     } catch (error) {
       console.error('Failed to get boost pressure:', error);
       return null;
