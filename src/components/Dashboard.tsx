@@ -22,7 +22,7 @@ import {
 import ConnectionStatus from './ConnectionStatus';
 import VehicleInfoPanel from './VehicleInfoPanel';
 import LiveDataPanel from './LiveDataPanel';
-import DTCPanel from './DTCPanel';
+import DTCPanel from './DTCPanel.tsx';
 import { AdvancedDiagnosticsPanel } from './AdvancedDiagnosticsPanel';
 import { useQuery } from '@tanstack/react-query';
 
