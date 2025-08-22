@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -21,8 +22,10 @@ import { VehicleMake } from '@/types/vehicle';
 import { ManufacturerGrid } from './ManufacturerGrid';
 import { AdvancedDiagnosticsPanel } from './AdvancedDiagnosticsPanel';
 import { BiDirectionalControlPanel } from './BiDirectionalControlPanel';
-import { LiveDataMonitor } from './LiveDataMonitor';
+import { EnhancedLiveDataMonitor } from './EnhancedLiveDataMonitor';
+import { EnhancedServicePanel } from './EnhancedServicePanel';
 import { DTCPanel } from './DTCPanel';
+import { universalConnectionService } from '@/services/UniversalConnectionService';
 
 interface ConnectionStatus {
   type: 'bluetooth' | 'wifi' | 'usb' | null;
@@ -57,26 +60,50 @@ export const ProfessionalDashboard: React.FC = () => {
   const handleConnection = async (type: 'bluetooth' | 'wifi' | 'usb') => {
     setConnectionStatus({ type, connected: false });
     
-    // Simulate connection process
-    setTimeout(() => {
-      setConnectionStatus({
-        type,
-        connected: true,
-        device: `${type.toUpperCase()} Device`,
-        protocol: 'ISO 15765-4 (CAN)'
-      });
+    try {
+      let result;
       
-      // Simulate VIN reading
-      setTimeout(() => {
-        setVehicleInfo({
-          vin: 'VF3FC9HXC12345678',
-          make: selectedMake?.name || 'Unknown',
-          model: 'Test Model',
-          year: '2020',
-          engine: '1.6 HDi'
+      switch (type) {
+        case 'bluetooth':
+          const devices = await universalConnectionService.scanBluetoothDevices();
+          if (devices.length > 0) {
+            result = await universalConnectionService.connectBluetooth(devices[0]);
+          }
+          break;
+        case 'wifi':
+          const adapters = await universalConnectionService.scanWiFiAdapters();
+          if (adapters.length > 0) {
+            result = await universalConnectionService.connectWiFi(adapters[0]);
+          }
+          break;
+        case 'usb':
+          result = await universalConnectionService.connectUSB();
+          break;
+      }
+      
+      if (result?.success) {
+        setConnectionStatus({
+          type,
+          connected: true,
+          device: `${type.toUpperCase()} Device`,
+          protocol: result.protocol || 'Unknown'
         });
-      }, 2000);
-    }, 3000);
+        
+        // Simulate VIN reading
+        setTimeout(() => {
+          setVehicleInfo({
+            vin: 'VF3FC9HXC12345678',
+            make: selectedMake?.name || 'Unknown',
+            model: 'Test Model',
+            year: '2020',
+            engine: '1.6 HDi'
+          });
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('Connection failed:', error);
+      setConnectionStatus({ type: null, connected: false });
+    }
   };
 
   const isConnected = connectionStatus.connected;
@@ -109,7 +136,7 @@ export const ProfessionalDashboard: React.FC = () => {
             <TabsTrigger value="diagnostics">Diagnostics</TabsTrigger>
             <TabsTrigger value="live-data">Live Data</TabsTrigger>
             <TabsTrigger value="bi-directional">Bi-Directional</TabsTrigger>
-            <TabsTrigger value="advanced">Advanced</TabsTrigger>
+            <TabsTrigger value="service">Service</TabsTrigger>
           </TabsList>
 
           {/* Vehicle Selection Tab */}
@@ -220,7 +247,7 @@ export const ProfessionalDashboard: React.FC = () => {
           {/* Live Data Tab */}
           <TabsContent value="live-data" className="mt-6">
             {isConnected ? (
-              <LiveDataMonitor 
+              <EnhancedLiveDataMonitor 
                 isConnected={isConnected}
                 vehicleInfo={vehicleInfo}
               />
@@ -252,11 +279,10 @@ export const ProfessionalDashboard: React.FC = () => {
             )}
           </TabsContent>
 
-          {/* Advanced Tab */}
-          <TabsContent value="advanced" className="mt-6">
+          {/* Service Tab */}
+          <TabsContent value="service" className="mt-6">
             {isConnected ? (
-              <AdvancedDiagnosticsPanel 
-                vehicleMake={selectedMake?.name}
+              <EnhancedServicePanel 
                 isConnected={isConnected}
                 vehicleInfo={vehicleInfo}
               />
@@ -264,7 +290,7 @@ export const ProfessionalDashboard: React.FC = () => {
               <Alert>
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>
-                  Please connect to an OBD2 adapter first to access advanced functions.
+                  Please connect to an OBD2 adapter first to access service functions.
                 </AlertDescription>
               </Alert>
             )}
