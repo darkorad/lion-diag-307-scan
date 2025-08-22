@@ -1,346 +1,440 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
-import { 
-  Wrench, 
-  Oil, 
-  Filter, 
-  Battery, 
-  Brake, 
-  Thermometer,
-  CheckCircle,
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Settings,
+  Wrench,
+  RefreshCw,
   AlertTriangle,
-  Clock,
+  CheckCircle,
   Car,
-  Zap
+  Database,
+  TestTube,
+  Shield,
+  Zap,
+  Wind,
+  OilCan,
+  Battery,
+  Activity,
+  Target,
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { enhancedOBD2Service } from '@/services/EnhancedOBD2Service';
+import BackButton from './BackButton';
 
-interface ServiceFunction {
+interface AdvancedServicePanelProps {
+  isConnected: boolean;
+  onBack?: () => void;
+}
+
+interface ServiceExecution {
   id: string;
   name: string;
-  description: string;
-  category: 'maintenance' | 'emissions' | 'electrical' | 'brakes' | 'engine';
-  icon: React.ComponentType<{ className?: string }>;
-  riskLevel: 'low' | 'medium' | 'high';
-  duration: number; // in seconds
-  supported: boolean;
+  status: 'running' | 'completed' | 'failed';
+  progress: number;
+  result?: any;
+  error?: string;
+  startTime: Date;
+  endTime?: Date;
 }
 
-interface ServiceResult {
-  success: boolean;
-  message: string;
-  duration?: number;
-}
-
-interface EnhancedServicePanelProps {
-  isConnected: boolean;
-  vehicleInfo?: Record<string, unknown>;
-}
-
-export const EnhancedServicePanel: React.FC<EnhancedServicePanelProps> = ({
+const AdvancedServicePanel: React.FC<AdvancedServicePanelProps> = ({
   isConnected,
-  vehicleInfo
+  onBack,
 }) => {
-  const [activeFunction, setActiveFunction] = useState<string | null>(null);
-  const [results, setResults] = useState<Record<string, ServiceResult>>({});
-  const [progress, setProgress] = useState(0);
+  const [vehicleInfo, setVehicleInfo] = useState<any>(null);
+  const [availableFunctions, setAvailableFunctions] = useState<any[]>([]);
+  const [serviceExecutions, setServiceExecutions] = useState<ServiceExecution[]>([]);
+  const [selectedFunction, setSelectedFunction] = useState<string | null>(null);
+  const [functionParameters, setFunctionParameters] = useState<{ [key: string]: any }>({});
+  const [isExecuting, setIsExecuting] = useState(false);
 
-  const serviceFunctions: ServiceFunction[] = [
-    {
-      id: 'oil_reset',
-      name: 'Oil Service Reset',
-      description: 'Reset oil service indicator and maintenance timer',
-      category: 'maintenance',
-      icon: Oil,
-      riskLevel: 'low',
-      duration: 5,
-      supported: true
-    },
-    {
-      id: 'dpf_regen',
-      name: 'DPF Regeneration',
-      description: 'Force diesel particulate filter regeneration cycle',
-      category: 'emissions',
-      icon: Filter,
-      riskLevel: 'medium',
-      duration: 300, // 5 minutes
-      supported: true
-    },
-    {
-      id: 'battery_reset',
-      name: 'Battery Registration',
-      description: 'Register new battery with battery management system',
-      category: 'electrical',
-      icon: Battery,
-      riskLevel: 'medium',
-      duration: 10,
-      supported: true
-    },
-    {
-      id: 'abs_bleed',
-      name: 'ABS Brake Bleed',
-      description: 'Activate ABS pump for brake system bleeding',
-      category: 'brakes',
-      icon: Brake,
-      riskLevel: 'high',
-      duration: 60,
-      supported: true
-    },
-    {
-      id: 'throttle_adapt',
-      name: 'Throttle Adaptation',
-      description: 'Perform throttle body adaptation and learning',
-      category: 'engine',
-      icon: Zap,
-      riskLevel: 'medium',
-      duration: 15,
-      supported: true
-    },
-    {
-      id: 'coolant_bleed',
-      name: 'Coolant System Bleed',
-      description: 'Activate electric water pump for coolant bleeding',
-      category: 'engine',
-      icon: Thermometer,
-      riskLevel: 'medium',
-      duration: 120,
-      supported: true
-    },
-    {
-      id: 'injector_adapt',
-      name: 'Injector Adaptation',
-      description: 'Perform fuel injector adaptation and coding',
-      category: 'engine',
-      icon: Car,
-      riskLevel: 'high',
-      duration: 45,
-      supported: false // Example of unsupported function
-    },
-    {
-      id: 'steering_adapt',
-      name: 'Steering Angle Adaptation',
-      description: 'Calibrate steering angle sensor after alignment',
-      category: 'maintenance',
-      icon: Wrench,
-      riskLevel: 'medium',
-      duration: 20,
-      supported: true
+  useEffect(() => {
+    if (isConnected) {
+      loadVehicleInfo();
     }
-  ];
+  }, [isConnected]);
 
-  const executeService = async (serviceFunction: ServiceFunction) => {
-    if (!isConnected || activeFunction) {
+  const loadVehicleInfo = async () => {
+    try {
+      const info = enhancedOBD2Service.getVehicleInfo();
+      setVehicleInfo(info);
+
+      const functions = enhancedOBD2Service.getAdvancedFunctions();
+      setAvailableFunctions(functions);
+    } catch (error) {
+      console.error('Failed to load vehicle info:', error);
+    }
+  };
+
+  const executeFunction = async (functionId: string) => {
+    const func = availableFunctions.find((f) => f.id === functionId);
+    if (!func) {
+      toast.error('Function not found');
       return;
     }
 
-    setActiveFunction(serviceFunction.id);
-    setProgress(0);
+    if (func.riskLevel === 'high') {
+      const confirmed = window.confirm(
+        `⚠️ HIGH RISK OPERATION\n\n${func.name}\n${func.description}\n\nThis operation can potentially damage your vehicle or affect safety systems. Are you sure you want to continue?`,
+      );
+      if (!confirmed) return;
+    }
+
+    setIsExecuting(true);
+    const execution: ServiceExecution = {
+      id: Date.now().toString(),
+      name: func.name,
+      status: 'running',
+      progress: 0,
+      startTime: new Date(),
+    };
+
+    setServiceExecutions((prev) => [...prev, execution]);
 
     try {
-      // Simulate progress
+      toast.info(`Starting ${func.name}...`);
+
       const progressInterval = setInterval(() => {
-        setProgress(prev => {
-          const increment = 100 / (serviceFunction.duration * 10); // Update every 100ms
-          const newProgress = prev + increment;
-          if (newProgress >= 100) {
-            clearInterval(progressInterval);
-            return 100;
-          }
-          return newProgress;
-        });
-      }, 100);
+        setServiceExecutions((prev) =>
+          prev.map((exec) =>
+            exec.id === execution.id
+              ? { ...exec, progress: Math.min(exec.progress + 10, 90) }
+              : exec,
+          ),
+        );
+      }, 500);
 
-      // Simulate service execution
-      await new Promise(resolve => setTimeout(resolve, serviceFunction.duration * 1000));
+      const result = await enhancedOBD2Service.executeAdvancedFunction(functionId);
 
-      const result: ServiceResult = {
-        success: true,
-        message: `${serviceFunction.name} completed successfully`,
-        duration: serviceFunction.duration
-      };
+      clearInterval(progressInterval);
 
-      setResults(prev => ({ ...prev, [serviceFunction.id]: result }));
-      
+      setServiceExecutions((prev) =>
+        prev.map((exec) =>
+          exec.id === execution.id
+            ? {
+                ...exec,
+                status: result.success ? 'completed' : 'failed',
+                progress: 100,
+                result: result.result,
+                error: result.error,
+                endTime: new Date(),
+              }
+            : exec,
+        ),
+      );
+
+      if (result.success) {
+        toast.success(`${func.name} completed successfully`);
+      } else {
+        toast.error(`${func.name} failed: ${result.error}`);
+      }
     } catch (error) {
-      const result: ServiceResult = {
-        success: false,
-        message: `${serviceFunction.name} failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-      };
-      
-      setResults(prev => ({ ...prev, [serviceFunction.id]: result }));
+      setServiceExecutions((prev) =>
+        prev.map((exec) =>
+          exec.id === execution.id
+            ? {
+                ...exec,
+                status: 'failed',
+                progress: 100,
+                error: error instanceof Error ? error.message : 'Unknown error',
+                endTime: new Date(),
+              }
+            : exec,
+        ),
+      );
+      toast.error(`Function failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
-      setActiveFunction(null);
-      setProgress(0);
+      setIsExecuting(false);
     }
   };
 
-  const getRiskColor = (riskLevel: string) => {
-    switch (riskLevel) {
-      case 'low': return 'text-green-600';
-      case 'medium': return 'text-yellow-600';
-      case 'high': return 'text-red-600';
-      default: return 'text-gray-600';
+  const getRiskColor = (level: string) => {
+    switch (level) {
+      case 'low':
+        return 'text-green-600';
+      case 'medium':
+        return 'text-yellow-600';
+      case 'high':
+        return 'text-red-600';
+      default:
+        return 'text-gray-600';
     }
   };
 
-  const getRiskVariant = (riskLevel: string) => {
-    switch (riskLevel) {
-      case 'low': return 'default';
-      case 'medium': return 'secondary';
-      case 'high': return 'destructive';
-      default: return 'outline';
+  const getRiskVariant = (level: string) => {
+    switch (level) {
+      case 'low':
+        return 'default';
+      case 'medium':
+        return 'secondary';
+      case 'high':
+        return 'destructive';
+      default:
+        return 'outline';
     }
   };
 
-  const groupedFunctions = serviceFunctions.reduce((acc, func) => {
-    if (!acc[func.category]) {
-      acc[func.category] = [];
-    }
+  const getCategoryIcon = (category: string) => {
+    const icons: { [key: string]: any } = {
+      service: Wrench,
+      adaptation: Settings,
+      calibration: Target,
+      testing: TestTube,
+      security: Shield,
+      emissions: Wind,
+      fuel: OilCan,
+      electrical: Zap,
+      brakes: Car,
+      engine: Activity,
+      hybrid: Battery,
+      comfort: Settings,
+      coding: Database,
+      reset: RefreshCw,
+    };
+    return icons[category] || Settings;
+  };
+
+  const groupedFunctions = availableFunctions.reduce((acc, func) => {
+    if (!acc[func.category]) acc[func.category] = [];
     acc[func.category].push(func);
     return acc;
-  }, {} as Record<string, ServiceFunction[]>);
+  }, {} as { [key: string]: any[] });
+
+  const categories = Object.keys(groupedFunctions);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Wrench className="h-5 w-5" />
-            Service Functions & Adaptations
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Alert>
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>
-              <strong>Important:</strong> Service functions directly modify vehicle systems. 
-              Ensure vehicle is in a safe location and follow proper procedures.
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
+    <div className="space-y-4 p-2 sm:p-4">
+      {/* Header with Back Button */}
+      <div className="flex items-center gap-4">
+        <BackButton
+          onBack={onBack}
+          fallbackRoute="/professional-diagnostics"
+          variant="ghost"
+          size="sm"
+          label="Back"
+          showIcon={true}
+        />
+        <div className="h-6 w-px bg-border" />
+        <h1 className="text-lg sm:text-xl md:text-2xl font-bold">Advanced Service Functions</h1>
+      </div>
 
-      {/* Active Function Progress */}
-      {activeFunction && (
-        <Card className="border-primary">
-          <CardContent className="pt-6">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-semibold">Service in Progress</p>
-                  <p className="text-sm text-muted-foreground">
-                    {serviceFunctions.find(f => f.id === activeFunction)?.name}
-                  </p>
-                </div>
-                <Badge variant="default">
-                  <Clock className="h-3 w-3 mr-1" />
-                  {Math.ceil((100 - progress) * (serviceFunctions.find(f => f.id === activeFunction)?.duration || 0) / 100)}s
-                </Badge>
+      {/* Vehicle Info */}
+      {vehicleInfo && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Car className="h-5 w-5" />
+              Vehicle Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Manufacturer</p>
+                <p className="text-sm font-semibold">{vehicleInfo.manufacturer || 'Unknown'}</p>
               </div>
-              <Progress value={progress} className="h-3" />
+              <div>
+                <p className="text-xs text-muted-foreground">Model</p>
+                <p className="text-sm font-semibold">{vehicleInfo.model || 'Unknown'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">VIN</p>
+                <p className="text-xs font-mono">{vehicleInfo.vin || 'Not detected'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Available Functions</p>
+                <p className="text-sm font-semibold">{availableFunctions.length}</p>
+              </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Service Categories */}
-      <Tabs defaultValue={Object.keys(groupedFunctions)[0]} className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
-          {Object.keys(groupedFunctions).map(category => (
-            <TabsTrigger key={category} value={category} className="capitalize">
-              {category}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+      {/* Active Executions */}
+      {serviceExecutions.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Activity className="h-5 w-5" />
+              Service Executions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {serviceExecutions.slice(-3).map((execution) => (
+                <div key={execution.id} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {execution.status === 'running' && <RefreshCw className="h-4 w-4 animate-spin" />}
+                      {execution.status === 'completed' && <CheckCircle className="h-4 w-4 text-green-500" />}
+                      {execution.status === 'failed' && <AlertTriangle className="h-4 w-4 text-red-500" />}
+                      <span className="text-sm font-medium">{execution.name}</span>
+                    </div>
+                    <Badge
+                      variant={
+                        execution.status === 'completed'
+                          ? 'default'
+                          : execution.status === 'failed'
+                          ? 'destructive'
+                          : 'secondary'
+                      }
+                    >
+                      {execution.status}
+                    </Badge>
+                  </div>
+                  <Progress value={execution.progress} className="w-full" />
+                  {execution.error && <p className="text-xs text-red-500">{execution.error}</p>}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-        {Object.entries(groupedFunctions).map(([category, functions]) => (
-          <TabsContent key={category} value={category} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {functions.map((serviceFunction) => {
-                const Icon = serviceFunction.icon;
-                const result = results[serviceFunction.id];
-                const isActive = activeFunction === serviceFunction.id;
-                
-                return (
-                  <Card key={serviceFunction.id} className={isActive ? 'border-primary' : ''}>
-                    <CardHeader>
-                      <CardTitle className="flex items-center justify-between text-lg">
-                        <div className="flex items-center gap-2">
-                          <Icon className="h-5 w-5" />
-                          <span>{serviceFunction.name}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={getRiskVariant(serviceFunction.riskLevel)}>
-                            {serviceFunction.riskLevel.toUpperCase()}
-                          </Badge>
-                          {!serviceFunction.supported && (
-                            <Badge variant="outline">Not Supported</Badge>
-                          )}
-                        </div>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <p className="text-sm text-muted-foreground">
-                          {serviceFunction.description}
-                        </p>
-                        
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <span>Duration: {serviceFunction.duration}s</span>
-                          <span className={getRiskColor(serviceFunction.riskLevel)}>
-                            Risk: {serviceFunction.riskLevel}
-                          </span>
-                        </div>
+      {/* Function Categories */}
+      {categories.length > 0 && (
+        <Tabs defaultValue={categories[0]} className="w-full">
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6">
+            {categories.slice(0, 6).map((category) => (
+              <TabsTrigger key={category} value={category} className="capitalize text-xs">
+                {category}
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
-                        <Button
-                          onClick={() => executeService(serviceFunction)}
-                          disabled={!isConnected || !serviceFunction.supported || isActive || !!activeFunction}
-                          className="w-full"
-                          variant={serviceFunction.riskLevel === 'high' ? 'destructive' : 'default'}
-                        >
-                          {isActive ? 'Executing...' : `Execute ${serviceFunction.name}`}
-                        </Button>
+          {categories.map((category) => (
+            <TabsContent key={category} value={category} className="space-y-4">
+              <div className="grid grid-cols-1 gap-4">
+                {groupedFunctions[category].map((func) => {
+                  const Icon = getCategoryIcon(func.category);
+                  const execution = serviceExecutions.find((e) => e.name === func.name);
 
-                        {result && (
-                          <Alert>
-                            {result.success ? (
-                              <CheckCircle className="h-4 w-4" />
-                            ) : (
-                              <AlertTriangle className="h-4 w-4" />
+                  return (
+                    <Card key={func.id} className="relative">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-1">
+                            <Icon className="h-5 w-5 flex-shrink-0" />
+                            <div className="min-w-0">
+                              <CardTitle className="text-base leading-tight">{func.name}</CardTitle>
+                              <p className="text-xs text-muted-foreground mt-1 break-words">
+                                {func.description}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex flex-col gap-1 flex-shrink-0">
+                            <Badge variant={getRiskVariant(func.riskLevel || 'low')} className="text-xs">
+                              {(func.riskLevel || 'low').toUpperCase()}
+                            </Badge>
+                            {func.requiresPin && (
+                              <Badge variant="outline" className="text-xs">
+                                PIN Required
+                              </Badge>
                             )}
-                            <AlertDescription className="text-sm">
-                              {result.message}
-                              {result.duration && (
-                                <span className="text-muted-foreground">
-                                  {' '}(Completed in {result.duration}s)
-                                </span>
+                            {func.manufacturer && (
+                              <Badge variant="outline" className="text-xs">
+                                {func.manufacturer}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </CardHeader>
+
+                      <CardContent className="space-y-4">
+                        {func.parameters && (
+                          <div className="space-y-3">
+                            <h4 className="text-sm font-medium">Parameters:</h4>
+                            {Object.entries(func.parameters).map(([key]) => (
+                              <div key={key} className="space-y-1">
+                                <Label className="text-xs capitalize">{key.replace(/_/g, ' ')}</Label>
+                                <Input
+                                  type="text"
+                                  placeholder={`Enter ${key}`}
+                                  className="text-sm"
+                                  onChange={(e) =>
+                                    setFunctionParameters((prev) => ({
+                                      ...prev,
+                                      [func.id]: {
+                                        ...prev[func.id],
+                                        [key]: e.target.value,
+                                      },
+                                    }))
+                                  }
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {execution && (
+                          <Alert>
+                            <div className="flex items-center gap-2">
+                              {execution.status === 'completed' ? (
+                                <CheckCircle className="h-4 w-4 text-green-600" />
+                              ) : execution.status === 'failed' ? (
+                                <AlertTriangle className="h-4 w-4 text-red-600" />
+                              ) : (
+                                <RefreshCw className="h-4 w-4 animate-spin" />
                               )}
-                            </AlertDescription>
+                              <AlertDescription>
+                                <div>
+                                  <p className="text-sm font-medium">
+                                    {execution.status === 'completed'
+                                      ? 'Success'
+                                      : execution.status === 'failed'
+                                      ? 'Failed'
+                                      : 'Running'}
+                                  </p>
+                                  <p className="text-xs">
+                                    {execution.endTime?.toLocaleString() || 'In progress...'}
+                                  </p>
+                                </div>
+                              </AlertDescription>
+                            </div>
                           </Alert>
                         )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </TabsContent>
-        ))}
-      </Tabs>
+
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Category: {func.category}</span>
+                          <Button
+                            onClick={() => executeFunction(func.id)}
+                            disabled={!isConnected || isExecuting}
+                            variant={func.riskLevel === 'high' ? 'destructive' : 'default'}
+                            size="sm"
+                            className="w-full sm:w-auto"
+                          >
+                            Execute
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </TabsContent>
+          ))}
+        </Tabs>
+      )}
 
       {!isConnected && (
         <Alert>
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            Connect to an OBD2 adapter to access service functions.
+            <strong>Connect to vehicle to access advanced service functions.</strong>
+            <br />
+            Advanced functions require active OBD2 connection and may need specific capabilities.
           </AlertDescription>
         </Alert>
       )}
     </div>
   );
 };
+
+export default AdvancedServicePanel;
