@@ -5,7 +5,6 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -22,16 +21,11 @@ import {
   Wind,
   OilCan,
   Battery,
-  Gauge,
   Activity,
-  Timer,
   Target,
-  Key,
-  Radio
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { enhancedOBD2Service } from '@/services/EnhancedOBD2Service';
-import { VehicleDatabase } from '@/services/VehicleDatabase';
 import BackButton from './BackButton';
 
 interface AdvancedServicePanelProps {
@@ -52,7 +46,7 @@ interface ServiceExecution {
 
 const AdvancedServicePanel: React.FC<AdvancedServicePanelProps> = ({
   isConnected,
-  onBack
+  onBack,
 }) => {
   const [vehicleInfo, setVehicleInfo] = useState<any>(null);
   const [availableFunctions, setAvailableFunctions] = useState<any[]>([]);
@@ -74,16 +68,13 @@ const AdvancedServicePanel: React.FC<AdvancedServicePanelProps> = ({
 
       const functions = enhancedOBD2Service.getAdvancedFunctions();
       setAvailableFunctions(functions);
-
-      console.log('Vehicle info loaded:', info);
-      console.log('Available functions:', functions);
     } catch (error) {
       console.error('Failed to load vehicle info:', error);
     }
   };
 
   const executeFunction = async (functionId: string) => {
-    const func = availableFunctions.find(f => f.id === functionId);
+    const func = availableFunctions.find((f) => f.id === functionId);
     if (!func) {
       toast.error('Function not found');
       return;
@@ -91,7 +82,7 @@ const AdvancedServicePanel: React.FC<AdvancedServicePanelProps> = ({
 
     if (func.riskLevel === 'high') {
       const confirmed = window.confirm(
-        `⚠️ HIGH RISK OPERATION\n\n${func.name}\n${func.description}\n\nThis operation can potentially damage your vehicle or affect safety systems. Are you sure you want to continue?`
+        `⚠️ HIGH RISK OPERATION\n\n${func.name}\n${func.description}\n\nThis operation can potentially damage your vehicle or affect safety systems. Are you sure you want to continue?`,
       );
       if (!confirmed) return;
     }
@@ -102,81 +93,91 @@ const AdvancedServicePanel: React.FC<AdvancedServicePanelProps> = ({
       name: func.name,
       status: 'running',
       progress: 0,
-      startTime: new Date()
+      startTime: new Date(),
     };
 
-    setServiceExecutions(prev => [...prev, execution]);
+    setServiceExecutions((prev) => [...prev, execution]);
 
     try {
       toast.info(`Starting ${func.name}...`);
 
-      // Progress simulation
       const progressInterval = setInterval(() => {
-        setServiceExecutions(prev => prev.map(exec =>
-          exec.id === execution.id
-            ? { ...exec, progress: Math.min(exec.progress + 10, 90) }
-            : exec
-        ));
+        setServiceExecutions((prev) =>
+          prev.map((exec) =>
+            exec.id === execution.id
+              ? { ...exec, progress: Math.min(exec.progress + 10, 90) }
+              : exec,
+          ),
+        );
       }, 500);
 
-      // Execute the function with correct signature
       const result = await enhancedOBD2Service.executeAdvancedFunction(functionId);
 
       clearInterval(progressInterval);
 
-      setServiceExecutions(prev => prev.map(exec =>
-        exec.id === execution.id
-          ? {
-              ...exec,
-              status: result.success ? 'completed' : 'failed',
-              progress: 100,
-              result: result.result,
-              error: result.error,
-              endTime: new Date()
-            }
-          : exec
-      ));
+      setServiceExecutions((prev) =>
+        prev.map((exec) =>
+          exec.id === execution.id
+            ? {
+                ...exec,
+                status: result.success ? 'completed' : 'failed',
+                progress: 100,
+                result: result.result,
+                error: result.error,
+                endTime: new Date(),
+              }
+            : exec,
+        ),
+      );
 
       if (result.success) {
         toast.success(`${func.name} completed successfully`);
       } else {
         toast.error(`${func.name} failed: ${result.error}`);
       }
-
     } catch (error) {
-      setServiceExecutions(prev => prev.map(exec =>
-        exec.id === execution.id
-          ? {
-              ...exec,
-              status: 'failed',
-              progress: 100,
-              error: error instanceof Error ? error.message : 'Unknown error',
-              endTime: new Date()
-            }
-          : exec
-      ));
-
+      setServiceExecutions((prev) =>
+        prev.map((exec) =>
+          exec.id === execution.id
+            ? {
+                ...exec,
+                status: 'failed',
+                progress: 100,
+                error: error instanceof Error ? error.message : 'Unknown error',
+                endTime: new Date(),
+              }
+            : exec,
+        ),
+      );
       toast.error(`Function failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsExecuting(false);
     }
   };
 
-  const getRiskLevelColor = (level: string) => {
+  const getRiskColor = (level: string) => {
     switch (level) {
-      case 'low': return 'text-green-600';
-      case 'medium': return 'text-yellow-600';
-      case 'high': return 'text-red-600';
-      default: return 'text-gray-600';
+      case 'low':
+        return 'text-green-600';
+      case 'medium':
+        return 'text-yellow-600';
+      case 'high':
+        return 'text-red-600';
+      default:
+        return 'text-gray-600';
     }
   };
 
-  const getRiskLevelVariant = (level: string) => {
+  const getRiskVariant = (level: string) => {
     switch (level) {
-      case 'low': return 'secondary';
-      case 'medium': return 'default';
-      case 'high': return 'destructive';
-      default: return 'outline';
+      case 'low':
+        return 'default';
+      case 'medium':
+        return 'secondary';
+      case 'high':
+        return 'destructive';
+      default:
+        return 'outline';
     }
   };
 
@@ -195,7 +196,7 @@ const AdvancedServicePanel: React.FC<AdvancedServicePanelProps> = ({
       hybrid: Battery,
       comfort: Settings,
       coding: Database,
-      reset: RefreshCw
+      reset: RefreshCw,
     };
     return icons[category] || Settings;
   };
@@ -276,14 +277,20 @@ const AdvancedServicePanel: React.FC<AdvancedServicePanelProps> = ({
                       {execution.status === 'failed' && <AlertTriangle className="h-4 w-4 text-red-500" />}
                       <span className="text-sm font-medium">{execution.name}</span>
                     </div>
-                    <Badge variant={execution.status === 'completed' ? 'default' : execution.status === 'failed' ? 'destructive' : 'secondary'}>
+                    <Badge
+                      variant={
+                        execution.status === 'completed'
+                          ? 'default'
+                          : execution.status === 'failed'
+                          ? 'destructive'
+                          : 'secondary'
+                      }
+                    >
                       {execution.status}
                     </Badge>
                   </div>
                   <Progress value={execution.progress} className="w-full" />
-                  {execution.error && (
-                    <p className="text-xs text-red-500">{execution.error}</p>
-                  )}
+                  {execution.error && <p className="text-xs text-red-500">{execution.error}</p>}
                 </div>
               ))}
             </div>
@@ -295,19 +302,19 @@ const AdvancedServicePanel: React.FC<AdvancedServicePanelProps> = ({
       {categories.length > 0 && (
         <Tabs defaultValue={categories[0]} className="w-full">
           <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6">
-            {categories.slice(0, 6).map(category => (
+            {categories.slice(0, 6).map((category) => (
               <TabsTrigger key={category} value={category} className="capitalize text-xs">
                 {category}
               </TabsTrigger>
             ))}
           </TabsList>
 
-          {categories.map(category => (
+          {categories.map((category) => (
             <TabsContent key={category} value={category} className="space-y-4">
               <div className="grid grid-cols-1 gap-4">
-                {groupedFunctions[category].map(func => {
+                {groupedFunctions[category].map((func) => {
                   const Icon = getCategoryIcon(func.category);
-                  const execution = serviceExecutions.find(e => e.name === func.name);
+                  const execution = serviceExecutions.find((e) => e.name === func.name);
 
                   return (
                     <Card key={func.id} className="relative">
@@ -323,14 +330,18 @@ const AdvancedServicePanel: React.FC<AdvancedServicePanelProps> = ({
                             </div>
                           </div>
                           <div className="flex flex-col gap-1 flex-shrink-0">
-                            <Badge variant={getRiskLevelVariant(func.riskLevel || 'low')} className="text-xs">
+                            <Badge variant={getRiskVariant(func.riskLevel || 'low')} className="text-xs">
                               {(func.riskLevel || 'low').toUpperCase()}
                             </Badge>
                             {func.requiresPin && (
-                              <Badge variant="outline" className="text-xs">PIN Required</Badge>
+                              <Badge variant="outline" className="text-xs">
+                                PIN Required
+                              </Badge>
                             )}
                             {func.manufacturer && (
-                              <Badge variant="outline" className="text-xs">{func.manufacturer}</Badge>
+                              <Badge variant="outline" className="text-xs">
+                                {func.manufacturer}
+                              </Badge>
                             )}
                           </div>
                         </div>
@@ -340,20 +351,22 @@ const AdvancedServicePanel: React.FC<AdvancedServicePanelProps> = ({
                         {func.parameters && (
                           <div className="space-y-3">
                             <h4 className="text-sm font-medium">Parameters:</h4>
-                            {Object.entries(func.parameters).map(([key, value]) => (
+                            {Object.entries(func.parameters).map(([key]) => (
                               <div key={key} className="space-y-1">
                                 <Label className="text-xs capitalize">{key.replace(/_/g, ' ')}</Label>
                                 <Input
                                   type="text"
                                   placeholder={`Enter ${key}`}
                                   className="text-sm"
-                                  onChange={(e) => setFunctionParameters(prev => ({
-                                    ...prev,
-                                    [func.id]: {
-                                      ...prev[func.id],
-                                      [key]: e.target.value
-                                    }
-                                  }))}
+                                  onChange={(e) =>
+                                    setFunctionParameters((prev) => ({
+                                      ...prev,
+                                      [func.id]: {
+                                        ...prev[func.id],
+                                        [key]: e.target.value,
+                                      },
+                                    }))
+                                  }
                                 />
                               </div>
                             ))}
@@ -373,8 +386,11 @@ const AdvancedServicePanel: React.FC<AdvancedServicePanelProps> = ({
                               <AlertDescription>
                                 <div>
                                   <p className="text-sm font-medium">
-                                    {execution.status === 'completed' ? 'Success' :
-                                     execution.status === 'failed' ? 'Failed' : 'Running'}
+                                    {execution.status === 'completed'
+                                      ? 'Success'
+                                      : execution.status === 'failed'
+                                      ? 'Failed'
+                                      : 'Running'}
                                   </p>
                                   <p className="text-xs">
                                     {execution.endTime?.toLocaleString() || 'In progress...'}
@@ -386,9 +402,7 @@ const AdvancedServicePanel: React.FC<AdvancedServicePanelProps> = ({
                         )}
 
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                          <span className="text-xs text-muted-foreground">
-                            Category: {func.category}
-                          </span>
+                          <span className="text-xs text-muted-foreground">Category: {func.category}</span>
                           <Button
                             onClick={() => executeFunction(func.id)}
                             disabled={!isConnected || isExecuting}
