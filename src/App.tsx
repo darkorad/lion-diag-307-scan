@@ -1,69 +1,37 @@
 
-import React, { useEffect, useState } from 'react';
-import { Toaster } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import MainLayout from './components/MainLayout';
-import Dashboard from "./pages/Dashboard";
-import NotFound from "./pages/NotFound";
-import VehicleSpecific from "./pages/VehicleSpecific";
-import ProfessionalDiagnostics from "./pages/ProfessionalDiagnostics";
-import VehicleSpecificErrorBoundary from "./components/VehicleSpecificErrorBoundary";
-import MobileErrorBoundary from "./components/mobile/MobileErrorBoundary";
-import Diagnostics from './pages/Diagnostics';
-import VehicleSelection from './pages/VehicleSelection';
-import Connections from './pages/Connections';
-import Settings from './pages/Settings';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from '@/components/ui/sonner';
+import { ProfessionalDashboard } from '@/components/ProfessionalDashboard';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import './App.css';
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
-      staleTime: 5 * 60 * 1000,
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      refetchOnWindowFocus: false,
     },
   },
 });
 
-const App = () => {
+function App() {
   return (
-    <MobileErrorBoundary fallbackTitle="App Startup Error">
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <Toaster />
-          <BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <ErrorBoundary>
+        <Router>
+          <div className="min-h-screen bg-background">
             <Routes>
-              <Route element={<MainLayout />}>
-                <Route path="/" element={<Dashboard />} />
-                <Route
-                  path="/vehicle-specific"
-                  element={
-                    <VehicleSpecificErrorBoundary>
-                      <VehicleSpecific />
-                    </VehicleSpecificErrorBoundary>
-                  }
-                />
-                <Route
-                  path="/vehicle-specific/:make/:model/:generation/:engine"
-                  element={
-                    <VehicleSpecificErrorBoundary>
-                      <VehicleSpecific />
-                    </VehicleSpecificErrorBoundary>
-                  }
-                />
-                <Route path="/professional-diagnostics" element={<ProfessionalDiagnostics />} />
-                <Route path="/diagnostics" element={<Diagnostics />} />
-                <Route path="/vehicle-selection" element={<VehicleSelection />} />
-                <Route path="/connections" element={<Connections />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="*" element={<NotFound />} />
-              </Route>
+              <Route path="/" element={<ProfessionalDashboard />} />
+              <Route path="*" element={<ProfessionalDashboard />} />
             </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </QueryClientProvider>
-    </MobileErrorBoundary>
+            <Toaster />
+          </div>
+        </Router>
+      </ErrorBoundary>
+    </QueryClientProvider>
   );
-};
+}
 
 export default App;
