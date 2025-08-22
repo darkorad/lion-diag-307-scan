@@ -1,6 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { BluetoothSerial, BluetoothScanResult } from '@e-is/capacitor-bluetooth-serial';
-import { BluetoothDevice, ConnectionResult, ConnectionStatus } from './MasterBluetoothService';
+import { BluetoothDevice, ConnectionResult, ConnectionStatus, ConnectionHistory } from './bluetooth/types';
 import { parseObdResponse } from '../utils/obd2Utils';
 
 interface Command {
@@ -20,6 +20,8 @@ export class UnifiedBluetoothService {
   private dataListener: any = null;
   private incomingDataBuffer: string = "";
   private isNative = false;
+  private connectionHistory: ConnectionHistory[] = [];
+  private problematicDevices = new Set<string>();
 
   static getInstance(): UnifiedBluetoothService {
     if (!UnifiedBluetoothService.instance) {
@@ -50,9 +52,43 @@ export class UnifiedBluetoothService {
         return true;
     }
     console.log('Initializing UnifiedBluetoothService...');
+    this.loadConnectionHistory();
     this.isInitialized = true;
     console.log('UnifiedBluetoothService initialized successfully.');
     return true;
+  }
+
+  private loadConnectionHistory(): void {
+    try {
+      if (typeof window === 'undefined' || !window.localStorage) {
+        return;
+      }
+
+      const stored = localStorage.getItem('bluetooth_connection_history');
+      if (stored) {
+        const data = JSON.parse(stored);
+        this.connectionHistory = Array.isArray(data.history) ? data.history : [];
+      }
+    } catch (error) {
+      console.warn('Failed to load connection history:', error);
+      this.connectionHistory = [];
+    }
+  }
+
+  private saveConnectionHistory(): void {
+    try {
+      if (typeof window === 'undefined' || !window.localStorage) {
+        return;
+      }
+
+      const data = {
+        history: this.connectionHistory.slice(0, 50), // Keep last 50 entries
+        timestamp: Date.now()
+      };
+      localStorage.setItem('bluetooth_connection_history', JSON.stringify(data));
+    } catch (error) {
+      console.warn('Failed to save connection history:', error);
+    }
   }
 
   async isBluetoothEnabled(): Promise<boolean> {
@@ -133,6 +169,7 @@ export class UnifiedBluetoothService {
 
       const initResult = await this.initializeElm327();
       if (initResult.success) {
+        this.saveConnectionHistory();
         console.log('ELM327 initialized successfully.');
         return { success: true, device: this.currentDevice };
       } else {
@@ -142,6 +179,8 @@ export class UnifiedBluetoothService {
       }
     } catch (error) {
       console.error('Connection process failed:', error);
+      this.problematicDevices.add(device.address);
+      this.saveConnectionHistory();
       return { success: false, error: `Connection process failed: ${error}` };
     }
   }
@@ -176,6 +215,7 @@ export class UnifiedBluetoothService {
     return {
       isConnected: this.currentDevice?.isConnected || false,
       device: this.currentDevice || undefined,
+      lastConnected: this.connectionHistory[0] ? new Date(this.connectionHistory[0].connectionTime) : undefined,
       quality: 'unknown'
     };
   }
@@ -266,6 +306,19 @@ export class UnifiedBluetoothService {
       rawResponse,
       parsedResponse,
     };
+  }
+
+  getConnectionHistory(): ConnectionHistory[] {
+    return [...this.connectionHistory];
+  }
+
+  isDeviceProblematic(address: string): boolean {
+    return this.problematicDevices.has(address);
+  }
+
+  resetDeviceHistory(address: string): void {
+    this.problematicDevices.delete(address);
+    console.log(`Reset device history for ${address}`);
   }
 
   isConnectedToDevice(): boolean {

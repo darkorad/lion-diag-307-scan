@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { autoConnectService, StoredDevice, AutoConnectSettings } from '@/services/AutoConnectService';
 import { useToast } from '@/hooks/use-toast';
-import { BluetoothDevice } from '@/services/MasterBluetoothService';
+import { BluetoothDevice } from '@/services/bluetooth/types';
 
 interface AutoConnectManagerProps {
   onDeviceSelected?: (device: BluetoothDevice) => void;

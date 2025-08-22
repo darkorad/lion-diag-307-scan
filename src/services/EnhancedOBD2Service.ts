@@ -1,6 +1,6 @@
 
 import { unifiedBluetoothService } from './UnifiedBluetoothService';
-import { BluetoothDevice } from './MasterBluetoothService';
+import { BluetoothDevice } from './bluetooth/types';
 import { OBD2Data as TypesOBD2Data, DPFData as TypesDPFData } from '../types/obd2';
 
 // Use the types from the types file to ensure consistency
