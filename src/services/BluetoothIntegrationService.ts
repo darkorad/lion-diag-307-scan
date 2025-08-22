@@ -2,7 +2,6 @@
 import { unifiedBluetoothService, BluetoothDevice } from './UnifiedBluetoothService';
 import { bluetoothConnectionManager } from './BluetoothConnectionManager';
 import { permissionService } from './PermissionService';
-import { masterBluetoothService } from './MasterBluetoothService';
 
 export interface BluetoothIntegrationResult {
   success: boolean;

@@ -1,5 +1,5 @@
 
-import { BluetoothDevice } from './MasterBluetoothService';
+import { BluetoothDevice } from './bluetooth/types';
 import { comprehensiveBluetoothService } from './ComprehensiveBluetoothService';
 import { bluetoothConnectionManager } from './BluetoothConnectionManager';
 

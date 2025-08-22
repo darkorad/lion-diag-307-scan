@@ -1,5 +1,5 @@
 import { unifiedBluetoothService } from './UnifiedBluetoothService';
-import { BluetoothDevice, ConnectionResult, ConnectionStatus } from './MasterBluetoothService';
+import { BluetoothDevice, ConnectionResult, ConnectionStatus } from './bluetooth/types';
 
 // This service is now a wrapper around the UnifiedBluetoothService.
 // This is to ensure that all parts of the app use the same Bluetooth logic.

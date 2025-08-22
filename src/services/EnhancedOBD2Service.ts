@@ -1,5 +1,6 @@
 
-import { masterBluetoothService, BluetoothDevice } from './MasterBluetoothService';
+import { unifiedBluetoothService } from './UnifiedBluetoothService';
+import { BluetoothDevice } from './bluetooth/types';
 import { OBD2Data as TypesOBD2Data, DPFData as TypesDPFData } from '../types/obd2';
 
 // Use the types from the types file to ensure consistency
@@ -133,7 +134,7 @@ export class EnhancedOBD2Service {
     try {
       console.log(`Sending OBD2 command: ${command}`);
       
-      const response = await masterBluetoothService.sendCommand(command);
+      const response = await unifiedBluetoothService.sendCommand(command);
       
       console.log(`OBD2 response: ${response}`);
       return response.trim();
@@ -299,7 +300,7 @@ export class EnhancedOBD2Service {
 
   async disconnect(): Promise<void> {
     try {
-      await masterBluetoothService.disconnect();
+      await unifiedBluetoothService.disconnect();
       this.isConnected = false;
       this.serviceStatus.isConnected = false;
       this.currentDevice = null;

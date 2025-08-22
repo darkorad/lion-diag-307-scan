@@ -1,5 +1,5 @@
 
-import { BluetoothDevice } from '../MasterBluetoothService';
+import { BluetoothDevice } from './types';
 
 export interface ConnectionState {
   isConnected: boolean;

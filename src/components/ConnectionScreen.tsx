@@ -15,7 +15,7 @@ import ConnectionPanel from './ConnectionPanel';
 import ProfessionalConnectionPanel from './ProfessionalConnectionPanel';
 import SimplifiedBluetoothConnection from './SimplifiedBluetoothConnection';
 import BackButton from './BackButton';
-import { BluetoothDevice } from '@/services/MasterBluetoothService';
+import { BluetoothDevice } from '@/services/bluetooth/types';
 import { toast } from 'sonner';
 
 const ConnectionScreen: React.FC = () => {

@@ -1,6 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { BluetoothSerial, BluetoothScanResult } from '@e-is/capacitor-bluetooth-serial';
-import { BluetoothDevice, ConnectionResult, ConnectionStatus, ConnectionHistory } from './MasterBluetoothService';
+import { BluetoothDevice, ConnectionResult, ConnectionStatus, ConnectionHistory } from './bluetooth/types';
 import { parseObdResponse } from '../utils/obd2Utils';
 
 interface Command {

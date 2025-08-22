@@ -1,7 +1,7 @@
 
 import {
   BluetoothDevice,
-} from './MasterBluetoothService';
+} from './bluetooth/types';
 import { unifiedBluetoothService } from './UnifiedBluetoothService';
 
 export type { BluetoothDevice };

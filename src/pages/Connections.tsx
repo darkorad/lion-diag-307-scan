@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { unifiedBluetoothService } from '@/services/UnifiedBluetoothService';
-import { BluetoothDevice } from '@/services/MasterBluetoothService';
+import { BluetoothDevice } from '@/services/bluetooth/types';
 import { toast } from 'sonner';
 
 const Connections = () => {

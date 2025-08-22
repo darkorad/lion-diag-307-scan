@@ -1,5 +1,5 @@
 
-import { BluetoothDevice } from './MasterBluetoothService';
+import { BluetoothDevice } from './bluetooth/types';
 import { ConnectionStateManager, ConnectionState, ConnectionHistory } from './bluetooth/ConnectionState';
 import { HeartbeatManager } from './bluetooth/HeartbeatManager';
 import { unifiedBluetoothService } from './UnifiedBluetoothService';

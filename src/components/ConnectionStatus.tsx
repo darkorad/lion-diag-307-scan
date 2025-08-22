@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle, WifiOff, Loader2, Signal, Bluetooth } from 'lucide-react';
 import { bluetoothConnectionManager, ConnectionState } from '@/services/BluetoothConnectionManager';
-import { masterBluetoothService } from '@/services/MasterBluetoothService';
 import { toast } from 'sonner';
 
 interface ConnectionStatusProps {
@@ -36,7 +35,7 @@ const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
       if (onDisconnect) {
         await onDisconnect();
       } else {
-        await masterBluetoothService.disconnect();
+        await bluetoothConnectionManager.disconnect();
       }
       toast.info('Disconnected from device');
     } catch (error) {

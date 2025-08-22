@@ -23,7 +23,8 @@ import {
   AlertTriangle,
   History
 } from 'lucide-react';
-import { masterBluetoothService, BluetoothDevice, ConnectionResult } from '@/services/MasterBluetoothService';
+import { unifiedBluetoothService } from '@/services/UnifiedBluetoothService';
+import { BluetoothDevice, ConnectionResult, ConnectionHistory } from '@/services/bluetooth/types';
 import { toast } from 'sonner';
 
 interface ProfessionalConnectionPanelProps {
@@ -42,7 +43,7 @@ const ProfessionalConnectionPanel: React.FC<ProfessionalConnectionPanelProps> = 
   const [devices, setDevices] = useState<BluetoothDevice[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<BluetoothDevice | null>(null);
   const [scanProgress, setScanProgress] = useState(0);
-  const [connectionHistory, setConnectionHistory] = useState<any[]>([]);
+  const [connectionHistory, setConnectionHistory] = useState<ConnectionHistory[]>([]);
   const [connectionResult, setConnectionResult] = useState<ConnectionResult | null>(null);
 
   useEffect(() => {
@@ -51,14 +52,14 @@ const ProfessionalConnectionPanel: React.FC<ProfessionalConnectionPanelProps> = 
   }, []);
 
   const checkCurrentConnection = () => {
-    const status = masterBluetoothService.getConnectionStatus();
+    const status = unifiedBluetoothService.getConnectionStatus();
     if (status.isConnected && status.device) {
       onDeviceConnected(status.device);
     }
   };
 
   const loadConnectionHistory = () => {
-    const history = masterBluetoothService.getConnectionHistory();
+    const history = unifiedBluetoothService.getConnectionHistory();
     setConnectionHistory(history);
   };
 
@@ -80,7 +81,7 @@ const ProfessionalConnectionPanel: React.FC<ProfessionalConnectionPanelProps> = 
       }, 1000);
 
       // Discover devices
-      const foundDevices = await masterBluetoothService.discoverAllDevices();
+      const foundDevices = await unifiedBluetoothService.scanForDevices();
       
       clearInterval(progressInterval);
       setScanProgress(100);
@@ -108,12 +109,12 @@ const ProfessionalConnectionPanel: React.FC<ProfessionalConnectionPanelProps> = 
 
     try {
       // Reset problematic device history if needed
-      if (masterBluetoothService.isDeviceProblematic(device.address)) {
-        masterBluetoothService.resetDeviceHistory(device.address);
+      if (unifiedBluetoothService.isDeviceProblematic(device.address)) {
+        unifiedBluetoothService.resetDeviceHistory(device.address);
         toast.info('Resetting connection history for better compatibility');
       }
 
-      const result = await masterBluetoothService.connectToDevice(device);
+      const result = await unifiedBluetoothService.connectToDevice(device);
       setConnectionResult(result);
       
       if (result.success) {
@@ -141,7 +142,7 @@ const ProfessionalConnectionPanel: React.FC<ProfessionalConnectionPanelProps> = 
 
   const handleDisconnect = async () => {
     try {
-      await masterBluetoothService.disconnect();
+      await unifiedBluetoothService.disconnect();
       toast.info('Disconnected from OBD2 device');
       // Reset connection state handled by parent component
     } catch (error) {

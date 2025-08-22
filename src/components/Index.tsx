@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import BluetoothDeviceScanner from './BluetoothDeviceScanner';
 import PeugeotAlarmPanel from './PeugeotAlarmPanel';
-import { BluetoothDevice } from '@/services/MasterBluetoothService';
+import { BluetoothDevice } from '@/services/bluetooth/types';
 import { toast } from 'sonner';
 
 const Index = () => {

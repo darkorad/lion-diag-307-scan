@@ -17,7 +17,7 @@ import {
   Shield,
   Zap
 } from 'lucide-react';
-import { BluetoothDevice } from '@/services/MasterBluetoothService';
+import { BluetoothDevice } from '@/services/bluetooth/types';
 import { enhancedConnectionService } from '@/services/EnhancedConnectionService';
 import { mobilePermissionsService } from '@/services/MobilePermissionsService';
 import MobilePermissionDialog from './MobilePermissionDialog';

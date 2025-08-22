@@ -20,7 +20,7 @@ import {
   Activity,
   Signal
 } from 'lucide-react';
-import { BluetoothDevice } from '@/services/MasterBluetoothService';
+import { BluetoothDevice } from '@/services/bluetooth/types';
 import { bluetoothConnectionManager } from '@/services/BluetoothConnectionManager';
 import { bluetoothIntegrationService } from '@/services/BluetoothIntegrationService';
 import { toast } from 'sonner';

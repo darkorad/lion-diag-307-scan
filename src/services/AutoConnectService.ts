@@ -1,4 +1,4 @@
-import { BluetoothDevice } from './MasterBluetoothService';
+import { BluetoothDevice } from './bluetooth/types';
 
 export interface StoredDevice {
   id: string;
