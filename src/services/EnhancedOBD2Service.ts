@@ -1,4 +1,3 @@
-
 import { unifiedBluetoothService } from './UnifiedBluetoothService';
 import { BluetoothDevice } from './bluetooth/types';
 import { OBD2Data as TypesOBD2Data, DPFData as TypesDPFData } from '../types/obd2';
@@ -39,6 +38,8 @@ export class EnhancedOBD2Service {
 
   private constructor() {
     console.log('EnhancedOBD2Service initialized');
+    this.currentDevice = unifiedBluetoothService.getConnectedDevice();
+    this.isConnected = unifiedBluetoothService.isConnectedToDevice();
   }
 
   static getInstance(): EnhancedOBD2Service {
@@ -134,7 +135,7 @@ export class EnhancedOBD2Service {
     try {
       console.log(`Sending OBD2 command: ${command}`);
       
-      const response = await unifiedBluetoothService.sendCommand(command);
+      const response = await unifiedBluetoothService.sendCommand(command, timeout);
       
       console.log(`OBD2 response: ${response}`);
       return response.trim();
