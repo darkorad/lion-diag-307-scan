@@ -19,10 +19,10 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import LexiaDiagboxEmulator from '@/components/LexiaDiagboxEmulator';
-import DTCPanel from '@/components/DTCPanel';
+import DTCPanel from '@/components/DTCPanel.tsx';
 import LiveDataMonitor from '@/components/LiveDataMonitor';
 import { AdvancedDiagnosticsPanel } from '@/components/AdvancedDiagnosticsPanel';
-import BiDirectionalControlPanel from '@/components/BiDirectionalControlPanel';
+import BiDirectionalControlPanel from '@/components/BiDirectionalControlPanel.tsx';
 import AdvancedServicePanel from '@/components/AdvancedServicePanel';
 import VehicleTestingPanel from '@/components/VehicleTestingPanel';
 
