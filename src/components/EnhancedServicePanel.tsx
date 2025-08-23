@@ -21,6 +21,7 @@ import {
   Zap,
   Wind,
   OilCan,
+  Filter,
   Battery,
   Gauge,
   Activity,
@@ -34,7 +35,7 @@ import { enhancedOBD2Service } from '@/services/EnhancedOBD2Service';
 import { VehicleDatabase } from '@/services/VehicleDatabase';
 import BackButton from './BackButton';
 
-interface AdvancedServicePanelProps {
+interface EnhancedServicePanelProps {
   isConnected: boolean;
   onBack?: () => void;
 }
@@ -50,7 +51,7 @@ interface ServiceExecution {
   endTime?: Date;
 }
 
-const AdvancedServicePanel: React.FC<AdvancedServicePanelProps> = ({
+const EnhancedServicePanel: React.FC<EnhancedServicePanelProps> = ({
   isConnected,
   onBack
 }) => {
@@ -423,4 +424,4 @@ const AdvancedServicePanel: React.FC<AdvancedServicePanelProps> = ({
   );
 };
 
-export default AdvancedServicePanel;
+export default EnhancedServicePanel;
