@@ -1,3 +1,4 @@
+
 import { unifiedBluetoothService } from './UnifiedBluetoothService';
 import { BluetoothDevice, ConnectionResult, ConnectionStatus } from './bluetooth/types';
 
@@ -13,6 +14,10 @@ export class MobileSafeBluetoothService {
       MobileSafeBluetoothService.instance = new MobileSafeBluetoothService();
     }
     return MobileSafeBluetoothService.instance;
+  }
+
+  async initialize(): Promise<boolean> {
+    return unifiedBluetoothService.initialize();
   }
 
   async isBluetoothEnabled(): Promise<boolean> {

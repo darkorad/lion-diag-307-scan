@@ -22,6 +22,7 @@ export class UnifiedBluetoothService {
   private isNative = false;
   private connectionHistory: ConnectionHistory[] = [];
   private problematicDevices = new Set<string>();
+  private connectionAttempts = new Map<string, number>();
 
   static getInstance(): UnifiedBluetoothService {
     if (!UnifiedBluetoothService.instance) {
@@ -150,6 +151,10 @@ export class UnifiedBluetoothService {
     }
   }
 
+  async discoverAllOBD2Devices(): Promise<BluetoothDevice[]> {
+    return this.scanForDevices();
+  }
+
   async connectToDevice(device: BluetoothDevice): Promise<ConnectionResult> {
     if (!this.isNative) {
       console.warn('Bluetooth connection not available in web environment.');
@@ -162,6 +167,10 @@ export class UnifiedBluetoothService {
       if (this.currentDevice && this.currentDevice.isConnected) {
         await this.disconnect();
       }
+
+      // Track connection attempts
+      const attempts = this.connectionAttempts.get(device.address) || 0;
+      this.connectionAttempts.set(device.address, attempts + 1);
 
       await BluetoothSerial.connect({ address: device.address });
       this.currentDevice = { ...device, isConnected: true };
@@ -183,6 +192,10 @@ export class UnifiedBluetoothService {
       this.saveConnectionHistory();
       return { success: false, error: `Connection process failed: ${error}` };
     }
+  }
+
+  async smartConnect(device: BluetoothDevice): Promise<ConnectionResult> {
+    return this.connectToDevice(device);
   }
 
   private setupSubscription(): void {
@@ -321,6 +334,16 @@ export class UnifiedBluetoothService {
     console.log(`Reset device history for ${address}`);
   }
 
+  resetConnectionAttempts(deviceAddress: string): void {
+    this.connectionAttempts.delete(deviceAddress);
+    this.problematicDevices.delete(deviceAddress);
+    console.log(`Reset connection attempts for ${deviceAddress}`);
+  }
+
+  getConnectionAttempts(deviceAddress: string): number {
+    return this.connectionAttempts.get(deviceAddress) || 0;
+  }
+
   isConnectedToDevice(): boolean {
     return this.currentDevice?.isConnected || false;
   }
@@ -331,3 +354,5 @@ export class UnifiedBluetoothService {
 }
 
 export const unifiedBluetoothService = UnifiedBluetoothService.getInstance();
+// Export the BluetoothDevice type
+export type { BluetoothDevice, ConnectionResult, ConnectionStatus, ConnectionHistory };

@@ -36,10 +36,10 @@ export class BluetoothIntegrationService {
       }
       
       // 3. Check if Bluetooth is enabled
-      const isEnabled = await masterBluetoothService.isBluetoothEnabled();
+      const isEnabled = await unifiedBluetoothService.isBluetoothEnabled();
       if (!isEnabled) {
         console.log('Bluetooth not enabled, attempting to enable...');
-        const enabled = await masterBluetoothService.enableBluetooth();
+        const enabled = await unifiedBluetoothService.enableBluetooth();
         if (!enabled) {
           console.error('Failed to enable Bluetooth');
           return false;
