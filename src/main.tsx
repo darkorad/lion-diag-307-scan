@@ -102,17 +102,17 @@ const startApp = () => {
 import { unifiedBluetoothService } from './services/UnifiedBluetoothService';
 
 // Wait for the deviceready event to ensure all plugins are loaded
-const initializeApp = () => {
+const initializeApp = async () => {
   console.log('Starting app initialization...');
   if (typeof window !== 'undefined' && (window.cordova || window.Capacitor)) {
     console.log('Native platform detected, waiting for Capacitor...');
-    document.addEventListener('deviceready', () => {
-      unifiedBluetoothService.initialize();
+    document.addEventListener('deviceready', async () => {
+      await unifiedBluetoothService.initialize();
       startApp();
     }, false);
   } else {
     console.log('Web platform detected, starting app immediately.');
-    unifiedBluetoothService.initialize();
+    await unifiedBluetoothService.initialize();
     startApp();
   }
 };
