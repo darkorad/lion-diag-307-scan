@@ -1,65 +1,61 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertTriangle, Car, CheckCircle } from 'lucide-react';
+import { AlertTriangle, Car, CheckCircle, ArrowLeft } from 'lucide-react';
 import { VEHICLE_DATABASE } from '@/constants/vehicleDatabase';
-import { mobileSafeBluetoothService } from '@/services/MobileSafeBluetoothService';
-import WorkingVehicleSpecificDiagnostics from '@/components/WorkingVehicleSpecificDiagnostics';
-import BackButton from '@/components/BackButton';
-import { VisualVehicleSelector } from '@/components/VisualVehicleSelector';
 
 const VehicleSpecific = () => {
   const { make, model, generation, engine } = useParams();
   const navigate = useNavigate();
   const [vehicleInfo, setVehicleInfo] = useState<any>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState('');
-  const [showVehicleSelector, setShowVehicleSelector] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // If no vehicle parameters, show the vehicle selector
-    if (!make || !model || !generation || !engine) {
-      console.log('No vehicle parameters found, showing selector');
-      setShowVehicleSelector(true);
-      return;
-    }
-
     loadVehicleInfo();
-    checkConnectionStatus();
-    
-    const interval = setInterval(checkConnectionStatus, 2000);
-    return () => clearInterval(interval);
   }, [make, model, generation, engine]);
 
   const loadVehicleInfo = () => {
     try {
+      setLoading(true);
+      setError(null);
+
+      // If no vehicle parameters, show error
+      if (!make || !model || !generation || !engine) {
+        setError('Vehicle parameters are missing');
+        setLoading(false);
+        return;
+      }
+
       const makeData = VEHICLE_DATABASE.find(m => m.id === make);
       if (!makeData) {
-        console.error(`Make ${make} not found in database`);
-        setShowVehicleSelector(true);
+        setError(`Make ${make} not found in database`);
+        setLoading(false);
         return;
       }
 
       const modelData = makeData.models?.find(m => m.id === model);
       if (!modelData) {
-        console.error(`Model ${model} not found for make ${make}`);
-        setShowVehicleSelector(true);
+        setError(`Model ${model} not found for make ${make}`);
+        setLoading(false);
         return;
       }
 
       const generationData = modelData.generations?.find(g => g.id === generation);
       if (!generationData) {
-        console.error(`Generation ${generation} not found for model ${model}`);
-        setShowVehicleSelector(true);
+        setError(`Generation ${generation} not found for model ${model}`);
+        setLoading(false);
         return;
       }
 
       const engineData = generationData.engines?.find(e => e.id === engine);
       if (!engineData) {
-        console.error(`Engine ${engine} not found for generation ${generation}`);
-        setShowVehicleSelector(true);
+        setError(`Engine ${engine} not found for generation ${generation}`);
+        setLoading(false);
         return;
       }
 
@@ -77,94 +73,36 @@ const VehicleSpecific = () => {
         generationId: generationData.id,
         engineId: engineData.id
       });
+      setLoading(false);
     } catch (error) {
       console.error('Error loading vehicle info:', error);
-      setShowVehicleSelector(true);
-    }
-  };
-
-  const checkConnectionStatus = async () => {
-    try {
-      const status = mobileSafeBluetoothService.getConnectionStatus();
-      setIsConnected(status.isConnected);
-      setConnectionStatus(status.isConnected ? 'Connected' : 'Not Connected');
-    } catch (error) {
-      setIsConnected(false);
-      setConnectionStatus('Error');
-    }
-  };
-
-  const handleConnect = async () => {
-    try {
-      // Create a mock device object for connection
-      const mockDevice = {
-        id: 'auto-connect',
-        address: '',
-        name: 'Auto Connect',
-        isPaired: false
-      };
-      
-      const success = await mobileSafeBluetoothService.connectToDevice(mockDevice);
-      if (success) {
-        setIsConnected(true);
-        setConnectionStatus('Connected');
-      }
-    } catch (error) {
-      console.error('Connection failed:', error);
-      setConnectionStatus('Connection failed');
+      setError('Error loading vehicle information');
+      setLoading(false);
     }
   };
 
   const handleBack = () => {
-    navigate('/');
+    navigate('/vehicle-selection');
   };
 
-  const handleVehicleSelected = (profile: any) => {
-    // Navigate to the vehicle-specific page with the selected parameters
-    navigate(`/vehicle-specific/${profile.makeId}/${profile.modelId}/${profile.generationId}/${profile.engineId}`);
-    setShowVehicleSelector(false);
+  const handleConnect = () => {
+    // Simulate connection
+    setIsConnected(!isConnected);
   };
 
-  // Show vehicle selector if no vehicle is selected or if there was an error loading vehicle info
-  if (showVehicleSelector) {
+  if (loading) {
     return (
       <div className="container mx-auto p-4">
         <div className="flex items-center gap-4 mb-6">
-          <BackButton 
-            onBack={handleBack}
-            fallbackRoute="/"
-            variant="ghost"
-            size="sm"
-            label="Back to Home"
-            showIcon={true}
-          />
-        </div>
-        
-        <VisualVehicleSelector 
-          onVehicleSelected={handleVehicleSelected}
-          selectedProfile={null}
-          isConnected={isConnected}
-          onCommand={async (command: string) => {
-            // Mock command handler for now
-            return 'OK';
-          }}
-        />
-      </div>
-    );
-  }
-
-  if (!vehicleInfo) {
-    return (
-      <div className="container mx-auto p-4">
-        <div className="flex items-center gap-4 mb-6">
-          <BackButton 
-            onBack={handleBack}
-            fallbackRoute="/"
-            variant="ghost"
-            size="sm"
-            label="Back to Home"
-            showIcon={true}
-          />
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={handleBack}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Button>
         </div>
         <Alert>
           <AlertTriangle className="h-4 w-4" />
@@ -176,15 +114,53 @@ const VehicleSpecific = () => {
     );
   }
 
+  if (error) {
+    return (
+      <div className="container mx-auto p-4">
+        <div className="flex items-center gap-4 mb-6">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={handleBack}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Vehicle Selection
+          </Button>
+        </div>
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            {error}
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   return (
-    <div className="container mx-auto p-4">
+    <div className="container mx-auto p-4 space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-4">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={handleBack}
+          className="flex items-center gap-2"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </Button>
+        <h1 className="text-2xl font-bold">Vehicle Diagnostics</h1>
+      </div>
+
       {/* Connection Status */}
-      <Card className="mb-6">
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Car className="h-5 w-5" />
-              Vehicle Connection Status
+              OBD2 Connection Status
             </div>
             {isConnected ? (
               <div className="flex items-center gap-2 text-green-600">
@@ -203,33 +179,31 @@ const VehicleSpecific = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">
-                Status: {connectionStatus}
+                Status: {isConnected ? 'Connected to OBD2 adapter' : 'No connection detected'}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 {isConnected 
                   ? 'All diagnostic functions are available'
-                  : 'Connect to access real-time diagnostics'
+                  : 'Connect OBD2 adapter to access diagnostics'
                 }
               </p>
             </div>
-            {!isConnected && (
-              <Button onClick={handleConnect} size="sm">
-                Connect OBD2
-              </Button>
-            )}
+            <Button onClick={handleConnect} variant={isConnected ? "outline" : "default"}>
+              {isConnected ? 'Disconnect' : 'Connect OBD2'}
+            </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Vehicle Info */}
-      <Card className="mb-6">
+      {/* Vehicle Information */}
+      <Card>
         <CardHeader>
           <CardTitle>Selected Vehicle</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-              <p className="text-xs text-muted-foreground">Make</p>
+              <p className="text-xs text-muted-foreground">Manufacturer</p>
               <p className="font-semibold">{vehicleInfo.manufacturer}</p>
             </div>
             <div>
@@ -237,23 +211,131 @@ const VehicleSpecific = () => {
               <p className="font-semibold">{vehicleInfo.model}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Year</p>
+              <p className="text-xs text-muted-foreground">Year Range</p>
               <p className="font-semibold">{vehicleInfo.year}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Engine</p>
               <p className="font-semibold">{vehicleInfo.engine}</p>
             </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Generation</p>
+              <p className="font-semibold">{vehicleInfo.generation}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Displacement</p>
+              <p className="font-semibold">{vehicleInfo.displacement}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Power</p>
+              <p className="font-semibold">{vehicleInfo.power}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Fuel Type</p>
+              <p className="font-semibold">{vehicleInfo.fuel}</p>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Working Diagnostics Component */}
-      <WorkingVehicleSpecificDiagnostics
-        vehicleInfo={vehicleInfo}
-        isConnected={isConnected}
-        onBack={handleBack}
-      />
+      {/* Diagnostic Functions */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Read Diagnostic Codes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Scan for diagnostic trouble codes (DTCs)
+            </p>
+            <Button className="w-full" disabled={!isConnected}>
+              Scan DTCs
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Live Data Stream</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Monitor real-time engine parameters
+            </p>
+            <Button className="w-full" disabled={!isConnected}>
+              Start Live Data
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Clear Codes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Clear diagnostic trouble codes
+            </p>
+            <Button className="w-full" variant="destructive" disabled={!isConnected}>
+              Clear DTCs
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Readiness Tests</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Check emissions readiness monitors
+            </p>
+            <Button className="w-full" disabled={!isConnected}>
+              Check Readiness
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Freeze Frame Data</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              View freeze frame diagnostic data
+            </p>
+            <Button className="w-full" disabled={!isConnected}>
+              Read Freeze Frame
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Vehicle Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Read VIN and vehicle identification
+            </p>
+            <Button className="w-full" disabled={!isConnected}>
+              Read VIN
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Information Panel */}
+      {!isConnected && (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            <strong>Connect your OBD2 adapter to access diagnostic functions.</strong>
+            <br />
+            Make sure your vehicle is running and the OBD2 adapter is properly connected to the diagnostic port.
+          </AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 };
