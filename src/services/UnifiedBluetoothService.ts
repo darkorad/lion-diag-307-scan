@@ -131,17 +131,42 @@ export class UnifiedBluetoothService {
         }
       }
 
-      const result: BluetoothScanResult = await BluetoothSerial.scan();
-      const devices: BluetoothDevice[] = result.devices.map(d => ({
-        id: d.id,
-        address: d.id,
-        name: d.name || 'Unknown Device',
-        isPaired: false, // This info is not available from the new plugin's scan
-        isConnected: false,
-        deviceType: (d.name?.toLowerCase().includes('obd') || d.name?.toLowerCase().includes('elm327')) ? 'ELM327' : 'Generic',
-        compatibility: (d.name?.toLowerCase().includes('obd') || d.name?.toLowerCase().includes('elm327')) ? 0.9 : 0.5,
-        rssi: d.rssi,
-      }));
+      const [paired, discovered] = await Promise.all([
+        BluetoothSerial.list(),
+        BluetoothSerial.scan(),
+      ]);
+
+      const allDevices = new Map<string, BluetoothDevice>();
+
+      paired.devices.forEach(d => {
+        allDevices.set(d.id, {
+            id: d.id,
+            address: d.id,
+            name: d.name || 'Unknown Device',
+            isPaired: true,
+            isConnected: false,
+            deviceType: (d.name?.toLowerCase().includes('obd') || d.name?.toLowerCase().includes('elm327')) ? 'ELM327' : 'Generic',
+            compatibility: (d.name?.toLowerCase().includes('obd') || d.name?.toLowerCase().includes('elm327')) ? 0.9 : 0.5,
+            rssi: d.rssi,
+        });
+      });
+
+      discovered.devices.forEach(d => {
+        if (!allDevices.has(d.id)) {
+            allDevices.set(d.id, {
+                id: d.id,
+                address: d.id,
+                name: d.name || 'Unknown Device',
+                isPaired: false,
+                isConnected: false,
+                deviceType: (d.name?.toLowerCase().includes('obd') || d.name?.toLowerCase().includes('elm327')) ? 'ELM327' : 'Generic',
+                compatibility: (d.name?.toLowerCase().includes('obd') || d.name?.toLowerCase().includes('elm327')) ? 0.9 : 0.5,
+                rssi: d.rssi,
+            });
+        }
+      });
+
+      const devices = Array.from(allDevices.values());
       console.log(`Found ${devices.length} devices`);
       return devices;
     } catch (error) {
