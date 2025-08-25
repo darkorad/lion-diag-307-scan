@@ -22,13 +22,41 @@ const BluetoothDebugInfo: React.FC = () => {
     setIsLoading(true);
     
     try {
+      const platform = Capacitor.getPlatform();
+      const isNative = Capacitor.isNativePlatform();
+      
+      console.log('🐛 Collecting debug info...');
+      console.log('📱 Platform:', platform);
+      console.log('🏠 Native:', isNative);
+      
+      // Check for custom plugin availability
+      const customPluginAvailable = !!(window as any).CustomBluetoothSerial;
+      console.log('🔌 CustomBluetoothSerial available:', customPluginAvailable);
+      
+      // Initialize the service to get accurate status
+      let serviceInitialized = false;
+      let bluetoothEnabled = false;
+      
+      try {
+        serviceInitialized = await unifiedBluetoothService.initialize();
+        console.log('🔧 Service initialized:', serviceInitialized);
+        
+        if (serviceInitialized) {
+          bluetoothEnabled = await unifiedBluetoothService.isBluetoothEnabled();
+          console.log('🔵 Bluetooth enabled:', bluetoothEnabled);
+        }
+      } catch (error) {
+        console.error('❌ Service initialization error:', error);
+      }
+      
       const info = {
-        platform: Capacitor.getPlatform(),
-        isNative: Capacitor.isNativePlatform(),
+        platform,
+        isNative,
         webBluetoothSupported: 'bluetooth' in navigator,
-        customPluginAvailable: !!(window as any).CustomBluetoothSerial,
-        bluetoothEnabled: await unifiedBluetoothService.isBluetoothEnabled(),
-        serviceInitialized: await unifiedBluetoothService.initialize(),
+        customPluginAvailable,
+        bluetoothEnabled,
+        serviceInitialized,
+        currentService: unifiedBluetoothService.getCurrentService(),
         timestamp: new Date().toISOString()
       };
       
@@ -44,16 +72,50 @@ const BluetoothDebugInfo: React.FC = () => {
   };
 
   useEffect(() => {
-    collectDebugInfo();
+    // Delay initial collection to ensure plugins are loaded
+    setTimeout(() => {
+      collectDebugInfo();
+    }, 1000);
   }, []);
 
   const testBluetoothScan = async () => {
     try {
       console.log('🧪 Testing Bluetooth scan...');
-      const devices = await unifiedBluetoothService.scanForDevices();
+      
+      // First ensure service is initialized
+      const initialized = await unifiedBluetoothService.initialize();
+      if (!initialized) {
+        console.error('🧪 Service initialization failed');
+        return;
+      }
+      
+      // Check if Bluetooth is enabled
+      const enabled = await unifiedBluetoothService.isBluetoothEnabled();
+      if (!enabled) {
+        console.log('🧪 Bluetooth not enabled, attempting to enable...');
+        const enableResult = await unifiedBluetoothService.enableBluetooth();
+        console.log('🧪 Enable result:', enableResult);
+      }
+      
+      // Attempt scan
+      const devices = await unifiedBluetoothService.scanForDevices(5000);
       console.log('🧪 Test scan result:', devices);
+      
+      // Refresh debug info
+      await collectDebugInfo();
+      
     } catch (error) {
       console.error('🧪 Test scan failed:', error);
+    }
+  };
+
+  const getStatusIcon = (status: boolean | undefined) => {
+    if (status === true) {
+      return <CheckCircle className="h-4 w-4 text-green-500" />;
+    } else if (status === false) {
+      return <XCircle className="h-4 w-4 text-red-500" />;
+    } else {
+      return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
     }
   };
 
@@ -76,11 +138,13 @@ const BluetoothDebugInfo: React.FC = () => {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm">Native:</span>
-                {debugInfo.isNative ? (
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                ) : (
-                  <XCircle className="h-4 w-4 text-red-500" />
-                )}
+                {getStatusIcon(debugInfo.isNative)}
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Current Service:</span>
+                <Badge variant="outline" className="text-xs">
+                  {debugInfo.currentService || 'None'}
+                </Badge>
               </div>
             </div>
           </div>
@@ -90,27 +154,19 @@ const BluetoothDebugInfo: React.FC = () => {
             <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-sm">Web Bluetooth:</span>
-                {debugInfo.webBluetoothSupported ? (
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                ) : (
-                  <XCircle className="h-4 w-4 text-red-500" />
-                )}
+                {getStatusIcon(debugInfo.webBluetoothSupported)}
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm">Custom Plugin:</span>
-                {debugInfo.customPluginAvailable ? (
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                ) : (
-                  <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                )}
+                {getStatusIcon(debugInfo.customPluginAvailable)}
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm">BT Enabled:</span>
-                {debugInfo.bluetoothEnabled ? (
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                ) : (
-                  <XCircle className="h-4 w-4 text-red-500" />
-                )}
+                {getStatusIcon(debugInfo.bluetoothEnabled)}
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Service Init:</span>
+                {getStatusIcon(debugInfo.serviceInitialized)}
               </div>
             </div>
           </div>
@@ -140,6 +196,24 @@ const BluetoothDebugInfo: React.FC = () => {
         {debugInfo.error && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-md">
             <p className="text-sm text-red-800">Error: {debugInfo.error}</p>
+          </div>
+        )}
+
+        {/* Troubleshooting hints */}
+        {debugInfo.platform === 'android' && debugInfo.isNative && (
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+            <p className="text-sm text-blue-800 font-medium mb-2">Android Native Platform Detected</p>
+            <div className="text-xs text-blue-700 space-y-1">
+              {!debugInfo.customPluginAvailable && (
+                <p>• Custom Bluetooth plugin not found - check if MainActivity registers the plugin</p>
+              )}
+              {!debugInfo.bluetoothEnabled && (
+                <p>• Bluetooth is disabled - app will attempt to enable it when scanning</p>
+              )}
+              {!debugInfo.serviceInitialized && (
+                <p>• Service initialization failed - check Android permissions</p>
+              )}
+            </div>
           </div>
         )}
 
