@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -149,17 +148,17 @@ const ProfessionalConnectionPanel: React.FC<ProfessionalConnectionPanelProps> = 
         description: `Using ${selectedProtocol} protocol`
       });
 
-      const connected = await unifiedBluetoothService.connectToDevice(device.address);
+      const result = await unifiedBluetoothService.connectToDevice(device);
       
-      if (connected) {
-        onDeviceConnected(device);
-        saveConnectionHistory(device);
+      if (result.success && result.device) {
+        onDeviceConnected(result.device);
+        saveConnectionHistory(result.device);
         
         toast.success(`Connected to ${device.name}`, {
           description: 'Professional connection established'
         });
       } else {
-        throw new Error('Connection failed');
+        throw new Error(result.error || 'Connection failed');
       }
 
     } catch (error) {
@@ -183,22 +182,25 @@ const ProfessionalConnectionPanel: React.FC<ProfessionalConnectionPanelProps> = 
     try {
       toast.info(`Quick connecting to ${lastDevice.deviceName}...`);
       
-      const connected = await unifiedBluetoothService.connectToDevice(lastDevice.deviceAddress);
+      const device: BluetoothDevice = {
+        id: lastDevice.deviceAddress,
+        name: lastDevice.deviceName,
+        address: lastDevice.deviceAddress,
+        isPaired: true,
+        isConnected: false,
+        deviceType: 'ELM327',
+        compatibility: 0.8
+      };
       
-      if (connected) {
-        const device: BluetoothDevice = {
-          id: lastDevice.deviceAddress,
-          name: lastDevice.deviceName,
-          address: lastDevice.deviceAddress,
-          isPaired: true
-        };
-        
-        onDeviceConnected(device);
-        saveConnectionHistory(device);
+      const result = await unifiedBluetoothService.connectToDevice(device);
+      
+      if (result.success && result.device) {
+        onDeviceConnected(result.device);
+        saveConnectionHistory(result.device);
         
         toast.success(`Quick connected to ${lastDevice.deviceName}`);
       } else {
-        throw new Error('Quick connection failed');
+        throw new Error(result.error || 'Quick connection failed');
       }
 
     } catch (error) {
