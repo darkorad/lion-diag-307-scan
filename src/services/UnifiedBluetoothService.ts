@@ -1,7 +1,7 @@
-
 import { BluetoothDevice, ConnectionResult, ConnectionStatus } from './bluetooth/types';
 import { Device } from '@capacitor/device';
 import { Capacitor } from '@capacitor/core';
+import { androidBluetoothPermissionService } from './AndroidBluetoothPermissionService';
 
 export class UnifiedBluetoothService {
   private static instance: UnifiedBluetoothService;
@@ -23,70 +23,106 @@ export class UnifiedBluetoothService {
     }
 
     try {
-      console.log('Initializing UnifiedBluetoothService...');
+      console.log('🔧 Initializing UnifiedBluetoothService...');
       
       const platform = Capacitor.getPlatform();
-      console.log('Platform:', platform);
+      console.log('📱 Platform:', platform);
       
       if (platform === 'web') {
-        console.log('Running on web - Bluetooth functionality limited');
+        console.log('🌐 Running on web - Bluetooth functionality limited');
         this.isInitialized = true;
         return true;
       }
 
+      // For Android, check and request Bluetooth permissions
+      if (platform === 'android') {
+        console.log('🤖 Android detected - checking Bluetooth permissions...');
+        
+        const status = await androidBluetoothPermissionService.checkBluetoothStatus();
+        console.log('📊 Bluetooth status:', status);
+        
+        if (!status.enabled) {
+          console.log('🔵 Bluetooth not enabled - requesting permissions...');
+          const granted = await androidBluetoothPermissionService.requestBluetoothPermissions();
+          
+          if (!granted) {
+            console.error('❌ Bluetooth permissions not granted');
+            await androidBluetoothPermissionService.showBluetoothInstructions();
+            return false;
+          }
+        }
+      }
+
       // Check if device supports Bluetooth
       const deviceInfo = await Device.getInfo();
-      console.log('Device info:', deviceInfo);
+      console.log('📱 Device info:', deviceInfo);
       
       this.isInitialized = true;
-      console.log('UnifiedBluetoothService initialized successfully');
+      console.log('✅ UnifiedBluetoothService initialized successfully');
       return true;
       
     } catch (error) {
-      console.error('Failed to initialize UnifiedBluetoothService:', error);
+      console.error('❌ Failed to initialize UnifiedBluetoothService:', error);
       return false;
     }
   }
 
   async isBluetoothEnabled(): Promise<boolean> {
     try {
-      console.log('Checking if Bluetooth is enabled...');
+      console.log('🔍 Checking if Bluetooth is enabled...');
       
       const platform = Capacitor.getPlatform();
       
       if (platform === 'web') {
-        console.log('Web platform - checking navigator.bluetooth');
+        console.log('🌐 Web platform - checking navigator.bluetooth');
         return 'bluetooth' in navigator;
       }
 
-      // For mobile platforms, assume Bluetooth is available
-      // In a real app, you would use a Bluetooth plugin to check this
-      console.log('Mobile platform - assuming Bluetooth is available');
+      if (platform === 'android') {
+        console.log('🤖 Android platform - checking Bluetooth status');
+        const status = await androidBluetoothPermissionService.checkBluetoothStatus();
+        return status.enabled;
+      }
+
+      // For other mobile platforms, assume Bluetooth is available
+      console.log('📱 Mobile platform - assuming Bluetooth is available');
       return true;
       
     } catch (error) {
-      console.error('Error checking Bluetooth status:', error);
+      console.error('❌ Error checking Bluetooth status:', error);
       return false;
     }
   }
 
   async enableBluetooth(): Promise<boolean> {
     try {
-      console.log('Attempting to enable Bluetooth...');
+      console.log('🔵 Attempting to enable Bluetooth...');
       
       const platform = Capacitor.getPlatform();
       
       if (platform === 'web') {
-        console.log('Cannot enable Bluetooth on web platform');
+        console.log('🌐 Cannot enable Bluetooth on web platform');
         return false;
       }
 
-      // For mobile platforms, this would typically show a system dialog
-      console.log('Bluetooth enable request sent (simulated)');
+      if (platform === 'android') {
+        console.log('🤖 Requesting Bluetooth enable on Android...');
+        const granted = await androidBluetoothPermissionService.requestBluetoothPermissions();
+        
+        if (!granted) {
+          console.log('⚠️ Showing Bluetooth setup instructions...');
+          await androidBluetoothPermissionService.showBluetoothInstructions();
+        }
+        
+        return granted;
+      }
+
+      // For other platforms, return true (assume it works)
+      console.log('📱 Bluetooth enable request sent (simulated)');
       return true;
       
     } catch (error) {
-      console.error('Error enabling Bluetooth:', error);
+      console.error('❌ Error enabling Bluetooth:', error);
       return false;
     }
   }
