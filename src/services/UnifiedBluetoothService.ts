@@ -1,6 +1,7 @@
 import { BluetoothDevice, ConnectionResult, ConnectionStatus } from './bluetooth/types';
 import { Device } from '@capacitor/device';
 import { Capacitor } from '@capacitor/core';
+import { realBluetoothService } from './RealBluetoothService';
 import { androidBluetoothPermissionService } from './AndroidBluetoothPermissionService';
 
 export class UnifiedBluetoothService {
@@ -28,10 +29,13 @@ export class UnifiedBluetoothService {
       const platform = Capacitor.getPlatform();
       console.log('📱 Platform:', platform);
       
+      // Initialize the real Bluetooth service
+      const realServiceInitialized = await realBluetoothService.initialize();
+      
       if (platform === 'web') {
-        console.log('🌐 Running on web - Bluetooth functionality limited');
-        this.isInitialized = true;
-        return true;
+        console.log('🌐 Running on web - using real service with limitations');
+        this.isInitialized = realServiceInitialized;
+        return this.isInitialized;
       }
 
       // For Android, check and request Bluetooth permissions
@@ -57,9 +61,9 @@ export class UnifiedBluetoothService {
       const deviceInfo = await Device.getInfo();
       console.log('📱 Device info:', deviceInfo);
       
-      this.isInitialized = true;
+      this.isInitialized = realServiceInitialized;
       console.log('✅ UnifiedBluetoothService initialized successfully');
-      return true;
+      return this.isInitialized;
       
     } catch (error) {
       console.error('❌ Failed to initialize UnifiedBluetoothService:', error);
@@ -70,24 +74,7 @@ export class UnifiedBluetoothService {
   async isBluetoothEnabled(): Promise<boolean> {
     try {
       console.log('🔍 Checking if Bluetooth is enabled...');
-      
-      const platform = Capacitor.getPlatform();
-      
-      if (platform === 'web') {
-        console.log('🌐 Web platform - checking navigator.bluetooth');
-        return 'bluetooth' in navigator;
-      }
-
-      if (platform === 'android') {
-        console.log('🤖 Android platform - checking Bluetooth status');
-        const status = await androidBluetoothPermissionService.checkBluetoothStatus();
-        return status.enabled;
-      }
-
-      // For other mobile platforms, assume Bluetooth is available
-      console.log('📱 Mobile platform - assuming Bluetooth is available');
-      return true;
-      
+      return await realBluetoothService.isBluetoothEnabled();
     } catch (error) {
       console.error('❌ Error checking Bluetooth status:', error);
       return false;
@@ -97,30 +84,7 @@ export class UnifiedBluetoothService {
   async enableBluetooth(): Promise<boolean> {
     try {
       console.log('🔵 Attempting to enable Bluetooth...');
-      
-      const platform = Capacitor.getPlatform();
-      
-      if (platform === 'web') {
-        console.log('🌐 Cannot enable Bluetooth on web platform');
-        return false;
-      }
-
-      if (platform === 'android') {
-        console.log('🤖 Requesting Bluetooth enable on Android...');
-        const granted = await androidBluetoothPermissionService.requestBluetoothPermissions();
-        
-        if (!granted) {
-          console.log('⚠️ Showing Bluetooth setup instructions...');
-          await androidBluetoothPermissionService.showBluetoothInstructions();
-        }
-        
-        return granted;
-      }
-
-      // For other platforms, return true (assume it works)
-      console.log('📱 Bluetooth enable request sent (simulated)');
-      return true;
-      
+      return await realBluetoothService.enableBluetooth();
     } catch (error) {
       console.error('❌ Error enabling Bluetooth:', error);
       return false;
@@ -133,176 +97,13 @@ export class UnifiedBluetoothService {
       
       await this.initialize();
       
-      const platform = Capacitor.getPlatform();
-      console.log('Scanning on platform:', platform);
-      
-      if (platform === 'web') {
-        return this.scanForDevicesWeb();
-      } else {
-        return this.scanForDevicesMobile();
-      }
+      console.log('Using real Bluetooth service for device scan');
+      return await realBluetoothService.scanForDevices();
       
     } catch (error) {
       console.error('❌ Bluetooth scan failed:', error);
       throw new Error(`Bluetooth scan failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-  }
-
-  private async scanForDevicesWeb(): Promise<BluetoothDevice[]> {
-    console.log('🌐 Scanning for devices on web...');
-    
-    try {
-      if (!('bluetooth' in navigator)) {
-        throw new Error('Web Bluetooth is not supported in this browser');
-      }
-
-      // Request device with OBD2-related services
-      const device = await (navigator.bluetooth as any).requestDevice({
-        acceptAllDevices: true,
-        optionalServices: [
-          '00001101-0000-1000-8000-00805f9b34fb', // Serial Port Profile
-          '0000110a-0000-1000-8000-00805f9b34fb', // Audio Source
-          '0000110b-0000-1000-8000-00805f9b34fb'  // Audio Sink
-        ]
-      });
-
-      const bluetoothDevice: BluetoothDevice = {
-        id: device.id,
-        name: device.name || 'Unknown Device',
-        address: device.id,
-        isPaired: false,
-        isConnected: false,
-        deviceType: 'OBD2' as const,
-        compatibility: 0.8
-      };
-
-      console.log('✅ Web Bluetooth device found:', bluetoothDevice);
-      return [bluetoothDevice];
-      
-    } catch (error) {
-      console.error('❌ Web Bluetooth scan failed:', error);
-      
-      // Return mock devices for testing
-      const mockDevices: BluetoothDevice[] = [
-        {
-          id: 'mock-elm327-1',
-          name: 'ELM327 Bluetooth',
-          address: '00:0D:18:00:00:01',
-          isPaired: false,
-          isConnected: false,
-          deviceType: 'ELM327' as const,
-          compatibility: 0.9,
-          rssi: -45
-        },
-        {
-          id: 'mock-vgate-1',
-          name: 'Vgate iCar Pro',
-          address: '98:D3:31:00:00:02',
-          isPaired: true,
-          isConnected: false,
-          deviceType: 'OBD2' as const,
-          compatibility: 0.95,
-          rssi: -52
-        }
-      ];
-      
-      console.log('📱 Returning mock devices for testing:', mockDevices);
-      return mockDevices;
-    }
-  }
-
-  private async scanForDevicesMobile(): Promise<BluetoothDevice[]> {
-    console.log('📱 Scanning for devices on mobile...');
-    
-    try {
-      // Try to use custom Bluetooth plugin
-      if ((window as any).CustomBluetoothSerial) {
-        console.log('Using CustomBluetoothSerial plugin...');
-        
-        const result = await (window as any).CustomBluetoothSerial.list();
-        console.log('CustomBluetoothSerial result:', result);
-        
-        if (result && result.devices) {
-          const devices: BluetoothDevice[] = result.devices.map((device: any) => ({
-            id: device.id || device.address,
-            name: device.name || 'Unknown Device',
-            address: device.address,
-            isPaired: true, // Devices from .list() are typically paired
-            isConnected: false,
-            deviceType: this.identifyDeviceType(device.name),
-            compatibility: this.calculateCompatibility(device.name),
-            rssi: device.rssi
-          }));
-          
-          console.log('✅ Found devices via CustomBluetoothSerial:', devices);
-          return devices;
-        }
-      }
-      
-      // Fallback to mock devices for testing
-      console.log('⚠️ CustomBluetoothSerial not available, using mock data');
-      return this.getMockDevices();
-      
-    } catch (error) {
-      console.error('❌ Mobile Bluetooth scan error:', error);
-      console.log('📱 Falling back to mock devices');
-      return this.getMockDevices();
-    }
-  }
-
-  private getMockDevices(): BluetoothDevice[] {
-    const mockDevices: BluetoothDevice[] = [
-      {
-        id: 'test-elm327',
-        name: 'ELM327 OBDII',
-        address: '00:0D:18:12:34:56',
-        isPaired: false,
-        isConnected: false,
-        deviceType: 'ELM327' as const,
-        compatibility: 0.95,
-        rssi: -42
-      },
-      {
-        id: 'test-vgate',
-        name: 'Vgate iCar Pro BT3.0',
-        address: '98:D3:31:AB:CD:EF',
-        isPaired: true,
-        isConnected: false,
-        deviceType: 'OBD2' as const,
-        compatibility: 0.9,
-        rssi: -38
-      },
-      {
-        id: 'test-generic',
-        name: 'OBDII Bluetooth',
-        address: 'AC:83:F3:11:22:33',
-        isPaired: false,
-        isConnected: false,
-        deviceType: 'OBD2' as const,
-        compatibility: 0.7,
-        rssi: -55
-      }
-    ];
-    
-    console.log('📋 Returning mock devices for testing:', mockDevices);
-    return mockDevices;
-  }
-
-  private identifyDeviceType(name: string): 'ELM327' | 'OBD2' | 'Generic' {
-    const lowerName = name.toLowerCase();
-    
-    if (lowerName.includes('elm327')) return 'ELM327';
-    if (lowerName.includes('obd') || lowerName.includes('vgate') || lowerName.includes('konnwei')) return 'OBD2';
-    return 'Generic';
-  }
-
-  private calculateCompatibility(name: string): number {
-    const lowerName = name.toLowerCase();
-    
-    if (lowerName.includes('elm327')) return 0.95;
-    if (lowerName.includes('vgate')) return 0.9;
-    if (lowerName.includes('obd')) return 0.8;
-    return 0.5;
   }
 
   async discoverAllOBD2Devices(): Promise<BluetoothDevice[]> {
@@ -314,18 +115,14 @@ export class UnifiedBluetoothService {
     try {
       console.log(`🔗 Attempting to connect to ${device.name}...`);
       
-      // Simulate connection process
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const result = await realBluetoothService.connectToDevice(device);
       
-      this.connectedDevice = { ...device, isConnected: true };
+      if (result.success && result.device) {
+        this.connectedDevice = result.device;
+        console.log(`✅ Successfully connected to ${device.name}`);
+      }
       
-      console.log(`✅ Successfully connected to ${device.name}`);
-      
-      return {
-        success: true,
-        device: this.connectedDevice,
-        error: undefined
-      };
+      return result;
       
     } catch (error) {
       console.error(`❌ Connection to ${device.name} failed:`, error);
@@ -345,11 +142,11 @@ export class UnifiedBluetoothService {
 
   async disconnect(): Promise<boolean> {
     try {
-      if (this.connectedDevice) {
-        console.log(`🔌 Disconnecting from ${this.connectedDevice.name}...`);
+      const result = await realBluetoothService.disconnect();
+      if (result) {
         this.connectedDevice = null;
       }
-      return true;
+      return result;
     } catch (error) {
       console.error('❌ Disconnect failed:', error);
       return false;
@@ -363,10 +160,7 @@ export class UnifiedBluetoothService {
     
     console.log(`📤 Sending command: ${command}`);
     
-    // Simulate command response
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const response = `OK>${command}`;
+    const response = await realBluetoothService.sendCommand(command);
     console.log(`📥 Command response: ${response}`);
     
     return response;
