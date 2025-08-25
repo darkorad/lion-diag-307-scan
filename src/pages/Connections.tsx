@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,13 +5,15 @@ import { Badge } from '@/components/ui/badge';
 import { unifiedBluetoothService } from '@/services/UnifiedBluetoothService';
 import { BluetoothDevice } from '@/services/bluetooth/types';
 import { toast } from 'sonner';
-import { Bluetooth, Search, CheckCircle, AlertCircle, Zap } from 'lucide-react';
+import { Bluetooth, Search, CheckCircle, AlertCircle, Zap, Bug } from 'lucide-react';
+import BluetoothDebugInfo from '@/components/debug/BluetoothDebugInfo';
 
 const Connections = () => {
   const [devices, setDevices] = useState<BluetoothDevice[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [connectedDevice, setConnectedDevice] = useState<BluetoothDevice | null>(null);
   const [connectingToDevice, setConnectingToDevice] = useState<string | null>(null);
+  const [showDebug, setShowDebug] = useState(false);
 
   const handleScan = async () => {
     setIsScanning(true);
@@ -22,7 +23,7 @@ const Connections = () => {
     });
 
     try {
-      console.log('Starting real Bluetooth device scan...');
+      console.log('🔍 Starting comprehensive Bluetooth device scan...');
       
       // Initialize Bluetooth service
       const initialized = await unifiedBluetoothService.initialize();
@@ -32,6 +33,8 @@ const Connections = () => {
 
       // Check if Bluetooth is enabled
       const isEnabled = await unifiedBluetoothService.isBluetoothEnabled();
+      console.log('📡 Bluetooth enabled:', isEnabled);
+      
       if (!isEnabled) {
         toast.info('Enabling Bluetooth...');
         const enabled = await unifiedBluetoothService.enableBluetooth();
@@ -40,10 +43,11 @@ const Connections = () => {
         }
       }
 
-      // Scan for devices
+      // Scan for devices with enhanced logging
+      console.log('🔎 Scanning for devices...');
       const foundDevices = await unifiedBluetoothService.scanForDevices();
       
-      console.log(`Real scan completed. Found ${foundDevices.length} devices:`, foundDevices);
+      console.log(`✅ Scan completed. Found ${foundDevices.length} devices:`, foundDevices);
       
       setDevices(foundDevices);
       
@@ -58,7 +62,7 @@ const Connections = () => {
       }
 
     } catch (error) {
-      console.error('Bluetooth scan failed:', error);
+      console.error('❌ Bluetooth scan failed:', error);
       toast.error('Scan failed', {
         description: error instanceof Error ? error.message : 'Could not scan for Bluetooth devices'
       });
@@ -152,7 +156,24 @@ const Connections = () => {
 
   return (
     <div className="p-4 max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6 text-center">Bluetooth Connections</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold text-center">Bluetooth Connections</h1>
+        <Button
+          onClick={() => setShowDebug(!showDebug)}
+          variant="outline"
+          size="sm"
+        >
+          <Bug className="h-4 w-4 mr-2" />
+          Debug
+        </Button>
+      </div>
+
+      {/* Debug Info Panel */}
+      {showDebug && (
+        <div className="mb-6">
+          <BluetoothDebugInfo />
+        </div>
+      )}
 
       {/* Current Connection Status */}
       {connectedDevice && (
@@ -317,6 +338,7 @@ const Connections = () => {
               <p>💡 Make sure your OBD2 adapter is powered on and in pairing mode</p>
               <p>🚗 Connect the adapter to your vehicle's OBD2 port</p>
               <p>📱 Enable Bluetooth on your device</p>
+              <p>🐛 Click "Debug" to see detailed information</p>
             </div>
           </CardContent>
         </Card>
