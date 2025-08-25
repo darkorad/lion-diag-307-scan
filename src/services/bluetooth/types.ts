@@ -1,3 +1,4 @@
+
 export interface BluetoothDevice {
   id: string;
   address: string;
@@ -20,9 +21,10 @@ export interface ConnectionResult {
 
 export interface ConnectionStatus {
   isConnected: boolean;
-  device?: BluetoothDevice;
+  device?: BluetoothDevice | null;
   lastConnected?: Date;
   quality?: string;
+  strategy?: string | null;
 }
 
 export interface ConnectionHistory {

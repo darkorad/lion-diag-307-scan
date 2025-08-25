@@ -1,8 +1,9 @@
-
 import { Capacitor } from '@capacitor/core';
 import { webBluetoothService } from './WebBluetoothService';
 import { androidNativeBluetoothService } from './AndroidNativeBluetoothService';
 import { BluetoothDevice, ConnectionResult, ConnectionStatus } from './bluetooth/types';
+
+export { BluetoothDevice } from './bluetooth/types';
 
 export class UnifiedBluetoothService {
   private static instance: UnifiedBluetoothService;
@@ -14,6 +15,7 @@ export class UnifiedBluetoothService {
     lastConnected: null
   };
   private isInitialized = false;
+  private connectionAttempts = new Map<string, number>();
 
   static getInstance(): UnifiedBluetoothService {
     if (!UnifiedBluetoothService.instance) {
@@ -256,6 +258,79 @@ export class UnifiedBluetoothService {
       return 'Web Bluetooth';
     }
     return 'None';
+  }
+
+  async discoverAllOBD2Devices(): Promise<BluetoothDevice[]> {
+    try {
+      console.log('🔍 Starting comprehensive OBD2 device discovery...');
+      
+      if (!this.isInitialized) {
+        await this.initialize();
+      }
+      
+      if (!this.currentService) {
+        console.log('❌ No Bluetooth service available for OBD2 discovery');
+        return [];
+      }
+      
+      const devices = await this.scanForDevices();
+      
+      // Filter for OBD2 compatible devices
+      const obd2Devices = devices.filter(device => 
+        device.deviceType === 'ELM327' || 
+        device.deviceType === 'OBD2' || 
+        device.compatibility > 0.5
+      );
+      
+      console.log(`📱 Found ${obd2Devices.length} OBD2 compatible devices`);
+      return obd2Devices;
+      
+    } catch (error) {
+      console.error('❌ OBD2 device discovery failed:', error);
+      return [];
+    }
+  }
+
+  async smartConnect(device: BluetoothDevice): Promise<ConnectionResult> {
+    try {
+      console.log(`🧠 Smart connecting to ${device.name}...`);
+      
+      // Track connection attempts
+      const attempts = this.connectionAttempts.get(device.address) || 0;
+      this.connectionAttempts.set(device.address, attempts + 1);
+      
+      if (attempts > 3) {
+        return {
+          success: false,
+          error: 'Too many failed connection attempts'
+        };
+      }
+      
+      const result = await this.connectToDevice(device);
+      
+      if (result.success) {
+        // Reset attempts on successful connection
+        this.connectionAttempts.set(device.address, 0);
+      }
+      
+      return result;
+      
+    } catch (error) {
+      console.error('❌ Smart connection failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Smart connection failed'
+      };
+    }
+  }
+
+  resetConnectionAttempts(deviceAddress: string): void {
+    this.connectionAttempts.set(deviceAddress, 0);
+    console.log(`🔄 Reset connection attempts for ${deviceAddress}`);
+  }
+
+  getConnectionAttempts(deviceAddress: string): number {
+    return this.connectionAttempts.get(deviceAddress) || 0;
   }
 }
 
