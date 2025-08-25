@@ -1,271 +1,415 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
-import { AlertCircle, CheckCircle, Wifi, WifiOff, Bluetooth, Search, Loader2 } from 'lucide-react';
-import { unifiedBluetoothService } from '@/services/UnifiedBluetoothService';
-import { bluetoothConnectionManager, ConnectionState, ConnectionHistory } from '@/services/BluetoothConnectionManager';
+import { 
+  Bluetooth, 
+  Wifi, 
+  Search, 
+  Settings,
+  CheckCircle, 
+  AlertCircle,
+  RefreshCw,
+  Zap
+} from 'lucide-react';
 import { BluetoothDevice } from '@/services/bluetooth/types';
+import { unifiedBluetoothService } from '@/services/UnifiedBluetoothService';
 import { toast } from 'sonner';
 
-interface ConnectionAttempt {
-  deviceId: string;
-  timestamp: number;
-  strategy: string;
-  success: boolean;
-  error?: string;
+interface ProfessionalConnectionPanelProps {
+  onDeviceConnected: (device: BluetoothDevice) => void;
+  isConnected: boolean;
+  currentDevice: BluetoothDevice | null;
 }
 
-const ProfessionalConnectionPanel: React.FC = () => {
+interface ConnectionHistory {
+  deviceName: string;
+  deviceAddress: string;
+  lastConnected: Date;
+  connectionCount: number;
+}
+
+const ProfessionalConnectionPanel: React.FC<ProfessionalConnectionPanelProps> = ({
+  onDeviceConnected,
+  isConnected,
+  currentDevice
+}) => {
   const [devices, setDevices] = useState<BluetoothDevice[]>([]);
   const [isScanning, setIsScanning] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [connectionState, setConnectionState] = useState<ConnectionState>({
-    isConnected: false,
-    device: null,
-    connectionTime: null,
-    lastSeen: null,
-    connectionQuality: null
-  });
+  const [scanProgress, setScanProgress] = useState(0);
   const [connectionHistory, setConnectionHistory] = useState<ConnectionHistory[]>([]);
-  const [connectionAttempts, setConnectionAttempts] = useState<ConnectionAttempt[]>([]);
+  const [selectedProtocol, setSelectedProtocol] = useState('AUTO');
+  const [advancedSettings, setAdvancedSettings] = useState({
+    timeout: 5000,
+    retries: 3,
+    baudRate: 38400
+  });
 
   useEffect(() => {
-    const unsubscribe = bluetoothConnectionManager.subscribe(setConnectionState);
     loadConnectionHistory();
-    return unsubscribe;
   }, []);
 
   const loadConnectionHistory = () => {
-    const history = bluetoothConnectionManager.getConnectionHistory();
-    setConnectionHistory(history);
-  };
-
-  const handleScanDevices = useCallback(async () => {
-    setIsScanning(true);
     try {
-      const foundDevices = await unifiedBluetoothService.scanForDevices();
-      setDevices(foundDevices);
-      toast.success(`Found ${foundDevices.length} devices`);
-    } catch (error) {
-      toast.error('Scan failed');
-      console.error('Scan error:', error);
-    } finally {
-      setIsScanning(false);
-    }
-  }, []);
-
-  const handleConnectDevice = async (device: BluetoothDevice) => {
-    setIsConnecting(true);
-    const attempt: ConnectionAttempt = {
-      deviceId: device.address,
-      timestamp: Date.now(),
-      strategy: 'direct',
-      success: false
-    };
-
-    try {
-      const result = await unifiedBluetoothService.connectToDevice(device);
-      if (result.success) {
-        bluetoothConnectionManager.setConnected(device);
-        attempt.success = true;
-        toast.success(`Connected to ${device.name}`);
-      } else {
-        attempt.error = result.error;
-        toast.error(`Connection failed: ${result.error}`);
+      const saved = localStorage.getItem('obd2_connection_history');
+      if (saved) {
+        const history = JSON.parse(saved);
+        setConnectionHistory(history);
       }
     } catch (error) {
-      attempt.error = error instanceof Error ? error.message : 'Unknown error';
-      toast.error('Connection failed');
-    } finally {
-      setConnectionAttempts(prev => [attempt, ...prev.slice(0, 9)]);
-      setIsConnecting(false);
+      console.error('Failed to load connection history:', error);
     }
   };
 
-  const handleDisconnect = async () => {
+  const saveConnectionHistory = (device: BluetoothDevice) => {
     try {
-      await unifiedBluetoothService.disconnect();
-      bluetoothConnectionManager.setDisconnected();
-      toast.info('Disconnected');
+      const existing = connectionHistory.find(h => h.deviceAddress === device.address);
+      let updatedHistory;
+      
+      if (existing) {
+        updatedHistory = connectionHistory.map(h => 
+          h.deviceAddress === device.address 
+            ? { ...h, lastConnected: new Date(), connectionCount: h.connectionCount + 1 }
+            : h
+        );
+      } else {
+        const newEntry: ConnectionHistory = {
+          deviceName: device.name,
+          deviceAddress: device.address,
+          lastConnected: new Date(),
+          connectionCount: 1
+        };
+        updatedHistory = [...connectionHistory, newEntry];
+      }
+      
+      setConnectionHistory(updatedHistory);
+      localStorage.setItem('obd2_connection_history', JSON.stringify(updatedHistory));
     } catch (error) {
-      toast.error('Disconnect failed');
+      console.error('Failed to save connection history:', error);
     }
   };
 
-  const getSignalStrength = (rssi?: number) => {
-    if (!rssi) return 50;
-    return Math.max(0, Math.min(100, (rssi + 100) * 2));
+  const handleAdvancedScan = async () => {
+    setIsScanning(true);
+    setScanProgress(0);
+    setDevices([]);
+
+    try {
+      console.log('Starting professional device scan...');
+      
+      // Progressive scan with detailed feedback
+      const progressInterval = setInterval(() => {
+        setScanProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 10;
+        });
+      }, 800);
+
+      const foundDevices = await unifiedBluetoothService.scanForDevices();
+      
+      clearInterval(progressInterval);
+      setScanProgress(100);
+      
+      console.log(`Professional scan found ${foundDevices.length} devices:`, foundDevices);
+      setDevices(foundDevices);
+      
+      if (foundDevices.length > 0) {
+        toast.success(`Found ${foundDevices.length} OBD2 device(s)`, {
+          description: 'Professional scan completed successfully'
+        });
+      } else {
+        toast.info('No OBD2 devices found', {
+          description: 'Try moving closer to your adapter or check pairing'
+        });
+      }
+
+    } catch (error) {
+      console.error('Professional scan failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error('Professional scan failed', {
+        description: errorMessage
+      });
+    } finally {
+      setIsScanning(false);
+      setTimeout(() => setScanProgress(0), 3000);
+    }
   };
 
-  const formatTimestamp = (timestamp: number) => {
-    return new Date(timestamp).toLocaleTimeString();
+  const handleProfessionalConnect = async (device: BluetoothDevice) => {
+    try {
+      console.log(`Professional connect to ${device.name} with protocol: ${selectedProtocol}`);
+      
+      toast.info(`Connecting to ${device.name}...`, {
+        description: `Using ${selectedProtocol} protocol`
+      });
+
+      const connected = await unifiedBluetoothService.connectToDevice(device.address);
+      
+      if (connected) {
+        onDeviceConnected(device);
+        saveConnectionHistory(device);
+        
+        toast.success(`Connected to ${device.name}`, {
+          description: 'Professional connection established'
+        });
+      } else {
+        throw new Error('Connection failed');
+      }
+
+    } catch (error) {
+      console.error('Professional connection failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Connection failed';
+      toast.error('Professional connection failed', {
+        description: errorMessage
+      });
+    }
+  };
+
+  const handleQuickConnect = async () => {
+    if (connectionHistory.length === 0) {
+      toast.info('No connection history available', {
+        description: 'Please scan and connect to a device first'
+      });
+      return;
+    }
+
+    const lastDevice = connectionHistory[0];
+    try {
+      toast.info(`Quick connecting to ${lastDevice.deviceName}...`);
+      
+      const connected = await unifiedBluetoothService.connectToDevice(lastDevice.deviceAddress);
+      
+      if (connected) {
+        const device: BluetoothDevice = {
+          id: lastDevice.deviceAddress,
+          name: lastDevice.deviceName,
+          address: lastDevice.deviceAddress,
+          isPaired: true
+        };
+        
+        onDeviceConnected(device);
+        saveConnectionHistory(device);
+        
+        toast.success(`Quick connected to ${lastDevice.deviceName}`);
+      } else {
+        throw new Error('Quick connection failed');
+      }
+
+    } catch (error) {
+      console.error('Quick connect failed:', error);
+      toast.error('Quick connect failed', {
+        description: 'Please try a manual connection'
+      });
+    }
+  };
+
+  const getDeviceTypeIcon = (device: BluetoothDevice) => {
+    if (device.name.toLowerCase().includes('elm') || device.name.toLowerCase().includes('obd')) {
+      return <Zap className="h-5 w-5 text-blue-500" />;
+    }
+    return <Bluetooth className="h-5 w-5 text-gray-500" />;
+  };
+
+  const getDeviceCompatibilityScore = (device: BluetoothDevice): number => {
+    let score = 0;
+    
+    // Name-based scoring
+    if (device.name.toLowerCase().includes('elm327')) score += 40;
+    if (device.name.toLowerCase().includes('obd')) score += 30;
+    if (device.name.toLowerCase().includes('obdii')) score += 30;
+    if (device.name.toLowerCase().includes('bluetooth')) score += 10;
+    
+    // Pairing status
+    if (device.isPaired) score += 20;
+    
+    return Math.min(score, 100);
   };
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Bluetooth className="h-5 w-5" />
-          Professional Connection Panel
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Tabs defaultValue="devices" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="devices">Devices</TabsTrigger>
-            <TabsTrigger value="connection">Connection</TabsTrigger>
-            <TabsTrigger value="history">History</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="devices" className="space-y-4">
-            <div className="flex gap-2">
-              <Button onClick={handleScanDevices} disabled={isScanning} className="flex-1">
-                {isScanning ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Scanning...
-                  </>
-                ) : (
-                  <>
-                    <Search className="mr-2 h-4 w-4" />
-                    Scan Devices
-                  </>
-                )}
-              </Button>
+    <div className="space-y-6">
+      {/* Current Connection Status */}
+      {isConnected && currentDevice && (
+        <Card className="border-green-200 bg-green-50">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <CheckCircle className="h-6 w-6 text-green-600" />
+                <div>
+                  <p className="font-semibold text-green-900">{currentDevice.name}</p>
+                  <p className="text-sm text-green-700">{currentDevice.address}</p>
+                </div>
+              </div>
+              <Badge className="bg-green-500 text-white">Connected</Badge>
             </div>
+          </CardContent>
+        </Card>
+      )}
 
+      {/* Professional Controls */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Settings className="h-5 w-5" />
+            <span>Professional Controls</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Button
+              onClick={handleAdvancedScan}
+              disabled={isScanning}
+              className="h-12"
+              variant="outline"
+            >
+              {isScanning ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Scanning...
+                </>
+              ) : (
+                <>
+                  <Search className="mr-2 h-4 w-4" />
+                  Advanced Scan
+                </>
+              )}
+            </Button>
+            
+            <Button
+              onClick={handleQuickConnect}
+              disabled={connectionHistory.length === 0 || isConnected}
+              className="h-12"
+              variant="default"
+            >
+              <Zap className="mr-2 h-4 w-4" />
+              Quick Connect
+            </Button>
+          </div>
+
+          {isScanning && (
             <div className="space-y-2">
-              {devices.map((device) => (
-                <Card key={device.address} className="p-3">
+              <Progress value={scanProgress} className="w-full" />
+              <p className="text-sm text-center text-muted-foreground">
+                Professional scan in progress... {scanProgress}%
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Protocol Selection */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Protocol Settings</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            {['AUTO', 'ISO9141', 'ISO14230', 'ISO15765'].map((protocol) => (
+              <Button
+                key={protocol}
+                onClick={() => setSelectedProtocol(protocol)}
+                variant={selectedProtocol === protocol ? "default" : "outline"}
+                size="sm"
+              >
+                {protocol}
+              </Button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Device Results */}
+      {devices.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Discovered Devices ({devices.length})</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {devices.map((device) => (
+              <Card key={device.id || device.address} className="border-2">
+                <CardContent className="p-4">
                   <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-medium text-sm">{device.name}</h3>
-                        <Badge variant={device.isPaired ? "default" : "secondary"}>
-                          {device.isPaired ? "Paired" : "Unpaired"}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">{device.address}</p>
-                      {device.rssi && (
-                        <div className="flex items-center gap-2 mt-1">
-                          <Progress value={getSignalStrength(device.rssi)} className="w-16 h-1" />
-                          <span className="text-xs text-muted-foreground">{device.rssi}dBm</span>
+                    <div className="flex items-center space-x-3">
+                      {getDeviceTypeIcon(device)}
+                      <div>
+                        <p className="font-semibold">{device.name}</p>
+                        <p className="text-sm text-muted-foreground">{device.address}</p>
+                        <div className="flex items-center space-x-2 mt-1">
+                          {device.isPaired && (
+                            <Badge variant="outline" className="text-xs">Paired</Badge>
+                          )}
+                          <Badge 
+                            variant="outline" 
+                            className={`text-xs ${
+                              getDeviceCompatibilityScore(device) > 70 ? 'border-green-300 text-green-700' : 
+                              getDeviceCompatibilityScore(device) > 40 ? 'border-yellow-300 text-yellow-700' : 
+                              'border-red-300 text-red-700'
+                            }`}
+                          >
+                            {getDeviceCompatibilityScore(device)}% Compatible
+                          </Badge>
                         </div>
-                      )}
+                      </div>
                     </div>
                     <Button
-                      onClick={() => handleConnectDevice(device)}
-                      disabled={isConnecting || connectionState.isConnected}
-                      size="sm"
+                      onClick={() => handleProfessionalConnect(device)}
+                      disabled={isConnected}
+                      className="bg-blue-600 hover:bg-blue-700"
                     >
-                      {isConnecting ? "Connecting..." : "Connect"}
+                      Connect
                     </Button>
                   </div>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
+                </CardContent>
+              </Card>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
-          <TabsContent value="connection" className="space-y-4">
-            <Card className="p-4">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  {connectionState.isConnected ? (
-                    <CheckCircle className="h-5 w-5 text-green-500" />
-                  ) : (
-                    <WifiOff className="h-5 w-5 text-gray-400" />
-                  )}
-                  <span className="font-medium">
-                    {connectionState.isConnected ? 'Connected' : 'Disconnected'}
-                  </span>
+      {/* Connection History */}
+      {connectionHistory.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Connection History</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {connectionHistory.slice(0, 3).map((entry, index) => (
+              <div key={index} className="flex items-center justify-between p-2 border rounded">
+                <div>
+                  <p className="font-medium">{entry.deviceName}</p>
+                  <p className="text-sm text-muted-foreground">{entry.deviceAddress}</p>
                 </div>
-                <Badge variant={connectionState.isConnected ? "default" : "secondary"}>
-                  {connectionState.connectionQuality || 'Unknown'}
-                </Badge>
-              </div>
-
-              {connectionState.device && (
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Device:</span>
-                    <span>{connectionState.device.name}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Address:</span>
-                    <span className="font-mono">{connectionState.device.address}</span>
-                  </div>
-                  {connectionState.connectionTime && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Connected at:</span>
-                      <span>{formatTimestamp(connectionState.connectionTime)}</span>
-                    </div>
-                  )}
+                <div className="text-right">
+                  <p className="text-sm">Connected {entry.connectionCount} times</p>
+                  <p className="text-xs text-muted-foreground">
+                    Last: {entry.lastConnected.toLocaleDateString()}
+                  </p>
                 </div>
-              )}
-
-              {connectionState.isConnected && (
-                <Button onClick={handleDisconnect} variant="destructive" className="w-full mt-4">
-                  Disconnect
-                </Button>
-              )}
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="history" className="space-y-4">
-            <div className="space-y-2">
-              <h3 className="font-medium">Recent Connections</h3>
-              {connectionHistory.length > 0 ? (
-                connectionHistory.slice(0, 10).map((entry, index) => (
-                  <Card key={index} className="p-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-sm">{entry.deviceName}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatTimestamp(entry.connectionTime)}
-                        </p>
-                      </div>
-                      <Badge variant={entry.success ? "default" : "destructive"}>
-                        {entry.success ? "Success" : "Failed"}
-                      </Badge>
-                    </div>
-                  </Card>
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground">No connection history</p>
-              )}
-            </div>
-
-            {connectionAttempts.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="font-medium">Recent Attempts</h3>
-                {connectionAttempts.map((attempt, index) => (
-                  <Card key={index} className="p-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-sm">{attempt.deviceId}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatTimestamp(attempt.timestamp)} - {attempt.strategy}
-                        </p>
-                      </div>
-                      <Badge variant={attempt.success ? "default" : "destructive"}>
-                        {attempt.success ? "Success" : "Failed"}
-                      </Badge>
-                    </div>
-                    {attempt.error && (
-                      <p className="text-xs text-red-500 mt-1">{attempt.error}</p>
-                    )}
-                  </Card>
-                ))}
               </div>
-            )}
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Professional Tips */}
+      <Alert>
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          <strong>Professional Tips:</strong>
+          <ul className="mt-2 text-sm space-y-1">
+            <li>• Advanced scan provides detailed device analysis</li>
+            <li>• Protocol selection optimizes connection reliability</li>
+            <li>• Quick connect uses your most recent successful device</li>
+            <li>• Connection history helps identify reliable adapters</li>
+          </ul>
+        </AlertDescription>
+      </Alert>
+    </div>
   );
 };
 
