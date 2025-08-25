@@ -3,17 +3,19 @@ package com.lovable.liondiag307scan;
 
 import android.os.Bundle;
 import android.util.Log;
-import android.widget.Toast;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+    private static final String TAG = "MainActivity";
+    
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Log.d("DEBUG", "MainActivity started");
-        Toast.makeText(this, "App started", Toast.LENGTH_SHORT).show();
+        Log.d(TAG, "LionDiag 307 Scan MainActivity started");
         
-        // Capacitor plugins are now registered automatically via @CapacitorPlugin annotation
-        // No need to manually register plugins in newer versions of Capacitor
+        // Register our custom Bluetooth plugin
+        registerPlugin(CustomBluetoothSerial.class);
+        
+        Log.d(TAG, "CustomBluetoothSerial plugin registered");
     }
 }
