@@ -1,6 +1,6 @@
 import { BluetoothDevice, ConnectionResult } from './bluetooth/types';
 import { Capacitor } from '@capacitor/core';
-import { androidNativeBluetoothService } from './AndroidNativeBluetoothService';
+import { enhancedAndroidBluetoothService } from './EnhancedAndroidBluetoothService';
 
 interface BluetoothSerialPlugin {
   isEnabled(): Promise<{ value: boolean }>;
@@ -47,10 +47,10 @@ export class RealBluetoothService {
       }
 
       if (platform === 'android') {
-        console.log('🤖 Android platform - initializing native Bluetooth service');
-        const androidInitialized = await androidNativeBluetoothService.initialize();
+        console.log('🤖 Android platform - initializing enhanced Bluetooth service');
+        const androidInitialized = await enhancedAndroidBluetoothService.initialize();
         if (androidInitialized) {
-          console.log('✅ Android native Bluetooth service initialized');
+          console.log('✅ Enhanced Android Bluetooth service initialized');
           this.isInitialized = true;
           return true;
         }
@@ -74,7 +74,7 @@ export class RealBluetoothService {
         console.log('✅ CustomBluetoothSerial plugin found');
       }
 
-      if (!this.bluetoothSerial && !androidNativeBluetoothService) {
+      if (!this.bluetoothSerial && !enhancedAndroidBluetoothService) {
         console.log('⚠️ No Bluetooth plugin found, using mock data');
       }
 
@@ -110,9 +110,9 @@ export class RealBluetoothService {
       }
 
       if (platform === 'android') {
-        // Use Android native service first
-        const enabled = await androidNativeBluetoothService.isBluetoothEnabled();
-        console.log('🤖 Android Bluetooth enabled:', enabled);
+        // Use Enhanced Android service first
+        const enabled = await enhancedAndroidBluetoothService.isBluetoothEnabled();
+        console.log('🤖 Enhanced Android Bluetooth enabled:', enabled);
         this.bluetoothEnabled = enabled;
         return enabled;
       }
@@ -155,8 +155,8 @@ export class RealBluetoothService {
       }
 
       if (platform === 'android') {
-        const enabled = await androidNativeBluetoothService.enableBluetooth();
-        console.log('🤖 Android Bluetooth enable result:', enabled);
+        const enabled = await enhancedAndroidBluetoothService.enableBluetooth();
+        console.log('🤖 Enhanced Android Bluetooth enable result:', enabled);
         this.bluetoothEnabled = enabled;
         return enabled;
       }
@@ -195,31 +195,15 @@ export class RealBluetoothService {
       }
 
       if (platform === 'android') {
-        console.log('🤖 Using Android native Bluetooth scanning...');
+        console.log('🤖 Using Enhanced Android Bluetooth scanning...');
         
-        // Get bonded devices first
-        const bondedDevices = await androidNativeBluetoothService.getBondedDevices();
-        console.log(`📱 Found ${bondedDevices.length} bonded devices`);
-
-        // Start discovery for new devices
-        const discoveryStarted = await androidNativeBluetoothService.startDiscovery();
-        console.log('📡 Discovery started:', discoveryStarted);
-
-        if (discoveryStarted) {
-          // Wait for discovery to complete (usually takes 12 seconds)
-          console.log('⏳ Waiting for device discovery to complete...');
-          await new Promise(resolve => setTimeout(resolve, 15000));
-          
-          // Stop discovery
-          await androidNativeBluetoothService.stopDiscovery();
-        }
-
-        // Get all devices (bonded + discovered)
-        const allDevices = await androidNativeBluetoothService.getAllDevices();
-        console.log(`✅ Total devices found: ${allDevices.length}`);
-        
-        if (allDevices.length > 0) {
-          return allDevices;
+        try {
+          const devices = await enhancedAndroidBluetoothService.scanForDevices();
+          console.log(`✅ Enhanced scan found ${devices.length} devices`);
+          return devices;
+        } catch (error) {
+          console.error('❌ Enhanced scan failed:', error);
+          // Continue to fallback methods
         }
       }
 
@@ -243,7 +227,7 @@ export class RealBluetoothService {
     }
   }
 
-  async getPairedDevices(): Promise<BluetoothDevice[]> {
+  private async getPairedDevices(): Promise<BluetoothDevice[]> {
     try {
       console.log('📱 Getting paired Bluetooth devices...');
 
@@ -392,15 +376,15 @@ export class RealBluetoothService {
       }
 
       if (platform === 'android') {
-        console.log('🤖 Using Android native connection...');
-        const result = await androidNativeBluetoothService.connectToDevice(device);
+        console.log('🤖 Using Enhanced Android connection...');
+        const result = await enhancedAndroidBluetoothService.connectToDevice(device);
         
         if (result.success) {
           this.connectedDevice = result.device || { ...device, isConnected: true };
-          console.log(`✅ Android native connection successful`);
+          console.log(`✅ Enhanced Android connection successful`);
           return result;
         } else {
-          console.log('⚠️ Android native connection failed, trying plugin fallback...');
+          console.log('⚠️ Enhanced Android connection failed, trying plugin fallback...');
         }
       }
 
@@ -448,7 +432,7 @@ export class RealBluetoothService {
       const platform = Capacitor.getPlatform();
       
       if (platform === 'android') {
-        const result = await androidNativeBluetoothService.disconnect();
+        const result = await enhancedAndroidBluetoothService.disconnect();
         if (result) {
           this.connectedDevice = null;
           return true;
@@ -482,9 +466,9 @@ export class RealBluetoothService {
 
     if (platform === 'android') {
       try {
-        return await androidNativeBluetoothService.sendCommand(command);
+        return await enhancedAndroidBluetoothService.sendCommand(command);
       } catch (error) {
-        console.log('⚠️ Android native command failed, trying plugin...');
+        console.log('⚠️ Enhanced Android command failed, trying plugin...');
       }
     }
 
