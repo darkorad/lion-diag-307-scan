@@ -1,4 +1,3 @@
-
 import { BluetoothDevice, ConnectionResult } from './bluetooth/types';
 import { Capacitor } from '@capacitor/core';
 
@@ -384,7 +383,7 @@ export class AndroidNativeBluetoothService {
     return this.connectedDevice;
   }
 
-  isDiscovering(): boolean {
+  getDiscoveringState(): boolean {
     return this.isDiscovering;
   }
 
