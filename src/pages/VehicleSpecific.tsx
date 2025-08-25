@@ -24,6 +24,8 @@ const VehicleSpecific = () => {
       setLoading(true);
       setError(null);
 
+      console.log('Loading vehicle info for:', { make, model, generation, engine });
+
       // If no vehicle parameters, show error
       if (!make || !model || !generation || !engine) {
         setError('Vehicle parameters are missing');
@@ -31,28 +33,36 @@ const VehicleSpecific = () => {
         return;
       }
 
-      const makeData = VEHICLE_DATABASE.find(m => m.id === make);
+      const makeData = VEHICLE_DATABASE.find(m => m.id === make.toLowerCase());
+      console.log('Make data found:', makeData);
+      
       if (!makeData) {
         setError(`Make ${make} not found in database`);
         setLoading(false);
         return;
       }
 
-      const modelData = makeData.models?.find(m => m.id === model);
+      const modelData = makeData.models?.find(m => m.id === model.toLowerCase());
+      console.log('Model data found:', modelData);
+      
       if (!modelData) {
         setError(`Model ${model} not found for make ${make}`);
         setLoading(false);
         return;
       }
 
-      const generationData = modelData.generations?.find(g => g.id === generation);
+      const generationData = modelData.generations?.find(g => g.id === generation.toLowerCase());
+      console.log('Generation data found:', generationData);
+      
       if (!generationData) {
         setError(`Generation ${generation} not found for model ${model}`);
         setLoading(false);
         return;
       }
 
-      const engineData = generationData.engines?.find(e => e.id === engine);
+      const engineData = generationData.engines?.find(e => e.id === engine.toLowerCase());
+      console.log('Engine data found:', engineData);
+      
       if (!engineData) {
         setError(`Engine ${engine} not found for generation ${generation}`);
         setLoading(false);
@@ -125,7 +135,7 @@ const VehicleSpecific = () => {
             className="flex items-center gap-2"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to Vehicle Selection
+            Back
           </Button>
         </div>
         <Alert variant="destructive">
@@ -134,6 +144,11 @@ const VehicleSpecific = () => {
             {error}
           </AlertDescription>
         </Alert>
+        <div className="mt-4">
+          <p className="text-sm text-muted-foreground">
+            Debug info: Make: {make}, Model: {model}, Generation: {generation}, Engine: {engine}
+          </p>
+        </div>
       </div>
     );
   }

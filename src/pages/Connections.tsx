@@ -14,60 +14,6 @@ const Connections = () => {
   const [connectedDevice, setConnectedDevice] = useState<BluetoothDevice | null>(null);
   const [connectingToDevice, setConnectingToDevice] = useState<string | null>(null);
 
-  // Mock Bluetooth devices for testing
-  const mockBluetoothDevices: BluetoothDevice[] = [
-    {
-      id: '00:1D:A5:68:98:8B',
-      address: '00:1D:A5:68:98:8B',
-      name: 'ELM327 v1.5',
-      isPaired: true,
-      isConnected: false,
-      deviceType: 'ELM327',
-      compatibility: 0.95,
-      rssi: -45
-    },
-    {
-      id: '00:1B:DC:0F:BB:1C',
-      address: '00:1B:DC:0F:BB:1C',
-      name: 'OBD2 Scanner Pro',
-      isPaired: false,
-      isConnected: false,
-      deviceType: 'OBD2',
-      compatibility: 0.88,
-      rssi: -38
-    },
-    {
-      id: '00:15:83:0C:BF:EB',
-      address: '00:15:83:0C:BF:EB',
-      name: 'OBDII Bluetooth v2.1',
-      isPaired: true,
-      isConnected: false,
-      deviceType: 'ELM327',
-      compatibility: 0.85,
-      rssi: -52
-    },
-    {
-      id: '98:D3:31:FC:2E:A1',
-      address: '98:D3:31:FC:2E:A1',
-      name: 'Vgate iCar Pro',
-      isPaired: false,
-      isConnected: false,
-      deviceType: 'ELM327',
-      compatibility: 0.92,
-      rssi: -41
-    },
-    {
-      id: 'AC:83:F3:12:45:67',
-      address: 'AC:83:F3:12:45:67',
-      name: 'Konnwei KW902',
-      isPaired: true,
-      isConnected: false,
-      deviceType: 'ELM327',
-      compatibility: 0.90,
-      rssi: -48
-    }
-  ];
-
   const handleScan = async () => {
     setIsScanning(true);
     setDevices([]);
@@ -76,34 +22,47 @@ const Connections = () => {
     });
 
     try {
-      console.log('Starting Bluetooth device scan...');
+      console.log('Starting real Bluetooth device scan...');
       
-      // Simulate progressive device discovery
-      const foundDevices: BluetoothDevice[] = [];
-      
-      for (let i = 0; i < mockBluetoothDevices.length; i++) {
-        await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 600));
-        
-        const device = mockBluetoothDevices[i];
-        foundDevices.push(device);
-        setDevices([...foundDevices]);
-        
-        toast.info(`Found device: ${device.name}`, {
-          description: `${foundDevices.length} device(s) discovered so far`
-        });
+      // Initialize Bluetooth service
+      const initialized = await unifiedBluetoothService.initialize();
+      if (!initialized) {
+        throw new Error('Failed to initialize Bluetooth service');
       }
 
-      console.log(`Scan completed. Found ${foundDevices.length} devices:`, foundDevices);
+      // Check if Bluetooth is enabled
+      const isEnabled = await unifiedBluetoothService.isBluetoothEnabled();
+      if (!isEnabled) {
+        toast.info('Enabling Bluetooth...');
+        const enabled = await unifiedBluetoothService.enableBluetooth();
+        if (!enabled) {
+          throw new Error('Bluetooth is not enabled and could not be enabled');
+        }
+      }
+
+      // Scan for devices
+      const foundDevices = await unifiedBluetoothService.scanForDevices();
       
-      toast.success(`Scan completed successfully!`, {
-        description: `Found ${foundDevices.length} Bluetooth device(s)`
-      });
+      console.log(`Real scan completed. Found ${foundDevices.length} devices:`, foundDevices);
+      
+      setDevices(foundDevices);
+      
+      if (foundDevices.length > 0) {
+        toast.success(`Scan completed successfully!`, {
+          description: `Found ${foundDevices.length} Bluetooth device(s)`
+        });
+      } else {
+        toast.info('No devices found', {
+          description: 'Make sure your OBD2 adapter is powered on and in pairing mode'
+        });
+      }
 
     } catch (error) {
       console.error('Bluetooth scan failed:', error);
       toast.error('Scan failed', {
-        description: 'Could not scan for Bluetooth devices'
+        description: error instanceof Error ? error.message : 'Could not scan for Bluetooth devices'
       });
+      setDevices([]);
     } finally {
       setIsScanning(false);
     }
@@ -118,19 +77,16 @@ const Connections = () => {
     try {
       console.log(`Attempting to connect to ${device.name} (${device.address})`);
       
-      // Simulate connection process
-      await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 2000));
-      
       const result = await unifiedBluetoothService.connectToDevice(device);
       
-      if (result.success || true) { // Force success for demo
-        const connectedDev = { ...device, isConnected: true };
+      if (result.success && result.device) {
+        const connectedDev = result.device;
         setConnectedDevice(connectedDev);
         
         // Update device in list
         setDevices(prev => prev.map(d => 
           d.id === device.id 
-            ? connectedDev
+            ? { ...d, isConnected: true }
             : { ...d, isConnected: false }
         ));
         
@@ -302,9 +258,11 @@ const Connections = () => {
                           >
                             {Math.round((device.compatibility || 0) * 100)}% Compatible
                           </Badge>
-                          <Badge variant="outline" className="text-xs">
-                            Signal: {getSignalStrength(device.rssi)}
-                          </Badge>
+                          {device.rssi && (
+                            <Badge variant="outline" className="text-xs">
+                              Signal: {getSignalStrength(device.rssi)}
+                            </Badge>
+                          )}
                           <Badge variant="outline" className="text-xs">
                             Type: {device.deviceType}
                           </Badge>
