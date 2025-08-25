@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import {
@@ -19,11 +20,14 @@ const MainLayout = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background flex flex-col md:flex-row">
       {/* Sidebar for larger screens */}
-      <aside className="hidden md:flex flex-col w-64 border-r">
+      <aside className="hidden md:flex flex-col w-64 border-r bg-card">
         <div className="p-4 border-b">
-          <h1 className="text-xl font-bold">LionDiag</h1>
+          <div className="flex items-center gap-2">
+            <Car className="h-6 w-6 text-primary" />
+            <h1 className="text-xl font-bold">LionDiag</h1>
+          </div>
         </div>
         <nav className="flex-1 p-4 space-y-2">
           {navItems.map((item) => (
@@ -32,8 +36,8 @@ const MainLayout = () => {
               to={item.to}
               className={({ isActive }) =>
                 cn(
-                  'flex items-center px-4 py-2 text-sm font-medium rounded-md hover:bg-accent',
-                  isActive ? 'bg-primary text-primary-foreground' : ''
+                  'flex items-center px-4 py-3 text-sm font-medium rounded-md hover:bg-accent transition-colors',
+                  isActive ? 'bg-primary text-primary-foreground' : 'text-foreground hover:text-foreground'
                 )
               }
             >
@@ -45,12 +49,14 @@ const MainLayout = () => {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 pb-20 md:pb-0">
-        <Outlet />
+      <main className="flex-1 pb-20 md:pb-0 overflow-auto">
+        <div className="min-h-full">
+          <Outlet />
+        </div>
       </main>
 
       {/* Bottom navigation for smaller screens */}
-      <footer className="md:hidden fixed bottom-0 left-0 right-0 border-t bg-background">
+      <footer className="md:hidden fixed bottom-0 left-0 right-0 border-t bg-background z-10">
         <nav className="flex justify-around p-2">
           {navItems.map((item) => (
             <NavLink
@@ -58,13 +64,13 @@ const MainLayout = () => {
               to={item.to}
               className={({ isActive }) =>
                 cn(
-                  'flex flex-col items-center text-xs p-1 rounded-md',
-                  isActive ? 'text-primary' : 'text-muted-foreground'
+                  'flex flex-col items-center text-xs p-2 rounded-md min-w-0 flex-1',
+                  isActive ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground'
                 )
               }
             >
-              <item.icon className="h-6 w-6" />
-              <span>{item.label}</span>
+              <item.icon className="h-5 w-5 mb-1" />
+              <span className="truncate">{item.label}</span>
             </NavLink>
           ))}
         </nav>

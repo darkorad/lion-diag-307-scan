@@ -28,42 +28,44 @@ const queryClient = new QueryClient({
 
 const App = () => {
   return (
-    <MobileErrorBoundary fallbackTitle="App Startup Error">
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <Toaster />
-          <BrowserRouter>
-            <Routes>
-              <Route element={<MainLayout />}>
-                <Route path="/" element={<Dashboard />} />
-                <Route
-                  path="/vehicle-specific"
-                  element={
-                    <VehicleSpecificErrorBoundary>
-                      <VehicleSpecific />
-                    </VehicleSpecificErrorBoundary>
-                  }
-                />
-                <Route
-                  path="/vehicle-specific/:make/:model/:generation/:engine"
-                  element={
-                    <VehicleSpecificErrorBoundary>
-                      <VehicleSpecific />
-                    </VehicleSpecificErrorBoundary>
-                  }
-                />
-                <Route path="/professional-diagnostics" element={<ProfessionalDiagnostics />} />
-                <Route path="/diagnostics" element={<Diagnostics />} />
-                <Route path="/vehicle-selection" element={<VehicleSelection />} />
-                <Route path="/connections" element={<Connections />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="*" element={<NotFound />} />
-              </Route>
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </QueryClientProvider>
-    </MobileErrorBoundary>
+    <ErrorBoundary>
+      <MobileErrorBoundary fallbackTitle="App Startup Error">
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <Toaster />
+            <BrowserRouter>
+              <Routes>
+                <Route element={<MainLayout />}>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route
+                    path="/vehicle-specific"
+                    element={
+                      <VehicleSpecificErrorBoundary>
+                        <VehicleSpecific />
+                      </VehicleSpecificErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="/vehicle-specific/:make/:model/:generation/:engine"
+                    element={
+                      <VehicleSpecificErrorBoundary>
+                        <VehicleSpecific />
+                      </VehicleSpecificErrorBoundary>
+                    }
+                  />
+                  <Route path="/professional-diagnostics" element={<ProfessionalDiagnostics />} />
+                  <Route path="/diagnostics" element={<Diagnostics />} />
+                  <Route path="/vehicle-selection" element={<VehicleSelection />} />
+                  <Route path="/connections" element={<Connections />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="*" element={<NotFound />} />
+                </Route>
+              </Routes>
+            </BrowserRouter>
+          </TooltipProvider>
+        </QueryClientProvider>
+      </MobileErrorBoundary>
+    </ErrorBoundary>
   );
 };
 
