@@ -3,7 +3,7 @@ import { webBluetoothService } from './WebBluetoothService';
 import { androidNativeBluetoothService } from './AndroidNativeBluetoothService';
 import { BluetoothDevice, ConnectionResult, ConnectionStatus } from './bluetooth/types';
 
-export { BluetoothDevice } from './bluetooth/types';
+export type { BluetoothDevice } from './bluetooth/types';
 
 export class UnifiedBluetoothService {
   private static instance: UnifiedBluetoothService;
