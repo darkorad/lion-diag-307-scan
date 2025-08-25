@@ -1,42 +1,41 @@
 
-
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "com.lovable.liondiag307scan"
-    compileSdk = 34
+    namespace "com.lovable.liondiag307scan"
+    compileSdk 34
     
     defaultConfig {
-        applicationId = "com.lovable.liondiag307scan"
-        minSdkVersion = 23
-        targetSdkVersion = 34
-        versionCode = 1
-        versionName = "1.0"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        applicationId "com.lovable.liondiag307scan"
+        minSdkVersion 23
+        targetSdkVersion 34
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         
         // Enable multidex for large apps
-        multiDexEnabled = true
+        multiDexEnabled true
         
         aaptOptions {
-             ignoreAssetsPattern = "!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~"
+             ignoreAssetsPattern "!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~"
         }
     }
     
     buildTypes {
         debug {
-            debuggable = true
-            minifyEnabled = false
+            debuggable true
+            minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
         release {
-            minifyEnabled = false
+            minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
     
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
     
     packagingOptions {
@@ -47,9 +46,9 @@ android {
     
     lintOptions {
         disable 'DeprecatedApi', 'GradleDependency', 'NewApi'
-        abortOnError = false
-        warningsAsErrors = false
-        quiet = true
+        abortOnError false
+        warningsAsErrors false
+        quiet true
     }
 
     configurations.all {
