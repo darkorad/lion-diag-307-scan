@@ -37,12 +37,12 @@ allprojects {
     }
     
     // Suppress Kotlin deprecation warnings globally
-    tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask).configureEach {
-        compilerOptions {
-            freeCompilerArgs.addAll([
+    tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+        kotlinOptions {
+            freeCompilerArgs += [
                 "-Xsuppress-deprecated-warnings",
                 "-Xopt-in=kotlin.RequiresOptIn"
-            ])
+            ]
         }
     }
     
@@ -55,7 +55,7 @@ allprojects {
                     buildToolsVersion "34.0.0"
                 }
                 
-                lintOptions {
+                lint {
                     disable 'DeprecatedApi', 'GradleDependency'
                     abortOnError false
                     warningsAsErrors false
