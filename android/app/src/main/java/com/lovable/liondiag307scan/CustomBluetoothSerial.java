@@ -1,16 +1,32 @@
+
 package com.lovable.liondiag307scan;
 
+import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothManager;
+import android.content.Context;
+import android.content.pm.PackageManager;
+import androidx.core.app.ActivityCompat;
 import com.getcapacitor.JSObject;
+import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
-import com.e_is.capacitor_bluetooth_serial.CapacitorBluetoothSerial;
 import java.util.Set;
 import org.json.JSONArray;
 
-@CapacitorPlugin(name = "BluetoothSerial")
-public class CustomBluetoothSerial extends CapacitorBluetoothSerial {
+@CapacitorPlugin(name = "CustomBluetoothSerial")
+public class CustomBluetoothSerial extends Plugin {
+
+    private BluetoothAdapter bluetoothAdapter;
+
+    @Override
+    public void load() {
+        BluetoothManager bluetoothManager = (BluetoothManager) getContext().getSystemService(Context.BLUETOOTH_SERVICE);
+        if (bluetoothManager != null) {
+            bluetoothAdapter = bluetoothManager.getAdapter();
+        }
+    }
 
     @PluginMethod
     public void list(PluginCall call) {
@@ -19,7 +35,7 @@ public class CustomBluetoothSerial extends CapacitorBluetoothSerial {
             return;
         }
 
-        if (checkBluetoothPermission("android.permission.BLUETOOTH_CONNECT")) {
+        if (checkBluetoothPermission()) {
             JSONArray deviceList = new JSONArray();
             Set<BluetoothDevice> bondedDevices = bluetoothAdapter.getBondedDevices();
 
@@ -29,7 +45,11 @@ public class CustomBluetoothSerial extends CapacitorBluetoothSerial {
                     deviceJs.put("name", device.getName());
                     deviceJs.put("address", device.getAddress());
                     deviceJs.put("id", device.getAddress());
-                    deviceJs.put("class", device.getBluetoothClass().getDeviceClass());
+                    if (device.getBluetoothClass() != null) {
+                        deviceJs.put("class", device.getBluetoothClass().getDeviceClass());
+                    } else {
+                        deviceJs.put("class", 0);
+                    }
                     deviceList.put(deviceJs);
                 } catch (Exception e) {
                     // Log the exception or handle it
@@ -39,8 +59,11 @@ public class CustomBluetoothSerial extends CapacitorBluetoothSerial {
             result.put("devices", deviceList);
             call.resolve(result);
         } else {
-            requestBluetoothPermission("android.permission.BLUETOOTH_CONNECT", 1);
             call.reject("Bluetooth permission not granted");
         }
+    }
+
+    private boolean checkBluetoothPermission() {
+        return ActivityCompat.checkSelfPermission(getContext(), android.Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED;
     }
 }
