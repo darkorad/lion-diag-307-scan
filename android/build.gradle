@@ -1,6 +1,4 @@
 
-// Top-level build file where you can add configuration options common to all sub-projects/modules.
-
 buildscript {
     
     repositories {
@@ -12,9 +10,6 @@ buildscript {
         classpath 'com.android.tools.build:gradle:8.2.2'
         classpath 'com.google.gms:google-services:4.4.0'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.10"
-
-        // NOTE: Do not place your application dependencies here; they belong
-        // in the individual module build.gradle files
     }
 }
 
@@ -25,12 +20,9 @@ allprojects {
         google()
         mavenCentral()
         gradlePluginPortal()
-        
-        // Ensure proper repository order for better dependency resolution
         maven { url "https://jitpack.io" }
     }
     
-    // Global configuration to suppress warnings and fix Kotlin daemon issues
     tasks.withType(JavaCompile) {
         options.compilerArgs << "-Xlint:-deprecation"
         options.deprecation = false
@@ -38,7 +30,6 @@ allprojects {
         options.forkOptions.jvmArgs = ['-Xmx2g']
     }
     
-    // Fix Kotlin compilation daemon issues
     tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
         kotlinOptions {
             jvmTarget = "1.8"
@@ -47,19 +38,11 @@ allprojects {
                 "-Xopt-in=kotlin.RequiresOptIn"
             ]
         }
-        // Force daemon restart on memory issues
-        compilerOptions {
-            freeCompilerArgs.addAll([
-                "-Xjvm-default=all"
-            ])
-        }
     }
     
-    // Additional suppression for Android lint
     afterEvaluate { project ->
         if (project.hasProperty('android')) {
             project.android {
-                // Force compatible build tools version
                 if (!project.android.hasProperty('buildToolsVersion')) {
                     buildToolsVersion "34.0.0"
                 }
@@ -71,13 +54,6 @@ allprojects {
                     quiet true
                 }
             }
-        }
-    }
-    
-    // Gradle daemon configuration
-    gradle.projectsEvaluated {
-        tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile) {
-            kotlinOptions.jvmTarget = "1.8"
         }
     }
 }

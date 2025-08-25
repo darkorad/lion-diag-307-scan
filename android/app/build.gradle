@@ -13,7 +13,6 @@ android {
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         
-        // Enable multidex for large apps
         multiDexEnabled true
         
         aaptOptions {
@@ -51,7 +50,6 @@ android {
         quiet true
     }
 
-    // Force compatible dependency versions
     configurations.all {
         resolutionStrategy {
             force 'org.jetbrains.kotlin:kotlin-stdlib:1.9.10'
@@ -69,21 +67,16 @@ android {
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     
-    // Core Android dependencies
     implementation "androidx.appcompat:appcompat:1.6.1"
     implementation "androidx.coordinatorlayout:coordinatorlayout:1.2.0"
     implementation "androidx.core:core-splashscreen:1.0.1"
     implementation "androidx.multidex:multidex:2.0.1"
-    
-    // Bluetooth support
     implementation "androidx.core:core:1.12.0"
     
-    // Testing
     testImplementation "junit:junit:4.13.2"
     androidTestImplementation "androidx.test.ext:junit:1.1.5"
     androidTestImplementation "androidx.test.espresso:espresso-core:3.5.1"
     
-    // Capacitor
     implementation project(':capacitor-android')
 }
 
