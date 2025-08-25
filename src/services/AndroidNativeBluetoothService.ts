@@ -4,6 +4,7 @@ import { Capacitor } from '@capacitor/core';
 interface AndroidBluetoothPlugin {
   isEnabled(): Promise<{ value: boolean }>;
   enable(): Promise<{ value: boolean }>;
+  requestEnable(): Promise<{ value: boolean }>;
   startDiscovery(): Promise<{ success: boolean }>;
   stopDiscovery(): Promise<{ success: boolean }>;
   getBondedDevices(): Promise<{ devices: any[] }>;
@@ -15,6 +16,8 @@ interface AndroidBluetoothPlugin {
   read(): Promise<{ data: string }>;
   registerReceiver(): Promise<void>;
   unregisterReceiver(): Promise<void>;
+  getAdapterState(): Promise<{ state: string }>;
+  isDiscovering(): Promise<{ discovering: boolean }>;
 }
 
 export class AndroidNativeBluetoothService {
@@ -24,9 +27,17 @@ export class AndroidNativeBluetoothService {
   private isDiscovering = false;
   private connectedDevice: BluetoothDevice | null = null;
   private receiverRegistered = false;
+  private discoveryTimeout: NodeJS.Timeout | null = null;
 
   // Standard SPP UUID for OBD2 devices
   private readonly SPP_UUID = '00001101-0000-1000-8000-00805F9B34FB';
+  
+  // OBD2 device name patterns for better detection
+  private readonly OBD2_PATTERNS = [
+    'elm327', 'elm 327', 'obd', 'obdii', 'obd2', 'vgate', 'icar', 'konnwei', 
+    'autel', 'foxwell', 'launch', 'topdon', 'bafx', 'veepeak', 'panlong',
+    'wifi327', 'bt327', 'mini elm', 'bluetooth obd', 'scan tool'
+  ];
 
   static getInstance(): AndroidNativeBluetoothService {
     if (!AndroidNativeBluetoothService.instance) {
@@ -101,6 +112,15 @@ export class AndroidNativeBluetoothService {
     document.addEventListener('bluetoothDiscoveryFinished', () => {
       console.log('📱 Device discovery finished');
       this.isDiscovering = false;
+      if (this.discoveryTimeout) {
+        clearTimeout(this.discoveryTimeout);
+        this.discoveryTimeout = null;
+      }
+    });
+
+    document.addEventListener('bluetoothDiscoveryStarted', () => {
+      console.log('📱 Device discovery started');
+      this.isDiscovering = true;
     });
   }
 
@@ -111,9 +131,23 @@ export class AndroidNativeBluetoothService {
       }
       
       if (this.bluetoothPlugin) {
-        const result = await this.bluetoothPlugin.isEnabled();
-        console.log('📱 Bluetooth enabled status:', result.value);
-        return result.value;
+        // Try multiple methods to check Bluetooth status
+        try {
+          const result = await this.bluetoothPlugin.isEnabled();
+          console.log('📱 Bluetooth enabled status (isEnabled):', result.value);
+          return result.value;
+        } catch (error) {
+          console.log('⚠️ isEnabled failed, trying getAdapterState...');
+          
+          try {
+            const stateResult = await this.bluetoothPlugin.getAdapterState();
+            console.log('📱 Bluetooth adapter state:', stateResult.state);
+            return stateResult.state === 'STATE_ON' || stateResult.state === 'ON';
+          } catch (stateError) {
+            console.log('⚠️ getAdapterState also failed, assuming enabled');
+            return true; // Optimistic fallback
+          }
+        }
       }
       
       return false;
@@ -125,13 +159,50 @@ export class AndroidNativeBluetoothService {
 
   async enableBluetooth(): Promise<boolean> {
     try {
+      console.log('🔵 Attempting to enable Bluetooth...');
+      
       if (!this.bluetoothPlugin) {
+        console.log('❌ No Bluetooth plugin available');
         return false;
       }
       
-      const result = await this.bluetoothPlugin.enable();
-      console.log('🔵 Bluetooth enable result:', result.value);
-      return result.value;
+      // First check if already enabled
+      const isAlreadyEnabled = await this.isBluetoothEnabled();
+      if (isAlreadyEnabled) {
+        console.log('✅ Bluetooth is already enabled');
+        return true;
+      }
+
+      // Try requestEnable first (shows system dialog)
+      try {
+        console.log('🔵 Requesting Bluetooth enable via system dialog...');
+        const requestResult = await this.bluetoothPlugin.requestEnable();
+        console.log('🔵 Request enable result:', requestResult.value);
+        
+        if (requestResult.value) {
+          // Wait a moment for Bluetooth to actually turn on
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          return await this.isBluetoothEnabled();
+        }
+      } catch (requestError) {
+        console.log('⚠️ requestEnable failed, trying direct enable...');
+      }
+
+      // Fallback to direct enable
+      try {
+        const result = await this.bluetoothPlugin.enable();
+        console.log('🔵 Direct enable result:', result.value);
+        
+        if (result.value) {
+          // Wait for Bluetooth to turn on
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          return await this.isBluetoothEnabled();
+        }
+      } catch (enableError) {
+        console.error('❌ Direct enable also failed:', enableError);
+      }
+
+      return false;
       
     } catch (error) {
       console.error('❌ Error enabling Bluetooth:', error);
@@ -147,18 +218,49 @@ export class AndroidNativeBluetoothService {
         throw new Error('Bluetooth plugin not available');
       }
 
+      // Ensure Bluetooth is enabled first
+      const isEnabled = await this.isBluetoothEnabled();
+      if (!isEnabled) {
+        console.log('🔵 Bluetooth not enabled, attempting to enable...');
+        const enabled = await this.enableBluetooth();
+        if (!enabled) {
+          throw new Error('Failed to enable Bluetooth');
+        }
+      }
+
+      // Stop any ongoing discovery
+      if (this.isDiscovering) {
+        console.log('🛑 Stopping previous discovery...');
+        await this.stopDiscovery();
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
       // Clear previous discoveries
       this.discoveredDevices.clear();
       
-      // Start discovery
+      // Start discovery with timeout
+      console.log('📡 Starting Bluetooth device discovery...');
       const result = await this.bluetoothPlugin.startDiscovery();
-      this.isDiscovering = result.success;
       
-      console.log('📡 Discovery started:', result.success);
-      return result.success;
+      if (result.success) {
+        this.isDiscovering = true;
+        console.log('✅ Discovery started successfully');
+        
+        // Set a timeout to automatically stop discovery (Android typically runs for 12 seconds)
+        this.discoveryTimeout = setTimeout(async () => {
+          console.log('⏰ Discovery timeout reached, stopping...');
+          await this.stopDiscovery();
+        }, 15000);
+        
+        return true;
+      } else {
+        console.error('❌ Failed to start discovery');
+        return false;
+      }
       
     } catch (error) {
       console.error('❌ Failed to start discovery:', error);
+      this.isDiscovering = false;
       return false;
     }
   }
@@ -167,6 +269,11 @@ export class AndroidNativeBluetoothService {
     try {
       if (!this.bluetoothPlugin) {
         return false;
+      }
+
+      if (this.discoveryTimeout) {
+        clearTimeout(this.discoveryTimeout);
+        this.discoveryTimeout = null;
       }
       
       const result = await this.bluetoothPlugin.stopDiscovery();
@@ -177,6 +284,7 @@ export class AndroidNativeBluetoothService {
       
     } catch (error) {
       console.error('❌ Failed to stop discovery:', error);
+      this.isDiscovering = false;
       return false;
     }
   }
@@ -223,25 +331,40 @@ export class AndroidNativeBluetoothService {
     const bondedDevices = await this.getBondedDevices();
     const discoveredDevices = await this.getDiscoveredDevices();
     
-    // Merge and deduplicate
+    // Merge and deduplicate, prioritizing bonded devices
     const allDevices = new Map<string, BluetoothDevice>();
     
-    // Add bonded devices first (they have priority)
+    // Add bonded devices first
     bondedDevices.forEach(device => allDevices.set(device.address, device));
     
     // Add discovered devices (won't override bonded ones)
     discoveredDevices.forEach(device => {
       if (!allDevices.has(device.address)) {
         allDevices.set(device.address, device);
+      } else {
+        // Update RSSI if available
+        const existing = allDevices.get(device.address);
+        if (existing && device.rssi) {
+          existing.rssi = device.rssi;
+        }
       }
     });
     
     const devices = Array.from(allDevices.values());
     
-    // Sort by pairing status and compatibility
+    // Sort by OBD2 compatibility, pairing status, and signal strength
     devices.sort((a, b) => {
+      // OBD2 devices first
+      const aIsOBD2 = a.deviceType === 'ELM327' || a.deviceType === 'OBD2';
+      const bIsOBD2 = b.deviceType === 'ELM327' || b.deviceType === 'OBD2';
+      if (aIsOBD2 && !bIsOBD2) return -1;
+      if (!aIsOBD2 && bIsOBD2) return 1;
+      
+      // Paired devices next
       if (a.isPaired && !b.isPaired) return -1;
       if (!a.isPaired && b.isPaired) return 1;
+      
+      // Then by compatibility score
       return (b.compatibility || 0) - (a.compatibility || 0);
     });
     
@@ -390,22 +513,37 @@ export class AndroidNativeBluetoothService {
   private identifyDeviceType(name: string): 'ELM327' | 'OBD2' | 'Generic' {
     const lowerName = name.toLowerCase();
     
-    if (lowerName.includes('elm327')) return 'ELM327';
-    if (lowerName.includes('obd') || 
-        lowerName.includes('vgate') || 
-        lowerName.includes('konnwei') ||
-        lowerName.includes('autel') ||
-        lowerName.includes('foxwell')) return 'OBD2';
+    if (lowerName.includes('elm327') || lowerName.includes('elm 327')) return 'ELM327';
+    
+    // Check for OBD2 patterns
+    for (const pattern of this.OBD2_PATTERNS) {
+      if (lowerName.includes(pattern)) {
+        return 'OBD2';
+      }
+    }
+    
     return 'Generic';
   }
 
   private calculateCompatibility(name: string): number {
     const lowerName = name.toLowerCase();
     
+    // ELM327 devices are most compatible
     if (lowerName.includes('elm327')) return 0.95;
+    if (lowerName.includes('elm 327')) return 0.95;
+    
+    // Known good OBD2 brands
     if (lowerName.includes('vgate')) return 0.9;
+    if (lowerName.includes('icar')) return 0.9;
     if (lowerName.includes('konnwei')) return 0.85;
-    if (lowerName.includes('obd')) return 0.8;
+    if (lowerName.includes('autel')) return 0.85;
+    if (lowerName.includes('veepeak')) return 0.8;
+    if (lowerName.includes('bafx')) return 0.8;
+    
+    // Generic OBD2 mentions
+    if (lowerName.includes('obd') || lowerName.includes('scan')) return 0.75;
+    
+    // Bluetooth devices might be OBD2
     if (lowerName.includes('bluetooth')) return 0.3;
     
     return 0.5;
