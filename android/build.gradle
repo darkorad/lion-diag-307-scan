@@ -11,7 +11,7 @@ buildscript {
     dependencies {
         classpath 'com.android.tools.build:gradle:8.2.2'
         classpath 'com.google.gms:google-services:4.4.0'
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.20"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.10"
 
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files
@@ -30,19 +30,28 @@ allprojects {
         maven { url "https://jitpack.io" }
     }
     
-    // Global configuration to suppress warnings
+    // Global configuration to suppress warnings and fix Kotlin daemon issues
     tasks.withType(JavaCompile) {
         options.compilerArgs << "-Xlint:-deprecation"
         options.deprecation = false
+        options.fork = true
+        options.forkOptions.jvmArgs = ['-Xmx2g']
     }
     
-    // Suppress Kotlin deprecation warnings globally
+    // Fix Kotlin compilation daemon issues
     tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
         kotlinOptions {
+            jvmTarget = "1.8"
             freeCompilerArgs += [
                 "-Xsuppress-deprecated-warnings",
                 "-Xopt-in=kotlin.RequiresOptIn"
             ]
+        }
+        // Force daemon restart on memory issues
+        compilerOptions {
+            freeCompilerArgs.addAll([
+                "-Xjvm-default=all"
+            ])
         }
     }
     
@@ -62,6 +71,13 @@ allprojects {
                     quiet true
                 }
             }
+        }
+    }
+    
+    // Gradle daemon configuration
+    gradle.projectsEvaluated {
+        tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile) {
+            kotlinOptions.jvmTarget = "1.8"
         }
     }
 }

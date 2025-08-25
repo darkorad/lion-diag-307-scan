@@ -17,6 +17,7 @@ ext {
     // Compatible build tools version for API 34
     buildToolsVersion = '34.0.0'
     
-    // Suppress Bluetooth LE specific warnings
-    kotlinCompilerExtensionVersion = '1.5.8'
+    // Use compatible Kotlin version
+    kotlinCompilerExtensionVersion = '1.5.4'
+    kotlinVersion = '1.9.10'
 }
