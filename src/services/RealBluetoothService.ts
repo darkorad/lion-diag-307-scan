@@ -1,5 +1,6 @@
 import { BluetoothDevice, ConnectionResult } from './bluetooth/types';
 import { Capacitor } from '@capacitor/core';
+import { androidNativeBluetoothService } from './AndroidNativeBluetoothService';
 
 interface BluetoothSerialPlugin {
   isEnabled(): Promise<{ value: boolean }>;
@@ -45,7 +46,17 @@ export class RealBluetoothService {
         return true;
       }
 
-      // For native platforms, try to access Bluetooth plugins
+      if (platform === 'android') {
+        console.log('🤖 Android platform - initializing native Bluetooth service');
+        const androidInitialized = await androidNativeBluetoothService.initialize();
+        if (androidInitialized) {
+          console.log('✅ Android native Bluetooth service initialized');
+          this.isInitialized = true;
+          return true;
+        }
+      }
+
+      // Fallback: Try to access Bluetooth plugins
       try {
         // Check for @e-is/capacitor-bluetooth-serial plugin
         const { BluetoothSerial } = await import('@e-is/capacitor-bluetooth-serial');
@@ -57,16 +68,13 @@ export class RealBluetoothService {
         console.log('ℹ️ @e-is/capacitor-bluetooth-serial not available');
       }
 
-      // Fallback: Check for custom Bluetooth Serial plugin
+      // Check for custom Bluetooth Serial plugin
       if (!this.bluetoothSerial && (window as any).CustomBluetoothSerial) {
         this.bluetoothSerial = (window as any).CustomBluetoothSerial;
         console.log('✅ CustomBluetoothSerial plugin found');
-      } else if (!this.bluetoothSerial && (window as any).BluetoothSerial) {
-        this.bluetoothSerial = (window as any).BluetoothSerial;
-        console.log('✅ BluetoothSerial plugin found');
       }
 
-      if (!this.bluetoothSerial) {
+      if (!this.bluetoothSerial && !androidNativeBluetoothService) {
         console.log('⚠️ No Bluetooth plugin found, using mock data');
       }
 
@@ -82,11 +90,12 @@ export class RealBluetoothService {
     try {
       await this.initialize();
 
-      if (Capacitor.getPlatform() === 'web') {
-        // For web, check if Web Bluetooth is available and permission is granted
+      const platform = Capacitor.getPlatform();
+
+      if (platform === 'web') {
+        // For web, check if Web Bluetooth is available
         if ('bluetooth' in navigator) {
           try {
-            // Try to get availability - this will tell us if Bluetooth is actually enabled
             const available = await (navigator.bluetooth as any).getAvailability();
             console.log('🌐 Web Bluetooth availability:', available);
             this.bluetoothEnabled = available;
@@ -100,46 +109,35 @@ export class RealBluetoothService {
         return false;
       }
 
-      // For native platforms
+      if (platform === 'android') {
+        // Use Android native service first
+        const enabled = await androidNativeBluetoothService.isBluetoothEnabled();
+        console.log('🤖 Android Bluetooth enabled:', enabled);
+        this.bluetoothEnabled = enabled;
+        return enabled;
+      }
+
+      // Fallback to plugin check
       if (this.bluetoothSerial) {
         try {
           const result = await this.bluetoothSerial.isEnabled();
-          console.log('📱 Native Bluetooth status:', result);
+          console.log('📱 Plugin Bluetooth status:', result);
           this.bluetoothEnabled = result.value;
           return result.value;
         } catch (error) {
-          console.error('❌ Error checking native Bluetooth status:', error);
-          // If we can't check the status, assume it might be enabled
-          // This happens on some devices where the plugin works but status check fails
+          console.log('📱 Plugin Bluetooth check failed, assuming enabled');
           this.bluetoothEnabled = true;
           return true;
         }
       }
 
-      // If no plugin available, check Android system Bluetooth
-      if (Capacitor.getPlatform() === 'android') {
-        try {
-          // Try to access Android Bluetooth adapter through our custom plugin
-          if ((window as any).CustomBluetoothSerial) {
-            const status = await (window as any).CustomBluetoothSerial.getStatus();
-            console.log('🤖 Android Bluetooth status:', status);
-            this.bluetoothEnabled = status.enabled || true;
-            return this.bluetoothEnabled;
-          }
-        } catch (error) {
-          console.log('🤖 Android Bluetooth status check failed, assuming enabled');
-        }
-      }
-
       // Default to enabled if we can't determine the status
-      // This prevents the app from getting stuck trying to enable Bluetooth
       console.log('🔵 Cannot determine Bluetooth status, assuming enabled');
       this.bluetoothEnabled = true;
       return true;
 
     } catch (error) {
       console.error('❌ Error checking Bluetooth status:', error);
-      // Return true to avoid blocking the user
       this.bluetoothEnabled = true;
       return true;
     }
@@ -149,34 +147,38 @@ export class RealBluetoothService {
     try {
       console.log('🔵 Attempting to enable Bluetooth...');
 
-      if (Capacitor.getPlatform() === 'web') {
-        // For web, we can't programmatically enable Bluetooth
-        // But we can check if it's available
+      const platform = Capacitor.getPlatform();
+
+      if (platform === 'web') {
         this.bluetoothEnabled = 'bluetooth' in navigator;
         return this.bluetoothEnabled;
+      }
+
+      if (platform === 'android') {
+        const enabled = await androidNativeBluetoothService.enableBluetooth();
+        console.log('🤖 Android Bluetooth enable result:', enabled);
+        this.bluetoothEnabled = enabled;
+        return enabled;
       }
 
       if (this.bluetoothSerial) {
         try {
           const result = await this.bluetoothSerial.enable();
-          console.log('📱 Bluetooth enable result:', result);
+          console.log('📱 Plugin Bluetooth enable result:', result);
           this.bluetoothEnabled = result.value;
           return result.value;
         } catch (error) {
           console.error('❌ Failed to enable Bluetooth via plugin:', error);
-          // Even if enable fails, Bluetooth might already be enabled
           return await this.isBluetoothEnabled();
         }
       }
 
-      // For Android without plugin, assume Bluetooth is manageable by the user
-      console.log('📱 No Bluetooth plugin available for enable operation');
+      console.log('📱 No method available to enable Bluetooth');
       this.bluetoothEnabled = true;
       return true;
 
     } catch (error) {
       console.error('❌ Error enabling Bluetooth:', error);
-      // Don't block the user, return current status
       return await this.isBluetoothEnabled();
     }
   }
@@ -192,80 +194,50 @@ export class RealBluetoothService {
         return this.scanForDevicesWeb();
       }
 
-      // For native platforms, always try to get paired devices first
-      console.log('📱 Getting paired devices...');
-      const pairedDevices = await this.getPairedDevices();
-      console.log(`📱 Found ${pairedDevices.length} paired devices`);
+      if (platform === 'android') {
+        console.log('🤖 Using Android native Bluetooth scanning...');
+        
+        // Get bonded devices first
+        const bondedDevices = await androidNativeBluetoothService.getBondedDevices();
+        console.log(`📱 Found ${bondedDevices.length} bonded devices`);
 
-      // If we have paired devices, return them immediately
-      // This ensures the user can connect to known devices even if discovery fails
+        // Start discovery for new devices
+        const discoveryStarted = await androidNativeBluetoothService.startDiscovery();
+        console.log('📡 Discovery started:', discoveryStarted);
+
+        if (discoveryStarted) {
+          // Wait for discovery to complete (usually takes 12 seconds)
+          console.log('⏳ Waiting for device discovery to complete...');
+          await new Promise(resolve => setTimeout(resolve, 15000));
+          
+          // Stop discovery
+          await androidNativeBluetoothService.stopDiscovery();
+        }
+
+        // Get all devices (bonded + discovered)
+        const allDevices = await androidNativeBluetoothService.getAllDevices();
+        console.log(`✅ Total devices found: ${allDevices.length}`);
+        
+        if (allDevices.length > 0) {
+          return allDevices;
+        }
+      }
+
+      // Fallback to plugin scanning
+      console.log('📱 Fallback to plugin scanning...');
+      const pairedDevices = await this.getPairedDevices();
+      console.log(`📱 Found ${pairedDevices.length} paired devices via plugin`);
+
       if (pairedDevices.length > 0) {
-        console.log('✅ Returning paired devices for immediate use');
         return pairedDevices;
       }
 
-      // Try to discover new devices only if no paired devices found
-      console.log('🔍 No paired devices found, attempting device discovery...');
-      let discoveredDevices: BluetoothDevice[] = [];
-      
-      try {
-        if (this.bluetoothSerial && this.bluetoothSerial.scan) {
-          console.log('🔍 Starting Bluetooth scan...');
-          const scanResult = await Promise.race([
-            this.bluetoothSerial.scan(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Scan timeout')), 10000))
-          ]);
-          
-          if (scanResult && (scanResult as any).devices) {
-            discoveredDevices = (scanResult as any).devices.map((device: any) => ({
-              id: device.address || device.id,
-              name: device.name || `Device ${device.address?.slice(-4) || 'Unknown'}`,
-              address: device.address || device.id,
-              isPaired: false,
-              isConnected: false,
-              deviceType: this.identifyDeviceType(device.name || ''),
-              compatibility: this.calculateCompatibility(device.name || ''),
-              rssi: device.rssi
-            }));
-            
-            console.log(`🔍 Found ${discoveredDevices.length} discoverable devices`);
-          }
-        }
-      } catch (scanError) {
-        console.warn('⚠️ Device discovery failed:', scanError);
-        // Return mock devices for testing if real scan fails
-        console.log('🧪 Returning mock devices for testing');
-        return this.getMockDevices();
-      }
-
-      // Combine paired and discovered devices
-      const allDevices = [...pairedDevices, ...discoveredDevices];
-      const uniqueDevices = allDevices.filter((device, index, self) => 
-        index === self.findIndex(d => d.address === device.address)
-      );
-
-      // Sort by compatibility and pairing status
-      uniqueDevices.sort((a, b) => {
-        if (a.isPaired && !b.isPaired) return -1;
-        if (!a.isPaired && b.isPaired) return 1;
-        return (b.compatibility || 0) - (a.compatibility || 0);
-      });
-
-      console.log(`✅ Total unique devices found: ${uniqueDevices.length}`);
-      
-      // If still no devices found, provide mock devices for testing
-      if (uniqueDevices.length === 0) {
-        console.log('🧪 No real devices found, providing mock devices for testing');
-        return this.getMockDevices();
-      }
-
-      return uniqueDevices;
+      // If no real devices found, provide mock devices for testing
+      console.log('🧪 No real devices found, providing mock devices for testing');
+      return this.getMockDevices();
 
     } catch (error) {
       console.error('❌ Device scan failed:', error);
-      
-      // Always provide mock devices if real scan fails completely
-      // This ensures the user can test the app functionality
       console.log('🧪 Scan failed, providing mock devices for testing');
       return this.getMockDevices();
     }
@@ -411,44 +383,55 @@ export class RealBluetoothService {
     try {
       console.log(`🔗 Connecting to ${device.name} (${device.address})...`);
 
-      if (Capacitor.getPlatform() === 'web') {
-        // Simulate web connection
+      const platform = Capacitor.getPlatform();
+
+      if (platform === 'web') {
         await new Promise(resolve => setTimeout(resolve, 2000));
         this.connectedDevice = { ...device, isConnected: true };
         return { success: true, device: this.connectedDevice };
       }
 
-      if (!this.bluetoothSerial) {
-        throw new Error('Bluetooth plugin not available');
-      }
-
-      // Check if already connected
-      try {
-        const isConnected = await this.bluetoothSerial.isConnected();
-        if (isConnected.connected) {
-          console.log('📱 Already connected, disconnecting first...');
-          await this.bluetoothSerial.disconnect();
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-      } catch (error) {
-        console.log('📱 Could not check connection status, proceeding...');
-      }
-
-      // Attempt connection
-      const result = await this.bluetoothSerial.connect({ address: device.address });
-      
-      if (result.success) {
-        this.connectedDevice = { ...device, isConnected: true };
-        console.log(`✅ Successfully connected to ${device.name}`);
+      if (platform === 'android') {
+        console.log('🤖 Using Android native connection...');
+        const result = await androidNativeBluetoothService.connectToDevice(device);
         
-        return { 
-          success: true, 
-          device: this.connectedDevice,
-          strategy: 'Direct Connection'
-        };
-      } else {
-        throw new Error('Connection failed');
+        if (result.success) {
+          this.connectedDevice = result.device || { ...device, isConnected: true };
+          console.log(`✅ Android native connection successful`);
+          return result;
+        } else {
+          console.log('⚠️ Android native connection failed, trying plugin fallback...');
+        }
       }
+
+      // Plugin fallback
+      if (this.bluetoothSerial) {
+        try {
+          const isConnected = await this.bluetoothSerial.isConnected();
+          if (isConnected.connected) {
+            console.log('📱 Already connected, disconnecting first...');
+            await this.bluetoothSerial.disconnect();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        } catch (error) {
+          console.log('📱 Could not check connection status, proceeding...');
+        }
+
+        const result = await this.bluetoothSerial.connect({ address: device.address });
+        
+        if (result.success) {
+          this.connectedDevice = { ...device, isConnected: true };
+          console.log(`✅ Plugin connection successful`);
+          
+          return { 
+            success: true, 
+            device: this.connectedDevice,
+            strategy: 'Plugin Connection'
+          };
+        }
+      }
+
+      throw new Error('All connection methods failed');
 
     } catch (error) {
       console.error(`❌ Connection to ${device.name} failed:`, error);
@@ -462,6 +445,16 @@ export class RealBluetoothService {
 
   async disconnect(): Promise<boolean> {
     try {
+      const platform = Capacitor.getPlatform();
+      
+      if (platform === 'android') {
+        const result = await androidNativeBluetoothService.disconnect();
+        if (result) {
+          this.connectedDevice = null;
+          return true;
+        }
+      }
+      
       if (this.bluetoothSerial) {
         await this.bluetoothSerial.disconnect();
       }
@@ -480,10 +473,19 @@ export class RealBluetoothService {
       throw new Error('No device connected');
     }
 
-    if (Capacitor.getPlatform() === 'web') {
-      // Simulate command response for web
+    const platform = Capacitor.getPlatform();
+
+    if (platform === 'web') {
       await new Promise(resolve => setTimeout(resolve, 500));
       return `41 ${command.substring(2)} OK\r>`;
+    }
+
+    if (platform === 'android') {
+      try {
+        return await androidNativeBluetoothService.sendCommand(command);
+      } catch (error) {
+        console.log('⚠️ Android native command failed, trying plugin...');
+      }
     }
 
     if (!this.bluetoothSerial) {
@@ -492,13 +494,9 @@ export class RealBluetoothService {
 
     try {
       await this.bluetoothSerial.write({ data: command + '\r' });
-      
-      // Wait for response
       await new Promise(resolve => setTimeout(resolve, 500));
-      
       const response = await this.bluetoothSerial.read();
       return response.data || 'NO DATA';
-      
     } catch (error) {
       console.error('❌ Command failed:', error);
       throw error;
