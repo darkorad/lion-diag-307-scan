@@ -1,465 +1,271 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Bluetooth, 
-  Search, 
-  Settings,
-  CheckCircle, 
-  AlertCircle,
-  RefreshCw,
-  Shield,
-  Zap,
-  Signal,
-  Clock,
-  Wifi,
-  Car,
-  Info,
-  AlertTriangle,
-  History
-} from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { AlertCircle, CheckCircle, Wifi, WifiOff, Bluetooth, Search, Loader2 } from 'lucide-react';
 import { unifiedBluetoothService } from '@/services/UnifiedBluetoothService';
-import { BluetoothDevice, ConnectionResult, ConnectionHistory } from '@/services/bluetooth/types';
+import { bluetoothConnectionManager, ConnectionState, ConnectionHistory } from '@/services/BluetoothConnectionManager';
+import { BluetoothDevice } from '@/services/bluetooth/types';
 import { toast } from 'sonner';
 
-interface ProfessionalConnectionPanelProps {
-  onDeviceConnected: (device: BluetoothDevice) => void;
-  isConnected: boolean;
-  currentDevice?: BluetoothDevice | null;
+interface ConnectionAttempt {
+  deviceId: string;
+  timestamp: number;
+  strategy: string;
+  success: boolean;
+  error?: string;
 }
 
-const ProfessionalConnectionPanel: React.FC<ProfessionalConnectionPanelProps> = ({
-  onDeviceConnected,
-  isConnected,
-  currentDevice
-}) => {
+const ProfessionalConnectionPanel: React.FC = () => {
+  const [devices, setDevices] = useState<BluetoothDevice[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [devices, setDevices] = useState<BluetoothDevice[]>([]);
-  const [selectedDevice, setSelectedDevice] = useState<BluetoothDevice | null>(null);
-  const [scanProgress, setScanProgress] = useState(0);
+  const [connectionState, setConnectionState] = useState<ConnectionState>({
+    isConnected: false,
+    device: null,
+    connectionTime: null,
+    lastSeen: null,
+    connectionQuality: null
+  });
   const [connectionHistory, setConnectionHistory] = useState<ConnectionHistory[]>([]);
-  const [connectionResult, setConnectionResult] = useState<ConnectionResult | null>(null);
+  const [connectionAttempts, setConnectionAttempts] = useState<ConnectionAttempt[]>([]);
 
   useEffect(() => {
-    checkCurrentConnection();
+    const unsubscribe = bluetoothConnectionManager.subscribe(setConnectionState);
     loadConnectionHistory();
+    return unsubscribe;
   }, []);
 
-  const checkCurrentConnection = () => {
-    const status = unifiedBluetoothService.getConnectionStatus();
-    if (status.isConnected && status.device) {
-      onDeviceConnected(status.device);
-    }
-  };
-
   const loadConnectionHistory = () => {
-    const history = unifiedBluetoothService.getConnectionHistory();
+    const history = bluetoothConnectionManager.getConnectionHistory();
     setConnectionHistory(history);
   };
 
-  const handleScanDevices = async () => {
+  const handleScanDevices = useCallback(async () => {
     setIsScanning(true);
-    setScanProgress(0);
-    setDevices([]);
-
     try {
-      // Simulate progress
-      const progressInterval = setInterval(() => {
-        setScanProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return 90;
-          }
-          return prev + 15;
-        });
-      }, 1000);
-
-      // Discover devices
       const foundDevices = await unifiedBluetoothService.scanForDevices();
-      
-      clearInterval(progressInterval);
-      setScanProgress(100);
       setDevices(foundDevices);
-
-      toast.success(`Found ${foundDevices.length} OBD2 device(s)`, {
-        description: foundDevices.length > 0 ? 'Devices ranked by compatibility' : 'Make sure your adapter is powered on'
-      });
-
+      toast.success(`Found ${foundDevices.length} devices`);
     } catch (error) {
-      console.error('Scan failed:', error);
-      toast.error('Device scan failed', {
-        description: error instanceof Error ? error.message : 'Unknown error'
-      });
+      toast.error('Scan failed');
+      console.error('Scan error:', error);
     } finally {
       setIsScanning(false);
-      setTimeout(() => setScanProgress(0), 3000);
     }
-  };
+  }, []);
 
   const handleConnectDevice = async (device: BluetoothDevice) => {
     setIsConnecting(true);
-    setSelectedDevice(device);
-    setConnectionResult(null);
+    const attempt: ConnectionAttempt = {
+      deviceId: device.address,
+      timestamp: Date.now(),
+      strategy: 'direct',
+      success: false
+    };
 
     try {
-      // Reset problematic device history if needed
-      if (unifiedBluetoothService.isDeviceProblematic(device.address)) {
-        unifiedBluetoothService.resetDeviceHistory(device.address);
-        toast.info('Resetting connection history for better compatibility');
-      }
-
       const result = await unifiedBluetoothService.connectToDevice(device);
-      setConnectionResult(result);
-      
       if (result.success) {
-        onDeviceConnected(device);
-        toast.success(`Connected to ${device.name}`, {
-          description: `Strategy: ${result.strategy} (${result.connectionTime || 0}ms)`
-        });
-        loadConnectionHistory();
+        bluetoothConnectionManager.setConnected(device);
+        attempt.success = true;
+        toast.success(`Connected to ${device.name}`);
       } else {
-        toast.error('Connection failed', {
-          description: result.error
-        });
+        attempt.error = result.error;
+        toast.error(`Connection failed: ${result.error}`);
       }
-
     } catch (error) {
-      console.error('Connection failed:', error);
-      toast.error('Connection error', {
-        description: error instanceof Error ? error.message : 'Unknown error'
-      });
+      attempt.error = error instanceof Error ? error.message : 'Unknown error';
+      toast.error('Connection failed');
     } finally {
+      setConnectionAttempts(prev => [attempt, ...prev.slice(0, 9)]);
       setIsConnecting(false);
-      setSelectedDevice(null);
     }
   };
 
   const handleDisconnect = async () => {
     try {
       await unifiedBluetoothService.disconnect();
-      toast.info('Disconnected from OBD2 device');
-      // Reset connection state handled by parent component
+      bluetoothConnectionManager.setDisconnected();
+      toast.info('Disconnected');
     } catch (error) {
-      console.error('Disconnect failed:', error);
-      toast.error('Failed to disconnect properly');
+      toast.error('Disconnect failed');
     }
   };
 
-  const getDeviceIcon = (device: BluetoothDevice) => {
-    const quality = device.connectionQuality;
-    const iconColor = quality === 'excellent' ? 'text-green-500' : 
-                     quality === 'good' ? 'text-blue-500' : 
-                     quality === 'fair' ? 'text-yellow-500' : 'text-gray-500';
-    
-    return <Bluetooth className={`h-5 w-5 ${iconColor}`} />;
+  const getSignalStrength = (rssi?: number) => {
+    if (!rssi) return 50;
+    return Math.max(0, Math.min(100, (rssi + 100) * 2));
   };
 
-  const getQualityBadge = (quality?: string) => {
-    const variant = quality === 'excellent' ? 'default' : 
-                   quality === 'good' ? 'secondary' : 
-                   quality === 'fair' ? 'outline' : 'destructive';
-    
-    return (
-      <Badge variant={variant as any} className="text-xs">
-        {quality || 'Unknown'}
-      </Badge>
-    );
+  const formatTimestamp = (timestamp: number) => {
+    return new Date(timestamp).toLocaleTimeString();
   };
 
   return (
-    <div className="space-y-6">
-      {/* Professional Connection Status */}
-      <Card className="border-primary/20">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Car className="h-5 w-5 text-primary" />
-              <span>Professional OBD2 Connection</span>
+    <Card className="w-full">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Bluetooth className="h-5 w-5" />
+          Professional Connection Panel
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Tabs defaultValue="devices" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="devices">Devices</TabsTrigger>
+            <TabsTrigger value="connection">Connection</TabsTrigger>
+            <TabsTrigger value="history">History</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="devices" className="space-y-4">
+            <div className="flex gap-2">
+              <Button onClick={handleScanDevices} disabled={isScanning} className="flex-1">
+                {isScanning ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Scanning...
+                  </>
+                ) : (
+                  <>
+                    <Search className="mr-2 h-4 w-4" />
+                    Scan Devices
+                  </>
+                )}
+              </Button>
             </div>
-            <div className="flex items-center space-x-2">
-              <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
-              <Badge variant={isConnected ? "default" : "secondary"}>
-                {isConnected ? 'Connected' : 'Disconnected'}
-              </Badge>
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isConnected && currentDevice ? (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                <div className="flex items-center space-x-3">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                  <div>
-                    <p className="font-semibold text-green-700 dark:text-green-300">
-                      {currentDevice.name || 'OBD2 Device'}
-                    </p>
-                    <p className="text-sm text-green-600 dark:text-green-400">
-                      {currentDevice.address} • Active Connection
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  {getQualityBadge(currentDevice.connectionQuality)}
-                  <Button onClick={handleDisconnect} variant="outline" size="sm">
-                    <Wifi className="mr-2 h-4 w-4" />
-                    Disconnect
-                  </Button>
-                </div>
-              </div>
-              
-              {connectionResult && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Strategy:</span>
-                    <span className="font-medium">{connectionResult.strategy}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Time:</span>
-                    <span className="font-medium">{connectionResult.connectionTime || 0}ms</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Quality:</span>
-                    {getQualityBadge(currentDevice.connectionQuality)}
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Status:</span>
-                    <Badge variant="outline" className="text-xs">
-                      <Signal className="w-3 h-3 mr-1" />
-                      Live
-                    </Badge>
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-lg font-semibold mb-2">No Device Connected</p>
-              <p className="text-muted-foreground">Scan for OBD2 adapters to begin diagnostics</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
-      {/* Main Connection Interface */}
-      <Tabs defaultValue="scan" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="scan">Device Scanner</TabsTrigger>
-          <TabsTrigger value="history">Connection History</TabsTrigger>
-          <TabsTrigger value="troubleshoot">Troubleshooting</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="scan" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Search className="h-5 w-5" />
-                <span>Professional OBD2 Scanner</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <Button
-                  onClick={handleScanDevices}
-                  disabled={isScanning || isConnected}
-                  className="flex-1"
-                >
-                  {isScanning ? (
-                    <>
-                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                      Scanning for Devices...
-                    </>
-                  ) : (
-                    <>
-                      <Search className="mr-2 h-4 w-4" />
-                      Find All OBD2 Devices
-                    </>
-                  )}
-                </Button>
-              </div>
-
-              {isScanning && (
-                <div className="space-y-2">
-                  <Progress value={scanProgress} className="w-full" />
-                  <p className="text-sm text-muted-foreground text-center">
-                    Discovering OBD2 devices... {scanProgress}%
-                  </p>
-                </div>
-              )}
-
-              {devices.length > 0 && (
-                <div className="space-y-3">
-                  <h4 className="font-medium">Found Devices ({devices.length})</h4>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {devices.map((device) => {
-                      const isProblematic = masterBluetoothService.isDeviceProblematic(device.address);
-                      
-                      return (
-                        <Card key={device.address} className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                              {getDeviceIcon(device)}
-                              <div className="flex-1">
-                                <p className="font-medium">
-                                  {device.name || 'Unknown OBD2 Device'}
-                                </p>
-                                <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                                  <span className="font-mono">{device.address}</span>
-                                  {device.rssi && (
-                                    <span>Signal: {device.rssi}dBm</span>
-                                  )}
-                                  <span>Score: {device.compatibility || 0}</span>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-center space-x-2">
-                              <div className="flex flex-col items-end space-y-1">
-                                <div className="flex items-center space-x-1">
-                                  <Badge variant={device.isPaired ? "default" : "secondary"} className="text-xs">
-                                    {device.isPaired ? "Paired" : "Available"}
-                                  </Badge>
-                                  {getQualityBadge(device.connectionQuality)}
-                                </div>
-                                {isProblematic && (
-                                  <Badge variant="destructive" className="text-xs">
-                                    Connection Issues
-                                  </Badge>
-                                )}
-                              </div>
-                              
-                              <Button
-                                onClick={() => handleConnectDevice(device)}
-                                disabled={isConnecting || isConnected}
-                                size="sm"
-                              >
-                                {isConnecting && selectedDevice?.address === device.address ? (
-                                  <>
-                                    <Zap className="mr-1 h-3 w-3 animate-pulse" />
-                                    Connecting...
-                                  </>
-                                ) : isConnected ? (
-                                  'Connected'
-                                ) : (
-                                  'Connect'
-                                )}
-                              </Button>
-                            </div>
-                          </div>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="history" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <History className="h-5 w-5" />
-                <span>Connection History</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {connectionHistory.length > 0 ? (
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {connectionHistory.slice(-10).reverse().map((attempt, index) => (
-                    <div key={index} className="flex items-center justify-between p-2 border rounded">
-                      <div className="flex items-center space-x-2">
-                        {attempt.success ? (
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <AlertCircle className="h-4 w-4 text-red-500" />
-                        )}
-                        <div>
-                          <p className="text-sm font-medium">{attempt.deviceId}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {attempt.strategy} • {new Date(attempt.timestamp).toLocaleTimeString()}
-                          </p>
-                        </div>
+            <div className="space-y-2">
+              {devices.map((device) => (
+                <Card key={device.address} className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium text-sm">{device.name}</h3>
+                        <Badge variant={device.isPaired ? "default" : "secondary"}>
+                          {device.isPaired ? "Paired" : "Unpaired"}
+                        </Badge>
                       </div>
-                      <Badge variant={attempt.success ? "default" : "destructive"} className="text-xs">
-                        {attempt.success ? 'Success' : 'Failed'}
+                      <p className="text-xs text-muted-foreground">{device.address}</p>
+                      {device.rssi && (
+                        <div className="flex items-center gap-2 mt-1">
+                          <Progress value={getSignalStrength(device.rssi)} className="w-16 h-1" />
+                          <span className="text-xs text-muted-foreground">{device.rssi}dBm</span>
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      onClick={() => handleConnectDevice(device)}
+                      disabled={isConnecting || connectionState.isConnected}
+                      size="sm"
+                    >
+                      {isConnecting ? "Connecting..." : "Connect"}
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="connection" className="space-y-4">
+            <Card className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  {connectionState.isConnected ? (
+                    <CheckCircle className="h-5 w-5 text-green-500" />
+                  ) : (
+                    <WifiOff className="h-5 w-5 text-gray-400" />
+                  )}
+                  <span className="font-medium">
+                    {connectionState.isConnected ? 'Connected' : 'Disconnected'}
+                  </span>
+                </div>
+                <Badge variant={connectionState.isConnected ? "default" : "secondary"}>
+                  {connectionState.connectionQuality || 'Unknown'}
+                </Badge>
+              </div>
+
+              {connectionState.device && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Device:</span>
+                    <span>{connectionState.device.name}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Address:</span>
+                    <span className="font-mono">{connectionState.device.address}</span>
+                  </div>
+                  {connectionState.connectionTime && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Connected at:</span>
+                      <span>{formatTimestamp(connectionState.connectionTime)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {connectionState.isConnected && (
+                <Button onClick={handleDisconnect} variant="destructive" className="w-full mt-4">
+                  Disconnect
+                </Button>
+              )}
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="history" className="space-y-4">
+            <div className="space-y-2">
+              <h3 className="font-medium">Recent Connections</h3>
+              {connectionHistory.length > 0 ? (
+                connectionHistory.slice(0, 10).map((entry, index) => (
+                  <Card key={index} className="p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-sm">{entry.deviceName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatTimestamp(entry.connectionTime)}
+                        </p>
+                      </div>
+                      <Badge variant={entry.success ? "default" : "destructive"}>
+                        {entry.success ? "Success" : "Failed"}
                       </Badge>
                     </div>
-                  ))}
-                </div>
+                  </Card>
+                ))
               ) : (
-                <div className="text-center py-8">
-                  <Clock className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-muted-foreground">No connection history available</p>
-                </div>
+                <p className="text-sm text-muted-foreground">No connection history</p>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </div>
 
-        <TabsContent value="troubleshoot" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Settings className="h-5 w-5" />
-                <span>Professional Troubleshooting</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Alert>
-                <Shield className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>Professional OBD2 Connection System</strong>
-                  <ul className="mt-2 text-sm space-y-1">
-                    <li>• Smart device ranking by compatibility score</li>
-                    <li>• Multiple connection strategies (Quick, Secure, Extended, Auto)</li>
-                    <li>• Support for all major brands (ELM327, Vgate, Konnwei, Autel, etc.)</li>
-                    <li>• Automatic protocol detection and initialization</li>
-                    <li>• Connection quality assessment and monitoring</li>
-                  </ul>
-                </AlertDescription>
-              </Alert>
-              
-              <Alert>
-                <Info className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>Quick Setup Guide:</strong>
-                  <ol className="mt-2 text-sm space-y-1">
-                    <li>1. Connect OBD2 adapter to vehicle's diagnostic port</li>
-                    <li>2. Turn on vehicle ignition (engine can stay off)</li>
-                    <li>3. Grant Bluetooth and Location permissions</li>
-                    <li>4. Tap "Find All OBD2 Devices" to scan</li>
-                    <li>5. Select highest-rated device and connect</li>
-                    <li>6. System automatically initializes ELM327 protocol</li>
-                  </ol>
-                </AlertDescription>
-              </Alert>
-
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>Common Issues & Solutions:</strong>
-                  <ul className="mt-2 text-sm space-y-1">
-                    <li>• No devices found: Ensure adapter is powered and in pairing mode</li>
-                    <li>• Connection fails: Try different strategy or reset adapter</li>
-                    <li>• Poor quality: Check distance and interference</li>
-                    <li>• Vehicle comm fails: Verify ignition on and OBD2 port connection</li>
-                  </ul>
-                </AlertDescription>
-              </Alert>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
+            {connectionAttempts.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="font-medium">Recent Attempts</h3>
+                {connectionAttempts.map((attempt, index) => (
+                  <Card key={index} className="p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-sm">{attempt.deviceId}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatTimestamp(attempt.timestamp)} - {attempt.strategy}
+                        </p>
+                      </div>
+                      <Badge variant={attempt.success ? "default" : "destructive"}>
+                        {attempt.success ? "Success" : "Failed"}
+                      </Badge>
+                    </div>
+                    {attempt.error && (
+                      <p className="text-xs text-red-500 mt-1">{attempt.error}</p>
+                    )}
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
   );
 };
 
