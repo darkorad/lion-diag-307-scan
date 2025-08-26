@@ -1,4 +1,5 @@
 
+
 ext {
     minSdkVersion = 23
     compileSdkVersion = 34
@@ -17,7 +18,12 @@ ext {
     // Compatible build tools version for API 34
     buildToolsVersion = '34.0.0'
     
-    // Use compatible Kotlin version
+    // Use compatible Kotlin version with JVM 17
     kotlinCompilerExtensionVersion = '1.5.4'
     kotlinVersion = '1.9.10'
+    
+    // Force JVM 17 for all projects
+    javaVersion = JavaVersion.VERSION_17
+    kotlinJvmTarget = "17"
 }
+
