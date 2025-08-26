@@ -16,6 +16,98 @@ export class DesktopConnectionService {
     return DesktopConnectionService.instance;
   }
 
+  // Check if running on desktop (browser environment)
+  async isDesktop(): Promise<boolean> {
+    // Check for desktop indicators
+    const isDesktopUA = !/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const hasDesktopFeatures = window.screen.width >= 1024;
+    
+    console.log('🖥️ Desktop detection:', { isDesktopUA, hasDesktopFeatures });
+    return isDesktopUA && hasDesktopFeatures;
+  }
+
+  // Get available connection methods based on browser capabilities
+  async getAvailableConnectionMethods(): Promise<string[]> {
+    const methods = [];
+    
+    // Check for Web Serial API (USB)
+    if ('serial' in navigator) {
+      methods.push('USB');
+    }
+    
+    // Check for Web Bluetooth API
+    if ('bluetooth' in navigator) {
+      methods.push('Bluetooth');
+    }
+    
+    // WiFi is always available in browsers
+    methods.push('WiFi');
+    
+    console.log('🔌 Available connection methods:', methods);
+    return methods;
+  }
+
+  // Show desktop connection instructions in console
+  async showDesktopConnectionInstructions(): Promise<void> {
+    const instructions = `
+    🖥️ DESKTOP OBD2 CONNECTION INSTRUCTIONS
+    =====================================
+    
+    WiFi Connection (Recommended):
+    1. Get ELM327 WiFi adapter (~$15-25)
+    2. Plug into car's OBD2 port
+    3. Connect PC to adapter's WiFi (usually "WiFi_OBD2")
+    4. Use IP: 192.168.0.10:35000 or 192.168.4.1:35000
+    
+    USB Connection:
+    1. Get ELM327 USB adapter
+    2. Install drivers if needed (CH340/CP2102)
+    3. Check Device Manager for COM port
+    4. Use Chrome/Edge with Web Serial API
+    
+    Bluetooth Connection:
+    1. Get ELM327 Bluetooth adapter
+    2. Pair in Windows Bluetooth settings
+    3. Use Chrome/Edge with Web Bluetooth API
+    
+    Browser Requirements:
+    - Chrome 89+ or Edge 89+ for best compatibility
+    - Enable experimental web features if needed
+    `;
+    
+    console.log(instructions);
+  }
+
+  // Create desktop shortcut instructions
+  async createDesktopShortcutInstructions(): Promise<string> {
+    return `
+    🖥️ CREATE DESKTOP APPLICATION SHORTCUT
+    =====================================
+    
+    For Google Chrome:
+    1. Open this web app in Chrome
+    2. Click the 3-dot menu (⋮) in top right
+    3. Go to "More tools" → "Create shortcut..."
+    4. Check "Open as window" for app-like experience
+    5. Click "Create"
+    
+    For Microsoft Edge:
+    1. Open this web app in Edge
+    2. Click the 3-dot menu (...) in top right
+    3. Go to "Apps" → "Install this site as an app"
+    4. Click "Install"
+    
+    Benefits:
+    ✓ Runs like a native Windows application
+    ✓ No browser tabs or address bar
+    ✓ Appears in Start Menu and taskbar
+    ✓ Faster startup and better performance
+    ✓ Works offline once cached
+    
+    The shortcut will create a PWA (Progressive Web App) that feels like a desktop program while maintaining all web functionality.
+    `;
+  }
+
   // Browser-based USB/Serial detection
   async detectUSBAdapters(): Promise<DesktopConnectionResult> {
     try {
