@@ -8,7 +8,22 @@ android {
   }
 }
 
-apply from: "../capacitor-cordova-android-plugins/cordova.variables.gradle"
+// Apply cordova variables if the file exists
+def cordovaVariablesFile = file("../capacitor-cordova-android-plugins/cordova.variables.gradle")
+if (cordovaVariablesFile.exists()) {
+    apply from: "../capacitor-cordova-android-plugins/cordova.variables.gradle"
+} else {
+    // Default values if cordova.variables.gradle doesn't exist
+    ext {
+        minSdkVersion = 23
+        compileSdkVersion = 34
+        targetSdkVersion = 34
+        androidxAppCompatVersion = '1.6.1'
+        androidxCoreVersion = '1.12.0'
+        buildToolsVersion = '34.0.0'
+    }
+}
+
 dependencies {
     implementation project(':capacitor-community-bluetooth-le')
     implementation project(':capacitor-app')
