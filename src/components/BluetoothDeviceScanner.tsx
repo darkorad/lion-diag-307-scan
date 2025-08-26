@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -318,7 +317,7 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
                         size="sm" 
                         onClick={() => {
                           // This would ideally open Bluetooth settings
-                          toast.info('Please go to Settings > Bluetooth to enable Bluetooth and pair your ELM327 adapter');
+                          toast.info('Please go to Settings &gt; Bluetooth to enable Bluetooth and pair your ELM327 adapter');
                         }}
                       >
                         <Settings className="h-4 w-4 mr-2" />
@@ -455,9 +454,9 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
         <AlertDescription>
           <strong>Mobile Setup Instructions:</strong>
           <ul className="mt-2 text-sm space-y-1">
-            <li>1. Connect your ELM327 to the car's OBD2 port</li>
+            <li>1. Connect your ELM327 to the car&apos;s OBD2 port</li>
             <li>2. Turn on vehicle ignition (engine can be off)</li>
-            <li>3. Go to Settings > Bluetooth and pair your ELM327 manually first</li>
+            <li>3. Go to Settings &gt; Bluetooth and pair your ELM327 manually first</li>
             <li>4. Return here and scan to connect</li>
             <li>5. Grant all Bluetooth and location permissions when asked</li>
           </ul>
