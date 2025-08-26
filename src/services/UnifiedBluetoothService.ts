@@ -15,10 +15,13 @@ interface UnifiedBluetoothService {
   connectToDevice(device: BluetoothDevice): Promise<ConnectionResult>;
   smartConnect(device: BluetoothDevice): Promise<ConnectionResult>;
   disconnect(): Promise<boolean>;
+  sendCommand(command: string): Promise<string>;
   getConnectionStatus(): any;
   getCurrentService(): string;
   resetConnectionAttempts(address: string): void;
   getConnectionAttempts(address: string): number;
+  isConnectedToDevice(): boolean;
+  getConnectedDevice(): BluetoothDevice | null;
 }
 
 class UnifiedBluetoothServiceImpl implements UnifiedBluetoothService {
@@ -146,7 +149,7 @@ class UnifiedBluetoothServiceImpl implements UnifiedBluetoothService {
         
       } else if (this.currentService === 'web') {
         console.log('🌐 Using Web Bluetooth scanning...');
-        return await webBluetoothService.scanForDevices(timeout);
+        return await webBluetoothService.scanForDevices();
       }
       
       console.log('❌ No Bluetooth service available');
@@ -275,6 +278,47 @@ class UnifiedBluetoothServiceImpl implements UnifiedBluetoothService {
       console.error('❌ Disconnect failed:', error);
       return false;
     }
+  }
+
+  async sendCommand(command: string): Promise<string> {
+    if (!this.isInitialized) {
+      throw new Error('Service not initialized');
+    }
+
+    try {
+      if (this.currentService === 'android') {
+        return await androidNativeBluetoothService.sendCommand(command);
+      } else if (this.currentService === 'web') {
+        return await webBluetoothService.sendCommand(command);
+      }
+      
+      throw new Error('No Bluetooth service available');
+    } catch (error) {
+      console.error('❌ Send command failed:', error);
+      throw error;
+    }
+  }
+
+  isConnectedToDevice(): boolean {
+    if (this.currentService === 'android') {
+      const device = androidNativeBluetoothService.getConnectedDevice();
+      return device !== null;
+    } else if (this.currentService === 'web') {
+      const device = webBluetoothService.getConnectedDevice();
+      return device !== null;
+    }
+    
+    return false;
+  }
+
+  getConnectedDevice(): BluetoothDevice | null {
+    if (this.currentService === 'android') {
+      return androidNativeBluetoothService.getConnectedDevice();
+    } else if (this.currentService === 'web') {
+      return webBluetoothService.getConnectedDevice();
+    }
+    
+    return null;
   }
 
   getConnectionStatus() {
