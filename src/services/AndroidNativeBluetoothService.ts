@@ -82,15 +82,36 @@ export class AndroidNativeBluetoothService {
       }
       
       console.log('📱 Getting paired/bonded devices...');
-      const result = await (window as any).CustomBluetoothSerial.getPairedDevices();
+      
+      // Try different method names that might be available
+      let result;
+      try {
+        result = await (window as any).CustomBluetoothSerial.getBondedDevices();
+      } catch (error) {
+        console.log('⚠️ getBondedDevices failed, trying getPairedDevices...');
+        try {
+          result = await (window as any).CustomBluetoothSerial.getPairedDevices();
+        } catch (error2) {
+          console.log('⚠️ getPairedDevices failed, trying list...');
+          result = await (window as any).CustomBluetoothSerial.list();
+        }
+      }
+      
       console.log('📋 Bonded devices result:', result);
       
-      if (!result.devices || !Array.isArray(result.devices)) {
+      if (!result.devices && !result.list && !Array.isArray(result)) {
         console.log('⚠️ No bonded devices found or invalid response');
         return [];
       }
       
-      const devices: BluetoothDevice[] = result.devices.map((device: any) => ({
+      // Handle different response formats
+      const deviceArray = result.devices || result.list || result;
+      if (!Array.isArray(deviceArray)) {
+        console.log('⚠️ Device list is not an array:', deviceArray);
+        return [];
+      }
+      
+      const devices: BluetoothDevice[] = deviceArray.map((device: any) => ({
         id: device.address || device.id || Math.random().toString(36),
         address: device.address || '',
         name: device.name || 'Unknown Device',
@@ -118,9 +139,18 @@ export class AndroidNativeBluetoothService {
       }
       
       console.log('🔍 Starting Bluetooth discovery...');
-      const result = await (window as any).CustomBluetoothSerial.startScan();
+      
+      // Try different method names
+      let result;
+      try {
+        result = await (window as any).CustomBluetoothSerial.startDiscovery();
+      } catch (error) {
+        console.log('⚠️ startDiscovery failed, trying startScan...');
+        result = await (window as any).CustomBluetoothSerial.startScan();
+      }
+      
       console.log('🔍 Discovery start result:', result);
-      return result.success === true;
+      return result.success === true || result === true;
       
     } catch (error) {
       console.error('❌ Error starting discovery:', error);
@@ -135,9 +165,18 @@ export class AndroidNativeBluetoothService {
       }
       
       console.log('⏹️ Stopping Bluetooth discovery...');
-      const result = await (window as any).CustomBluetoothSerial.stopScan();
+      
+      // Try different method names
+      let result;
+      try {
+        result = await (window as any).CustomBluetoothSerial.stopDiscovery();
+      } catch (error) {
+        console.log('⚠️ stopDiscovery failed, trying stopScan...');
+        result = await (window as any).CustomBluetoothSerial.stopScan();
+      }
+      
       console.log('⏹️ Discovery stop result:', result);
-      return result.success === true;
+      return result.success === true || result === true;
       
     } catch (error) {
       console.error('❌ Error stopping discovery:', error);

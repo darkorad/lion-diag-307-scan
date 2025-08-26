@@ -1,142 +1,94 @@
+
 import { Capacitor } from '@capacitor/core';
+import { BluetoothDevice, ConnectionResult } from './bluetooth/types';
 import { webBluetoothService } from './WebBluetoothService';
 import { androidNativeBluetoothService } from './AndroidNativeBluetoothService';
-import { androidBluetoothPermissionService } from './AndroidBluetoothPermissionService';
-import { BluetoothDevice, ConnectionResult, ConnectionStatus } from './bluetooth/types';
 
-export type { BluetoothDevice } from './bluetooth/types';
+export type { BluetoothDevice, ConnectionResult };
 
-export class UnifiedBluetoothService {
-  private static instance: UnifiedBluetoothService;
-  private currentService: any = null;
-  private connectionStatus: ConnectionStatus = {
-    isConnected: false,
-    device: null,
-    strategy: null,
-    lastConnected: null
-  };
+interface UnifiedBluetoothService {
+  initialize(): Promise<boolean>;
+  isBluetoothEnabled(): Promise<boolean>;
+  enableBluetooth(): Promise<boolean>;
+  scanForDevices(timeout?: number): Promise<BluetoothDevice[]>;
+  discoverAllOBD2Devices(): Promise<BluetoothDevice[]>;
+  connectToDevice(device: BluetoothDevice): Promise<ConnectionResult>;
+  smartConnect(device: BluetoothDevice): Promise<ConnectionResult>;
+  disconnect(): Promise<boolean>;
+  getConnectionStatus(): any;
+  getCurrentService(): string;
+  resetConnectionAttempts(address: string): void;
+  getConnectionAttempts(address: string): number;
+}
+
+class UnifiedBluetoothServiceImpl implements UnifiedBluetoothService {
+  private currentService: 'android' | 'web' | null = null;
   private isInitialized = false;
-  private connectionAttempts = new Map<string, number>();
-
-  static getInstance(): UnifiedBluetoothService {
-    if (!UnifiedBluetoothService.instance) {
-      UnifiedBluetoothService.instance = new UnifiedBluetoothService();
-    }
-    return UnifiedBluetoothService.instance;
-  }
+  private connectionAttempts: { [address: string]: number } = {};
 
   async initialize(): Promise<boolean> {
+    if (this.isInitialized) {
+      console.log('🔄 Service already initialized, using existing service');
+      return true;
+    }
+
+    console.log('🔧 Initializing UnifiedBluetoothService...');
+    console.log('📱 Platform:', Capacitor.getPlatform());
+    console.log('🏠 Native platform:', Capacitor.isNativePlatform());
+
     try {
-      console.log('🔧 Initializing UnifiedBluetoothService...');
-      console.log('📱 Platform:', Capacitor.getPlatform());
-      console.log('🏠 Native platform:', Capacitor.isNativePlatform());
-      
-      const platform = Capacitor.getPlatform();
-      
-      if (platform === 'android' && Capacitor.isNativePlatform()) {
-        console.log('🤖 Initializing Android native Bluetooth...');
+      if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+        console.log('🤖 Attempting Android Native Bluetooth...');
+        const androidInitialized = await androidNativeBluetoothService.initialize();
         
-        // First request permissions
-        console.log('🔐 Requesting Android Bluetooth permissions...');
-        const permissionsGranted = await androidBluetoothPermissionService.requestBluetoothPermissions();
-        console.log('📋 Permissions granted:', permissionsGranted);
-        
-        if (!permissionsGranted) {
-          console.warn('⚠️ Bluetooth permissions not granted, but continuing...');
-        }
-        
-        // Wait for the plugin to be available
-        let attempts = 0;
-        const maxAttempts = 20;
-        
-        while (attempts < maxAttempts) {
-          if ((window as any).CustomBluetoothSerial) {
-            console.log('✅ CustomBluetoothSerial plugin found');
-            break;
-          }
-          console.log(`⏳ Waiting for CustomBluetoothSerial plugin... (${attempts + 1}/${maxAttempts})`);
-          await new Promise(resolve => setTimeout(resolve, 500));
-          attempts++;
-        }
-        
-        if (!(window as any).CustomBluetoothSerial) {
-          console.error('❌ CustomBluetoothSerial plugin not found after waiting');
-          console.log('🌐 Falling back to Web Bluetooth...');
+        if (androidInitialized) {
+          this.currentService = 'android';
+          this.isInitialized = true;
+          console.log('✅ Android Native Bluetooth service initialized');
+          return true;
         } else {
-          const androidInitialized = await androidNativeBluetoothService.initialize();
-          if (androidInitialized) {
-            this.currentService = androidNativeBluetoothService;
-            console.log('✅ Android native Bluetooth service initialized');
-            this.isInitialized = true;
-            return true;
-          } else {
-            console.log('❌ Android native Bluetooth initialization failed, falling back...');
-          }
+          console.log('❌ Android Native Bluetooth initialization failed');
         }
       }
-      
-      // Fallback to Web Bluetooth for web platform or if native fails
+
+      // Fallback to Web Bluetooth
       console.log('🌐 Using Web Bluetooth...');
       const webInitialized = await webBluetoothService.initialize();
+      
       if (webInitialized) {
-        this.currentService = webBluetoothService;
-        console.log('✅ Web Bluetooth service initialized');
+        this.currentService = 'web';
         this.isInitialized = true;
+        console.log('✅ Web Bluetooth service initialized');
         return true;
+      } else {
+        console.log('❌ Web Bluetooth initialization failed');
       }
-      
-      console.log('❌ All Bluetooth initialization attempts failed');
-      this.isInitialized = false;
+
       return false;
-      
+
     } catch (error) {
-      console.error('❌ Bluetooth initialization error:', error);
-      this.isInitialized = false;
+      console.error('❌ UnifiedBluetoothService initialization failed:', error);
       return false;
     }
   }
 
   async isBluetoothEnabled(): Promise<boolean> {
+    if (!this.isInitialized) {
+      console.log('🔄 Service not initialized, attempting initialization...');
+      await this.initialize();
+    }
+
     try {
-      if (!this.isInitialized) {
-        console.log('🔄 Service not initialized, attempting initialization...');
-        const initialized = await this.initialize();
-        if (!initialized) {
-          console.log('❌ Failed to initialize Bluetooth service');
-          return false;
-        }
+      if (this.currentService === 'android') {
+        const enabled = await androidNativeBluetoothService.isBluetoothEnabled();
+        console.log('🔵 Android Bluetooth enabled:', enabled);
+        return enabled;
+      } else if (this.currentService === 'web') {
+        const enabled = await webBluetoothService.isBluetoothEnabled();
+        console.log('🔵 Web Bluetooth enabled:', enabled);
+        return enabled;
       }
-      
-      if (!this.currentService) {
-        console.log('❌ No Bluetooth service available');
-        return false;
-      }
-      
-      // For Android native, check system Bluetooth state
-      if (this.currentService === androidNativeBluetoothService) {
-        console.log('🤖 Checking Android Bluetooth status...');
-        
-        // Check if the plugin is available
-        if (!(window as any).CustomBluetoothSerial) {
-          console.log('❌ CustomBluetoothSerial plugin not available');
-          return false;
-        }
-        
-        try {
-          const result = await (window as any).CustomBluetoothSerial.isEnabled();
-          console.log('🔵 Android Bluetooth enabled result:', result);
-          return result.enabled === true;
-        } catch (error) {
-          console.error('❌ Error checking Android Bluetooth status:', error);
-          return false;
-        }
-      }
-      
-      // For Web Bluetooth
-      const enabled = await this.currentService.isBluetoothEnabled();
-      console.log(`🔵 Bluetooth enabled: ${enabled}`);
-      return enabled;
-      
+      return false;
     } catch (error) {
       console.error('❌ Error checking Bluetooth status:', error);
       return false;
@@ -144,39 +96,19 @@ export class UnifiedBluetoothService {
   }
 
   async enableBluetooth(): Promise<boolean> {
+    if (!this.isInitialized) {
+      await this.initialize();
+    }
+
     try {
-      if (!this.currentService) {
-        await this.initialize();
+      if (this.currentService === 'android') {
+        console.log('🔵 Enabling Android Bluetooth...');
+        return await androidNativeBluetoothService.enableBluetooth();
+      } else if (this.currentService === 'web') {
+        console.log('🔵 Web Bluetooth is browser-controlled');
+        return true; // Web Bluetooth is controlled by browser
       }
-      
-      if (!this.currentService) {
-        console.log('❌ No Bluetooth service available for enable');
-        return false;
-      }
-      
-      // For Android native, try to enable Bluetooth through the system
-      if (this.currentService === androidNativeBluetoothService) {
-        console.log('🤖 Attempting to enable Android Bluetooth...');
-        
-        if (!(window as any).CustomBluetoothSerial) {
-          console.log('❌ CustomBluetoothSerial plugin not available');
-          return false;
-        }
-        
-        try {
-          const result = await (window as any).CustomBluetoothSerial.requestEnable();
-          console.log('🔵 Android Bluetooth enable result:', result);
-          return result.enabled === true;
-        } catch (error) {
-          console.error('❌ Error enabling Android Bluetooth:', error);
-          // Show instructions to user
-          await androidBluetoothPermissionService.showBluetoothInstructions();
-          return false;
-        }
-      }
-      
-      return await this.currentService.enableBluetooth();
-      
+      return false;
     } catch (error) {
       console.error('❌ Error enabling Bluetooth:', error);
       return false;
@@ -184,73 +116,101 @@ export class UnifiedBluetoothService {
   }
 
   async scanForDevices(timeout: number = 10000): Promise<BluetoothDevice[]> {
+    if (!this.isInitialized) {
+      await this.initialize();
+    }
+
     try {
-      if (!this.currentService) {
-        await this.initialize();
-      }
+      console.log(`🔍 Starting device scan (timeout: ${timeout}ms)...`);
       
-      if (!this.currentService) {
-        console.log('❌ No Bluetooth service available for scanning');
-        return [];
-      }
-      
-      // Ensure Bluetooth is enabled before scanning
-      const isEnabled = await this.isBluetoothEnabled();
-      if (!isEnabled) {
-        console.log('🔵 Bluetooth not enabled, attempting to enable...');
-        const enabled = await this.enableBluetooth();
-        if (!enabled) {
-          throw new Error('Bluetooth could not be enabled. Please enable it manually in system settings.');
-        }
-      }
-      
-      if (this.currentService === androidNativeBluetoothService) {
+      if (this.currentService === 'android') {
         // For Android, get both paired and discovered devices
-        const bondedDevices = await androidNativeBluetoothService.getBondedDevices();
+        console.log('📱 Using Android native scanning...');
+        
+        // First get paired devices
+        const pairedDevices = await androidNativeBluetoothService.getBondedDevices();
+        console.log(`📋 Found ${pairedDevices.length} paired devices`);
         
         // Start discovery for new devices
         const discoveryStarted = await androidNativeBluetoothService.startDiscovery();
-        if (discoveryStarted) {
-          // Wait for discovery to complete
-          await new Promise(resolve => setTimeout(resolve, timeout));
-          await androidNativeBluetoothService.stopDiscovery();
-        }
+        console.log('🔍 Discovery started:', discoveryStarted);
         
-        const allDevices = await androidNativeBluetoothService.getAllDevices();
-        console.log(`📱 Found ${allDevices.length} Android devices`);
-        return allDevices;
-      } else {
-        return await this.currentService.scanForDevices();
+        // Wait a bit for discovery to find devices
+        await new Promise(resolve => setTimeout(resolve, Math.min(timeout, 8000)));
+        
+        // Stop discovery
+        await androidNativeBluetoothService.stopDiscovery();
+        
+        // For now, return paired devices (discovery results would need event listeners)
+        return pairedDevices;
+        
+      } else if (this.currentService === 'web') {
+        console.log('🌐 Using Web Bluetooth scanning...');
+        return await webBluetoothService.scanForDevices(timeout);
       }
+      
+      console.log('❌ No Bluetooth service available');
+      return [];
       
     } catch (error) {
       console.error('❌ Device scan failed:', error);
-      throw error; // Re-throw to let the UI handle the error
+      return [];
+    }
+  }
+
+  async discoverAllOBD2Devices(): Promise<BluetoothDevice[]> {
+    console.log('🔍 Discovering all OBD2 devices...');
+    
+    try {
+      const allDevices = await this.scanForDevices(12000);
+      console.log(`📋 Total devices found: ${allDevices.length}`);
+      
+      // Filter for potential OBD2 devices
+      const obd2Devices = allDevices.filter(device => {
+        const name = device.name.toLowerCase();
+        const isOBD2 = name.includes('elm327') || 
+                      name.includes('obd') || 
+                      name.includes('vgate') || 
+                      name.includes('konnwei') ||
+                      name.includes('autel') ||
+                      name.includes('icar') ||
+                      name.includes('bluetooth') ||
+                      device.isPaired; // Include all paired devices as potential OBD2
+        
+        if (isOBD2) {
+          console.log(`✅ Potential OBD2 device: ${device.name} (${device.address})`);
+        }
+        
+        return isOBD2;
+      });
+      
+      console.log(`🎯 OBD2 devices found: ${obd2Devices.length}`);
+      return obd2Devices;
+      
+    } catch (error) {
+      console.error('❌ OBD2 discovery failed:', error);
+      return [];
     }
   }
 
   async connectToDevice(device: BluetoothDevice): Promise<ConnectionResult> {
+    if (!this.isInitialized) {
+      await this.initialize();
+    }
+
     try {
-      if (!this.currentService) {
-        await this.initialize();
+      console.log(`🔗 Connecting to ${device.name} via ${this.currentService}...`);
+      
+      if (this.currentService === 'android') {
+        return await androidNativeBluetoothService.connectToDevice(device);
+      } else if (this.currentService === 'web') {
+        return await webBluetoothService.connectToDevice(device);
       }
       
-      if (!this.currentService) {
-        throw new Error('No Bluetooth service available');
-      }
-      
-      const result = await this.currentService.connectToDevice(device);
-      
-      if (result.success && result.device) {
-        this.connectionStatus = {
-          isConnected: true,
-          device: result.device,
-          strategy: result.strategy || 'Unknown',
-          lastConnected: new Date()
-        };
-      }
-      
-      return result;
+      return {
+        success: false,
+        error: 'No Bluetooth service available'
+      };
       
     } catch (error) {
       console.error('❌ Connection failed:', error);
@@ -261,132 +221,97 @@ export class UnifiedBluetoothService {
     }
   }
 
-  async disconnect(): Promise<boolean> {
+  async smartConnect(device: BluetoothDevice): Promise<ConnectionResult> {
+    console.log(`🧠 Smart connecting to ${device.name}...`);
+    
+    // Increment connection attempts
+    this.connectionAttempts[device.address] = (this.connectionAttempts[device.address] || 0) + 1;
+    
     try {
-      if (!this.currentService) {
-        return false;
+      // First attempt: Direct connection
+      const result = await this.connectToDevice(device);
+      
+      if (result.success) {
+        // Reset attempts on success
+        this.connectionAttempts[device.address] = 0;
+        return result;
       }
       
-      const result = await this.currentService.disconnect();
+      // If direct connection fails, try enabling Bluetooth first
+      console.log('🔄 Direct connection failed, checking Bluetooth status...');
+      const isEnabled = await this.isBluetoothEnabled();
       
-      if (result) {
-        this.connectionStatus = {
-          isConnected: false,
-          device: null,
-          strategy: null,
-          lastConnected: this.connectionStatus.lastConnected
-        };
+      if (!isEnabled) {
+        console.log('🔵 Bluetooth disabled, attempting to enable...');
+        const enabled = await this.enableBluetooth();
+        
+        if (enabled) {
+          // Wait a moment then try connecting again
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          return await this.connectToDevice(device);
+        }
       }
       
       return result;
       
+    } catch (error) {
+      console.error('❌ Smart connect failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Smart connect failed'
+      };
+    }
+  }
+
+  async disconnect(): Promise<boolean> {
+    try {
+      if (this.currentService === 'android') {
+        return await androidNativeBluetoothService.disconnect();
+      } else if (this.currentService === 'web') {
+        return await webBluetoothService.disconnect();
+      }
+      return false;
     } catch (error) {
       console.error('❌ Disconnect failed:', error);
       return false;
     }
   }
 
-  async sendCommand(command: string): Promise<string> {
-    if (!this.currentService || !this.connectionStatus.isConnected) {
-      throw new Error('No device connected');
+  getConnectionStatus() {
+    if (this.currentService === 'android') {
+      const device = androidNativeBluetoothService.getConnectedDevice();
+      return {
+        isConnected: device !== null,
+        device: device,
+        service: 'android'
+      };
+    } else if (this.currentService === 'web') {
+      const device = webBluetoothService.getConnectedDevice();
+      return {
+        isConnected: device !== null,
+        device: device,
+        service: 'web'
+      };
     }
     
-    return await this.currentService.sendCommand(command);
-  }
-
-  getConnectionStatus(): ConnectionStatus {
-    return { ...this.connectionStatus };
-  }
-
-  isConnectedToDevice(): boolean {
-    return this.connectionStatus.isConnected;
-  }
-
-  getConnectedDevice(): BluetoothDevice | null {
-    return this.connectionStatus.device;
+    return {
+      isConnected: false,
+      device: null,
+      service: 'none'
+    };
   }
 
   getCurrentService(): string {
-    if (this.currentService === androidNativeBluetoothService) {
-      return 'Android Native';
-    } else if (this.currentService === webBluetoothService) {
-      return 'Web Bluetooth';
-    }
-    return 'None';
+    return this.currentService || 'none';
   }
 
-  async discoverAllOBD2Devices(): Promise<BluetoothDevice[]> {
-    try {
-      console.log('🔍 Starting comprehensive OBD2 device discovery...');
-      
-      if (!this.isInitialized) {
-        await this.initialize();
-      }
-      
-      if (!this.currentService) {
-        console.log('❌ No Bluetooth service available for OBD2 discovery');
-        return [];
-      }
-      
-      const devices = await this.scanForDevices();
-      
-      // Filter for OBD2 compatible devices
-      const obd2Devices = devices.filter(device => 
-        device.deviceType === 'ELM327' || 
-        device.deviceType === 'OBD2' || 
-        device.compatibility > 0.5
-      );
-      
-      console.log(`📱 Found ${obd2Devices.length} OBD2 compatible devices`);
-      return obd2Devices;
-      
-    } catch (error) {
-      console.error('❌ OBD2 device discovery failed:', error);
-      return [];
-    }
+  resetConnectionAttempts(address: string): void {
+    this.connectionAttempts[address] = 0;
   }
 
-  async smartConnect(device: BluetoothDevice): Promise<ConnectionResult> {
-    try {
-      console.log(`🧠 Smart connecting to ${device.name}...`);
-      
-      // Track connection attempts
-      const attempts = this.connectionAttempts.get(device.address) || 0;
-      this.connectionAttempts.set(device.address, attempts + 1);
-      
-      if (attempts > 3) {
-        return {
-          success: false,
-          error: 'Too many failed connection attempts'
-        };
-      }
-      
-      const result = await this.connectToDevice(device);
-      
-      if (result.success) {
-        // Reset attempts on successful connection
-        this.connectionAttempts.set(device.address, 0);
-      }
-      
-      return result;
-      
-    } catch (error) {
-      console.error('❌ Smart connection failed:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Smart connection failed'
-      };
-    }
-  }
-
-  resetConnectionAttempts(deviceAddress: string): void {
-    this.connectionAttempts.set(deviceAddress, 0);
-    console.log(`🔄 Reset connection attempts for ${deviceAddress}`);
-  }
-
-  getConnectionAttempts(deviceAddress: string): number {
-    return this.connectionAttempts.get(deviceAddress) || 0;
+  getConnectionAttempts(address: string): number {
+    return this.connectionAttempts[address] || 0;
   }
 }
 
-export const unifiedBluetoothService = UnifiedBluetoothService.getInstance();
+export const unifiedBluetoothService = new UnifiedBluetoothServiceImpl();

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,8 @@ import {
   CheckCircle, 
   AlertCircle,
   RefreshCw,
-  Settings
+  Settings,
+  Smartphone
 } from 'lucide-react';
 import { unifiedBluetoothService, BluetoothDevice } from '@/services/UnifiedBluetoothService';
 import { toast } from 'sonner';
@@ -31,16 +33,22 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
   const [bluetoothChecking, setBluetoothChecking] = useState(true);
   const [mounted, setMounted] = useState(true);
   const [lastError, setLastError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string>('');
+
+  const updateDebugInfo = (message: string) => {
+    console.log('📱 Debug:', message);
+    setDebugInfo(prev => `${new Date().toLocaleTimeString()}: ${message}\n${prev}`);
+  };
 
   const checkBluetoothStatus = useCallback(async () => {
     if (!mounted) return;
     
     try {
       setBluetoothChecking(true);
-      console.log('🔍 Checking Bluetooth status...');
+      updateDebugInfo('Checking Bluetooth status...');
       
       const enabled = await unifiedBluetoothService.isBluetoothEnabled();
-      console.log('🔵 Bluetooth enabled status:', enabled);
+      updateDebugInfo(`Bluetooth enabled: ${enabled}`);
       
       if (mounted) {
         setBluetoothEnabled(enabled);
@@ -48,9 +56,14 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
         
         if (!enabled && Capacitor.isNativePlatform()) {
           setLastError('Bluetooth is disabled. Please enable it in your device settings.');
+          updateDebugInfo('Bluetooth is disabled');
+        } else if (enabled) {
+          updateDebugInfo('Bluetooth is ready');
         }
       }
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      updateDebugInfo(`Bluetooth check failed: ${errorMsg}`);
       console.error('Error checking Bluetooth status:', error);
       if (mounted) {
         setBluetoothEnabled(false);
@@ -70,18 +83,27 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
       if (!mounted) return;
       
       try {
-        console.log('🚀 Initializing Bluetooth system...');
+        updateDebugInfo('Initializing Bluetooth system...');
         const initialized = await unifiedBluetoothService.initialize();
-        console.log('✅ Bluetooth system initialized:', initialized);
+        updateDebugInfo(`Bluetooth system initialized: ${initialized}`);
         
         if (initialized) {
           await checkBluetoothStatus();
+          
+          // Auto-load paired devices on Android
+          if (Capacitor.getPlatform() === 'android') {
+            updateDebugInfo('Auto-loading paired devices...');
+            await loadPairedDevices();
+          }
         } else {
           if (mounted) {
             setLastError('Failed to initialize Bluetooth system. Please check permissions.');
+            updateDebugInfo('Bluetooth initialization failed');
           }
         }
       } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+        updateDebugInfo(`Initialization error: ${errorMsg}`);
         console.error("Error initializing Bluetooth:", error);
         if (mounted) {
           setLastError('Bluetooth initialization failed. Please check your device settings.');
@@ -101,7 +123,7 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
     
     try {
       setBluetoothChecking(true);
-      console.log('🔵 Attempting to enable Bluetooth...');
+      updateDebugInfo('Attempting to enable Bluetooth...');
       
       const enabled = await unifiedBluetoothService.enableBluetooth();
       
@@ -110,19 +132,23 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
           setBluetoothEnabled(true);
           setLastError(null);
           toast.success('Bluetooth enabled successfully');
+          updateDebugInfo('Bluetooth enabled successfully');
           
           // Wait a moment then check for devices
           setTimeout(async () => {
             if (mounted) {
-              await loadDevices();
+              await loadPairedDevices();
             }
           }, 1000);
         } else {
           setLastError('Could not enable Bluetooth automatically. Please enable it manually in Settings > Bluetooth.');
+          updateDebugInfo('Bluetooth enable failed - manual action required');
           toast.error('Please enable Bluetooth manually in your device settings');
         }
       }
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      updateDebugInfo(`Bluetooth enable error: ${errorMsg}`);
       console.error('Error enabling Bluetooth:', error);
       if (mounted) {
         setLastError('Failed to enable Bluetooth. Please enable it manually in your device settings.');
@@ -135,27 +161,32 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
     }
   }, [mounted]);
 
-  const loadDevices = useCallback(async () => {
+  const loadPairedDevices = useCallback(async () => {
     if (!mounted || !bluetoothEnabled) return;
     
     try {
-      console.log('📱 Loading paired devices...');
-      const deviceList = await unifiedBluetoothService.scanForDevices(5000);
+      updateDebugInfo('Loading paired devices...');
+      const deviceList = await unifiedBluetoothService.scanForDevices(3000);
       
       if (mounted) {
         setDevices(deviceList);
+        updateDebugInfo(`Loaded ${deviceList.length} devices`);
         console.log(`📋 Loaded ${deviceList.length} devices`);
         
         if (deviceList.length === 0) {
           setLastError('No paired OBD2 devices found. Please pair your ELM327 adapter in Bluetooth settings first.');
+          updateDebugInfo('No devices found - need to pair first');
         } else {
           setLastError(null);
+          updateDebugInfo(`Found devices: ${deviceList.map(d => d.name).join(', ')}`);
         }
       }
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      updateDebugInfo(`Load devices error: ${errorMsg}`);
       console.error('Failed to load devices:', error);
       if (mounted) {
-        setLastError('Failed to scan for devices. ' + (error instanceof Error ? error.message : 'Please check Bluetooth permissions.'));
+        setLastError('Failed to scan for devices. ' + errorMsg);
         setDevices([]);
       }
     }
@@ -166,6 +197,7 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
     
     if (!bluetoothEnabled) {
       toast.error('Please enable Bluetooth first');
+      updateDebugInfo('Scan failed - Bluetooth not enabled');
       return;
     }
 
@@ -185,7 +217,9 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
         });
       }, 800);
 
+      updateDebugInfo('Starting comprehensive device scan...');
       console.log('🔍 Starting comprehensive device scan...');
+      
       const discoveredDevices = await unifiedBluetoothService.discoverAllOBD2Devices();
       
       clearInterval(progressInterval);
@@ -193,22 +227,25 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
       
       if (mounted) {
         setDevices(discoveredDevices);
+        updateDebugInfo(`Scan complete: ${discoveredDevices.length} devices found`);
         
         if (discoveredDevices.length > 0) {
           toast.success(`Found ${discoveredDevices.length} OBD2 device(s)`);
           setLastError(null);
         } else {
           setLastError('No OBD2 devices found. Make sure your adapter is powered on and paired in Bluetooth settings.');
+          updateDebugInfo('No OBD2 devices found in scan');
           toast.info('No devices found. Check if your ELM327 is paired and powered on.');
         }
       }
       
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      updateDebugInfo(`Scan error: ${errorMsg}`);
       console.error('Scan failed:', error);
       if (mounted) {
-        const errorMessage = error instanceof Error ? error.message : 'Device scan failed';
-        setLastError(errorMessage);
-        toast.error(errorMessage);
+        setLastError(errorMsg);
+        toast.error(errorMsg);
       }
     } finally {
       setTimeout(() => {
@@ -224,6 +261,7 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
     if (!mounted) return;
     
     setIsConnecting(device.id);
+    updateDebugInfo(`Connecting to ${device.name}...`);
 
     try {
       console.log(`🔗 Attempting to connect to ${device.name}...`);
@@ -232,18 +270,21 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
       if (mounted) {
         if (result.success && result.device) {
           toast.success(`Connected to ${device.name}`);
+          updateDebugInfo(`Successfully connected to ${device.name}`);
           onDeviceConnected(result.device);
           setLastError(null);
         } else {
           const errorMsg = result.error || 'Connection failed';
           setLastError(`Failed to connect to ${device.name}: ${errorMsg}`);
+          updateDebugInfo(`Connection failed: ${errorMsg}`);
           toast.error(`Connection failed: ${errorMsg}`);
         }
       }
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown connection error';
+      updateDebugInfo(`Connection error: ${errorMsg}`);
       console.error('Connection error:', error);
       if (mounted) {
-        const errorMsg = error instanceof Error ? error.message : 'Unknown connection error';
         setLastError(errorMsg);
         toast.error(`Connection failed: ${errorMsg}`);
       }
@@ -267,6 +308,24 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
 
   return (
     <div className="space-y-6">
+      {/* Platform Info */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Smartphone className="h-5 w-5" />
+            <span>Platform Info</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2 text-sm">
+            <div>Platform: {Capacitor.getPlatform()}</div>
+            <div>Native: {Capacitor.isNativePlatform() ? 'Yes' : 'No'}</div>
+            <div>Service: {unifiedBluetoothService.getCurrentService()}</div>
+            <div>Plugin Available: {(window as any).CustomBluetoothSerial ? 'Yes' : 'No'}</div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Bluetooth Status */}
       <Card>
         <CardHeader>
@@ -300,9 +359,6 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
               <span>
                 {bluetoothChecking ? 'Checking...' : bluetoothEnabled ? 'Bluetooth Ready' : 'Bluetooth Disabled'}
               </span>
-              <span className="text-sm text-muted-foreground">
-                ({Capacitor.getPlatform()}) - {unifiedBluetoothService.getCurrentService()}
-              </span>
             </div>
             
             {lastError && (
@@ -316,8 +372,7 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
                         variant="outline" 
                         size="sm" 
                         onClick={() => {
-                          // This would ideally open Bluetooth settings
-                          toast.info('Please go to Settings &gt; Bluetooth to enable Bluetooth and pair your ELM327 adapter');
+                          toast.info('Please go to Settings > Bluetooth to enable Bluetooth and pair your ELM327 adapter');
                         }}
                       >
                         <Settings className="h-4 w-4 mr-2" />
@@ -449,16 +504,31 @@ const BluetoothDeviceScanner: React.FC<BluetoothDeviceScannerProps> = ({ onDevic
         </CardContent>
       </Card>
 
+      {/* Debug Info */}
+      {debugInfo && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Debug Info</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <pre className="text-xs bg-muted p-2 rounded max-h-40 overflow-y-auto whitespace-pre-wrap">
+              {debugInfo}
+            </pre>
+          </CardContent>
+        </Card>
+      )}
+
       <Alert>
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
-          <strong>Mobile Setup Instructions:</strong>
+          <strong>Android Setup Instructions:</strong>
           <ul className="mt-2 text-sm space-y-1">
             <li>1. Connect your ELM327 to the car&apos;s OBD2 port</li>
             <li>2. Turn on vehicle ignition (engine can be off)</li>
             <li>3. Go to Settings &gt; Bluetooth and pair your ELM327 manually first</li>
             <li>4. Return here and scan to connect</li>
             <li>5. Grant all Bluetooth and location permissions when asked</li>
+            <li>6. Check the debug info above for troubleshooting details</li>
           </ul>
         </AlertDescription>
       </Alert>
