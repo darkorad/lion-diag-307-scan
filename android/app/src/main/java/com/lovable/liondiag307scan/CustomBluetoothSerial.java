@@ -1,4 +1,3 @@
-
 package com.lovable.liondiag307scan;
 
 import android.Manifest;
@@ -337,7 +336,7 @@ public class CustomBluetoothSerial extends Plugin {
         }
     }
 
-    private boolean hasRequiredPermissions() {
+    public boolean hasRequiredPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             return hasPermission("bluetoothConnect") && hasPermission("bluetoothScan");
         } else {
