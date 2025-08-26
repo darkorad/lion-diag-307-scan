@@ -144,14 +144,17 @@ export class NativeELM327Service {
           });
         }, 15000);
 
-        const finishListener = CapBluetooth.addListener('discoveryFinished', () => {
+        // Set up a one-time listener for discovery finished
+        const handleDiscoveryFinished = () => {
           clearTimeout(timeout);
-          finishListener.then(listener => listener.remove());
           resolve({
             devices: this.discoveredDevices,
             success: true
           });
-        });
+        };
+
+        // Add listener and handle completion
+        CapBluetooth.addListener('discoveryFinished', handleDiscoveryFinished);
       });
 
     } catch (error) {
