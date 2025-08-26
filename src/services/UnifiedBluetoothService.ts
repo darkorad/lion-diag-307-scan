@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { webBluetoothService } from './WebBluetoothService';
 import { androidNativeBluetoothService } from './AndroidNativeBluetoothService';
+import { androidBluetoothPermissionService } from './AndroidBluetoothPermissionService';
 import { BluetoothDevice, ConnectionResult, ConnectionStatus } from './bluetooth/types';
 
 export type { BluetoothDevice } from './bluetooth/types';
@@ -35,9 +36,18 @@ export class UnifiedBluetoothService {
       if (platform === 'android' && Capacitor.isNativePlatform()) {
         console.log('🤖 Initializing Android native Bluetooth...');
         
+        // First request permissions
+        console.log('🔐 Requesting Android Bluetooth permissions...');
+        const permissionsGranted = await androidBluetoothPermissionService.requestBluetoothPermissions();
+        console.log('📋 Permissions granted:', permissionsGranted);
+        
+        if (!permissionsGranted) {
+          console.warn('⚠️ Bluetooth permissions not granted, but continuing...');
+        }
+        
         // Wait for the plugin to be available
         let attempts = 0;
-        const maxAttempts = 10;
+        const maxAttempts = 20;
         
         while (attempts < maxAttempts) {
           if ((window as any).CustomBluetoothSerial) {
@@ -51,23 +61,22 @@ export class UnifiedBluetoothService {
         
         if (!(window as any).CustomBluetoothSerial) {
           console.error('❌ CustomBluetoothSerial plugin not found after waiting');
-          this.isInitialized = false;
-          return false;
-        }
-        
-        const androidInitialized = await androidNativeBluetoothService.initialize();
-        if (androidInitialized) {
-          this.currentService = androidNativeBluetoothService;
-          console.log('✅ Android native Bluetooth service initialized');
-          this.isInitialized = true;
-          return true;
+          console.log('🌐 Falling back to Web Bluetooth...');
         } else {
-          console.log('❌ Android native Bluetooth initialization failed');
+          const androidInitialized = await androidNativeBluetoothService.initialize();
+          if (androidInitialized) {
+            this.currentService = androidNativeBluetoothService;
+            console.log('✅ Android native Bluetooth service initialized');
+            this.isInitialized = true;
+            return true;
+          } else {
+            console.log('❌ Android native Bluetooth initialization failed, falling back...');
+          }
         }
       }
       
       // Fallback to Web Bluetooth for web platform or if native fails
-      console.log('🌐 Falling back to Web Bluetooth...');
+      console.log('🌐 Using Web Bluetooth...');
       const webInitialized = await webBluetoothService.initialize();
       if (webInitialized) {
         this.currentService = webBluetoothService;
@@ -91,7 +100,11 @@ export class UnifiedBluetoothService {
     try {
       if (!this.isInitialized) {
         console.log('🔄 Service not initialized, attempting initialization...');
-        await this.initialize();
+        const initialized = await this.initialize();
+        if (!initialized) {
+          console.log('❌ Failed to initialize Bluetooth service');
+          return false;
+        }
       }
       
       if (!this.currentService) {
@@ -99,6 +112,27 @@ export class UnifiedBluetoothService {
         return false;
       }
       
+      // For Android native, check system Bluetooth state
+      if (this.currentService === androidNativeBluetoothService) {
+        console.log('🤖 Checking Android Bluetooth status...');
+        
+        // Check if the plugin is available
+        if (!(window as any).CustomBluetoothSerial) {
+          console.log('❌ CustomBluetoothSerial plugin not available');
+          return false;
+        }
+        
+        try {
+          const result = await (window as any).CustomBluetoothSerial.isEnabled();
+          console.log('🔵 Android Bluetooth enabled result:', result);
+          return result.enabled === true;
+        } catch (error) {
+          console.error('❌ Error checking Android Bluetooth status:', error);
+          return false;
+        }
+      }
+      
+      // For Web Bluetooth
       const enabled = await this.currentService.isBluetoothEnabled();
       console.log(`🔵 Bluetooth enabled: ${enabled}`);
       return enabled;
@@ -118,6 +152,27 @@ export class UnifiedBluetoothService {
       if (!this.currentService) {
         console.log('❌ No Bluetooth service available for enable');
         return false;
+      }
+      
+      // For Android native, try to enable Bluetooth through the system
+      if (this.currentService === androidNativeBluetoothService) {
+        console.log('🤖 Attempting to enable Android Bluetooth...');
+        
+        if (!(window as any).CustomBluetoothSerial) {
+          console.log('❌ CustomBluetoothSerial plugin not available');
+          return false;
+        }
+        
+        try {
+          const result = await (window as any).CustomBluetoothSerial.requestEnable();
+          console.log('🔵 Android Bluetooth enable result:', result);
+          return result.enabled === true;
+        } catch (error) {
+          console.error('❌ Error enabling Android Bluetooth:', error);
+          // Show instructions to user
+          await androidBluetoothPermissionService.showBluetoothInstructions();
+          return false;
+        }
       }
       
       return await this.currentService.enableBluetooth();
@@ -145,7 +200,7 @@ export class UnifiedBluetoothService {
         console.log('🔵 Bluetooth not enabled, attempting to enable...');
         const enabled = await this.enableBluetooth();
         if (!enabled) {
-          throw new Error('Bluetooth could not be enabled');
+          throw new Error('Bluetooth could not be enabled. Please enable it manually in system settings.');
         }
       }
       
@@ -170,7 +225,7 @@ export class UnifiedBluetoothService {
       
     } catch (error) {
       console.error('❌ Device scan failed:', error);
-      return [];
+      throw error; // Re-throw to let the UI handle the error
     }
   }
 
