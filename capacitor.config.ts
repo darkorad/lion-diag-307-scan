@@ -6,6 +6,7 @@ const config: CapacitorConfig = {
   appName: 'lion-diag-307-scan',
   webDir: 'dist',
   server: {
+    url: 'https://8961d3c3-f07d-43bd-a471-2722432c1d2f.lovableproject.com?forceHideBadge=true',
     androidScheme: 'https',
     cleartext: true
   },
