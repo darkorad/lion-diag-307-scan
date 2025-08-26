@@ -2,18 +2,16 @@
 package com.lovable.liondiag307scan;
 
 import com.getcapacitor.BridgeActivity;
-import com.getcapacitor.Plugin;
 import com.lovable.liondiag307scan.bt.PermissionHelper;
-
-import java.util.ArrayList;
 
 public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(android.os.Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
-        // Register our custom Bluetooth plugin
+        // Register our custom Bluetooth plugins
         registerPlugin(CustomBluetoothSerial.class);
+        registerPlugin(CapBluetoothPlugin.class);
         
         // Check and request Bluetooth permissions
         if (!PermissionHelper.hasAll(this)) {
@@ -35,10 +33,8 @@ public class MainActivity extends BridgeActivity {
             }
             
             if (allGranted) {
-                // Permissions granted, Bluetooth functionality should work now
                 android.util.Log.d("MainActivity", "Bluetooth permissions granted");
             } else {
-                // Some permissions denied
                 android.util.Log.w("MainActivity", "Some Bluetooth permissions were denied");
             }
         }
