@@ -1,4 +1,3 @@
-
 package com.lovable.liondiag307scan;
 
 import com.getcapacitor.BridgeActivity;
@@ -9,7 +8,10 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(android.os.Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
-        // Register our custom Bluetooth plugins
+        // Register our enhanced Bluetooth plugin
+        registerPlugin(LionDiagBluetoothPlugin.class);
+        
+        // Keep existing plugins for backward compatibility
         registerPlugin(CustomBluetoothSerial.class);
         registerPlugin(CapBluetoothPlugin.class);
         
@@ -33,9 +35,9 @@ public class MainActivity extends BridgeActivity {
             }
             
             if (allGranted) {
-                android.util.Log.d("MainActivity", "Bluetooth permissions granted");
+                android.util.Log.d(\"MainActivity\", \"Bluetooth permissions granted\");
             } else {
-                android.util.Log.w("MainActivity", "Some Bluetooth permissions were denied");
+                android.util.Log.w(\"MainActivity\", \"Some Bluetooth permissions were denied\");
             }
         }
     }
