@@ -1,7 +1,8 @@
-<?xml version='1.0' encoding='utf-8'?>
+
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Universal OBD2 Tool</string>
-    <string name="title_activity_main">Universal OBD2 Tool</string>
+    <string name="app_name">lion-diag-307-scan</string>
+    <string name="title_activity_main">lion-diag-307-scan</string>
     <string name="package_name">com.lovable.liondiag307scan</string>
     <string name="custom_url_scheme">com.lovable.liondiag307scan</string>
 </resources>
