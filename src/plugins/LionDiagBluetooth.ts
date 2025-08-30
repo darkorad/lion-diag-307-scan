@@ -145,4 +145,4 @@ export interface LionDiagBluetoothPlugin {
   removeAllListeners(): Promise<void>;
 }
 
-export const LionDiagBluetooth = registerPlugin<LionDiagBluetoothPlugin>('LionDiagBluetooth');
+export const LionDiagBluetooth = registerPlugin<LionDiagBluetoothPlugin>('BluetoothPlugin');

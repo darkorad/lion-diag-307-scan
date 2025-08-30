@@ -1,3 +1,4 @@
+
 [
   {
     "pkg": "@capacitor-community/bluetooth-le",
@@ -38,5 +39,9 @@
   {
     "pkg": "@e-is/capacitor-bluetooth-serial",
     "classpath": "io.e.capacitor_bluetooth_serial.BluetoothSerial"
+  },
+  {
+    "pkg": "native-bluetooth-plugin",
+    "classpath": "com.liondiag.app.BluetoothPlugin"
   }
 ]
