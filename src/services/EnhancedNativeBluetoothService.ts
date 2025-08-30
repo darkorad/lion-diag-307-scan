@@ -1,4 +1,4 @@
-"import { LionDiagBluetooth, BluetoothDevice, BluetoothStatus } from '@/plugins/LionDiagBluetooth';
+import { LionDiagBluetooth, BluetoothDevice, BluetoothStatus } from '@/plugins/LionDiagBluetooth';
 import { toast } from 'sonner';
 
 export interface ConnectionInfo {
@@ -664,4 +664,4 @@ export class EnhancedNativeBluetoothService {
 }
 
 // Export singleton instance
-export const enhancedNativeBluetoothService = EnhancedNativeBluetoothService.getInstance();"
+export const enhancedNativeBluetoothService = EnhancedNativeBluetoothService.getInstance();

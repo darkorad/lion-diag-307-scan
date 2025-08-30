@@ -1,4 +1,5 @@
-"import { registerPlugin } from '@capacitor/core';
+
+import { registerPlugin } from '@capacitor/core';
 
 export interface BluetoothDevice {
   name: string;
@@ -144,4 +145,4 @@ export interface LionDiagBluetoothPlugin {
   removeAllListeners(): Promise<void>;
 }
 
-export const LionDiagBluetooth = registerPlugin<LionDiagBluetoothPlugin>('LionDiagBluetooth');"
+export const LionDiagBluetooth = registerPlugin<LionDiagBluetoothPlugin>('LionDiagBluetooth');
