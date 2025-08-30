@@ -40,7 +40,7 @@ describe('Connections Page', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         listeners = {};
-        (LionDiagBluetooth.addListener as vi.Mock).mockImplementation((event, callback) => {
+        (LionDiagBluetooth.addListener as ReturnType<typeof vi.fn>).mockImplementation((event, callback) => {
             listeners[event] = callback;
         });
         enhancedAndroidBluetoothService['discoveredDevices'].clear();
@@ -80,33 +80,33 @@ describe('Connections Page', () => {
   });
 
   test('pairs with a device', async () => {
-    render(
-        <>
-            <Toaster />
-            <Connections />
-        </>
-    );
+        render(
+            <>
+                <Toaster />
+                <Connections />
+            </>
+        );
 
-    await waitFor(() => expect(listeners.deviceFound).toBeDefined());
+        await waitFor(() => expect(listeners.deviceFound).toBeDefined());
 
-    const mockDevice: PluginBluetoothDevice = { name: 'Test Device', address: '11:22:33:44:55:66', bonded: false, type: 1, compatibility: 80 };
-    act(() => {
-        listeners.deviceFound(mockDevice);
-    });
+        const mockDevice: PluginBluetoothDevice = { name: 'Test Device', address: '11:22:33:44:55:66', bonded: false, type: 1, compatibility: 80 };
+        act(() => {
+            listeners.deviceFound(mockDevice);
+        });
 
-    const pairButton = await screen.findByRole('button', { name: /Pair/i });
-    await userEvent.click(pairButton);
+        const pairButton = await screen.findByRole('button', { name: /Pair/i });
+        await userEvent.click(pairButton);
 
-    expect(LionDiagBluetooth.pairDevice).toHaveBeenCalledWith({ address: '11:22:33:44:55:66' });
+        expect(LionDiagBluetooth.pairDevice).toHaveBeenCalledWith({ address: '11:22:33:44:55:66' });
 
-    act(() => {
-        (LionDiagBluetooth.pairDevice as vi.Mock).mockResolvedValue({ success: true, message: 'Paired successfully' });
-        listeners.pairingState({ state: 'bonded', device: 'Test Device', address: '11:22:33:44:55:66', success: true, message: 'Paired successfully' });
-    });
+        act(() => {
+            (LionDiagBluetooth.pairDevice as ReturnType<typeof vi.fn>).mockResolvedValue({ success: true, message: 'Paired successfully' });
+            listeners.pairingState({ state: 'bonded', device: 'Test Device', address: '11:22:33:44:55:66', success: true, message: 'Paired successfully' });
+        });
 
-    await waitFor(() => {
-        expect(screen.getByText('Paired successfully')).toBeInTheDocument();
-    });
+        await waitFor(() => {
+            expect(screen.getByText('Paired successfully')).toBeInTheDocument();
+        });
   });
 
   test('connects to and disconnects from a device', async () => {
@@ -130,7 +130,7 @@ describe('Connections Page', () => {
     expect(LionDiagBluetooth.connectToDevice).toHaveBeenCalledWith({ address: 'AA:BB:CC:DD:EE:FF' });
 
     act(() => {
-        (LionDiagBluetooth.connectToDevice as vi.Mock).mockResolvedValue({ success: true, address: 'AA:BB:CC:DD:EE:FF', device: 'ELM327 Device' });
+        (LionDiagBluetooth.connectToDevice as ReturnType<typeof vi.fn>).mockResolvedValue({ success: true, address: 'AA:BB:CC:DD:EE:FF', device: 'ELM327 Device' });
         listeners.connected({ success: true, device: 'ELM327 Device', address: 'AA:BB:CC:DD:EE:FF' });
     });
 
