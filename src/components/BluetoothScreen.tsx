@@ -278,7 +278,7 @@ const BluetoothScreen: React.FC = () => {
                 </Button>
               </div>
             </div>
-          </div>
+          </CardContent>
         </Card>
       )}
 
