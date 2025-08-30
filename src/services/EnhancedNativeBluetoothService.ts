@@ -648,7 +648,7 @@ export class EnhancedNativeBluetoothService {
   /**
    * Cleanup resources
    */
-  async cleanup(): void {
+  async cleanup(): Promise<void> {
     await this.stopScan();
     await this.disconnect();
     

@@ -11,7 +11,7 @@ export interface SpecialFunction {
   supportedModels?: string[];
   command?: string;
   procedure: string[];
-  warnings: string[];
+  warnings?: string[]; // Made optional since not all functions need warnings
   prerequisites: string[];
   estimatedTime: string;
   difficulty: 'Basic' | 'Intermediate' | 'Advanced' | 'Expert';
@@ -112,7 +112,6 @@ export const SPECIAL_FUNCTIONS: SpecialFunction[] = [
       '6. Confirm reset operation',
       '7. Verify reset successful in instrument cluster'
     ],
-    warnings: ['Only reset after actual oil change'],
     prerequisites: ['Recent oil change completed'],
     estimatedTime: '2-5 minutes',
     difficulty: 'Basic',
