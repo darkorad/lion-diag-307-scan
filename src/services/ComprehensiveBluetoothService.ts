@@ -1,8 +1,8 @@
-
-import { LionDiagBluetooth, BluetoothDevice } from '@/plugins/LionDiagBluetooth';
+import { LionDiagBluetooth, BluetoothDevice as PluginBluetoothDevice } from '@/plugins/LionDiagBluetooth';
 import { toast } from 'sonner';
 
-export interface BluetoothServiceDevice {
+// Export the types that other components need
+export interface BluetoothDevice {
   id: string;
   address: string;
   name: string;
@@ -14,9 +14,16 @@ export interface BluetoothServiceDevice {
   lastConnected?: Date;
 }
 
+export interface BluetoothDiscoveryResult {
+  success: boolean;
+  devices: BluetoothDevice[];
+  error?: string;
+}
+
 export interface ConnectionResult {
   success: boolean;
-  device?: BluetoothServiceDevice;
+  device?: BluetoothDevice;
+  protocol?: string;
   error?: string;
 }
 
@@ -31,10 +38,10 @@ export interface SavedDevice {
 export class ComprehensiveBluetoothService {
   private static instance: ComprehensiveBluetoothService;
   private isInitialized = false;
-  private connectedDevice: BluetoothServiceDevice | null = null;
-  private discoveredDevices: BluetoothServiceDevice[] = [];
+  private connectedDevice: BluetoothDevice | null = null;
+  private discoveredDevices: BluetoothDevice[] = [];
   private savedDevices: SavedDevice[] = [];
-  private isScanning = false;
+  private scanning = false;
   private eventListeners: { [key: string]: Function[] } = {};
   
   private readonly STORAGE_KEY = 'bluetooth_saved_devices';
@@ -55,13 +62,97 @@ export class ComprehensiveBluetoothService {
     this.setupEventListeners();
   }
 
+  async requestAllBluetoothPermissions(): Promise<boolean> {
+    try {
+      const status = await LionDiagBluetooth.checkBluetoothStatus();
+      if (status.hasPermissions) {
+        return true;
+      }
+
+      const permissionResult = await LionDiagBluetooth.requestPermissions();
+      return permissionResult.granted;
+    } catch (error) {
+      console.error('Permission request failed:', error);
+      return false;
+    }
+  }
+
+  async discoverAllDevices(): Promise<BluetoothDiscoveryResult> {
+    try {
+      const initialized = await this.initialize();
+      if (!initialized) {
+        return { success: false, devices: [], error: 'Initialization failed' };
+      }
+
+      const scanResult = await this.startScan();
+      if (!scanResult) {
+        return { success: false, devices: [], error: 'Scan failed to start' };
+      }
+
+      // Wait for scan to complete
+      await new Promise(resolve => setTimeout(resolve, 10000));
+      await this.stopScan();
+
+      return {
+        success: true,
+        devices: this.getDiscoveredDevices()
+      };
+    } catch (error) {
+      return {
+        success: false,
+        devices: [],
+        error: error instanceof Error ? error.message : 'Discovery failed'
+      };
+    }
+  }
+
+  async scanForDevices(timeout: number = 15000): Promise<BluetoothDevice[]> {
+    try {
+      const result = await this.discoverAllDevices();
+      return result.devices;
+    } catch (error) {
+      console.error('Scan for devices failed:', error);
+      return [];
+    }
+  }
+
+  async smartConnect(options: { disconnect?: boolean } | BluetoothDevice): Promise<ConnectionResult> {
+    if ('disconnect' in options && options.disconnect) {
+      const success = await this.disconnect();
+      return { success };
+    }
+
+    const device = options as BluetoothDevice;
+    return await this.connectToDevice(device);
+  }
+
+  async pairDevice(device: BluetoothDevice): Promise<boolean> {
+    try {
+      console.log(`📱 Pairing with ${device.name}...`);
+      
+      const result = await LionDiagBluetooth.pairDevice({ address: device.address });
+      
+      if (result.success) {
+        device.isPaired = true;
+        this.saveDevice(device, true);
+        return true;
+      } else {
+        toast.error(`Failed to pair with ${device.name}`);
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Pairing failed:', error);
+      toast.error(`Pairing failed: ${error}`);
+      return false;
+    }
+  }
+
   async initialize(): Promise<boolean> {
     if (this.isInitialized) return true;
 
     try {
       console.log('🔵 Initializing Comprehensive Bluetooth Service...');
 
-      // Check Bluetooth status
       const status = await LionDiagBluetooth.checkBluetoothStatus();
       console.log('📊 Bluetooth status:', status);
 
@@ -71,7 +162,6 @@ export class ComprehensiveBluetoothService {
         return false;
       }
 
-      // Request permissions
       if (!status.hasPermissions) {
         console.log('🔐 Requesting permissions...');
         const permissionResult = await LionDiagBluetooth.requestPermissions();
@@ -83,18 +173,15 @@ export class ComprehensiveBluetoothService {
         }
       }
 
-      // Enable Bluetooth if needed
       if (!status.enabled) {
         console.log('🔵 Requesting to enable Bluetooth...');
         await LionDiagBluetooth.enableBluetooth();
-        // Give time for Bluetooth to enable
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
 
       this.isInitialized = true;
       console.log('✅ Bluetooth service initialized');
       
-      // Attempt auto-reconnect
       setTimeout(() => this.attemptAutoReconnect(), 1000);
       
       return true;
@@ -122,12 +209,12 @@ export class ComprehensiveBluetoothService {
     });
 
     LionDiagBluetooth.addListener('discoveryStarted', () => {
-      this.isScanning = true;
+      this.scanning = true;
       this.notifyListeners('scanStarted', {});
     });
 
     LionDiagBluetooth.addListener('discoveryFinished', (result) => {
-      this.isScanning = false;
+      this.scanning = false;
       // Sort by compatibility
       this.discoveredDevices.sort((a, b) => b.compatibility - a.compatibility);
       this.notifyListeners('scanFinished', { devices: this.discoveredDevices });
@@ -189,7 +276,7 @@ export class ComprehensiveBluetoothService {
       if (!initialized) return false;
     }
 
-    if (this.isScanning) {
+    if (this.scanning) {
       console.log('⚠️ Already scanning');
       return false;
     }
@@ -198,7 +285,6 @@ export class ComprehensiveBluetoothService {
       console.log('🔍 Starting device scan...');
       this.discoveredDevices = [];
 
-      // Get paired devices first
       const pairedResult = await LionDiagBluetooth.getPairedDevices();
       const pairedDevices = pairedResult.devices.map(device => ({
         ...this.convertToServiceDevice(device),
@@ -208,10 +294,10 @@ export class ComprehensiveBluetoothService {
       this.discoveredDevices.push(...pairedDevices);
       console.log(`📱 Found ${pairedDevices.length} paired devices`);
 
-      // Start discovery for new devices
       const discoveryResult = await LionDiagBluetooth.startDiscovery();
       
       if (discoveryResult.success) {
+        this.scanning = true;
         return true;
       } else {
         toast.error('Failed to start device scan');
@@ -227,38 +313,16 @@ export class ComprehensiveBluetoothService {
   async stopScan(): Promise<void> {
     try {
       await LionDiagBluetooth.stopDiscovery();
-      this.isScanning = false;
+      this.scanning = false;
     } catch (error) {
       console.error('❌ Failed to stop scan:', error);
     }
   }
 
-  async pairDevice(device: BluetoothServiceDevice): Promise<boolean> {
-    try {
-      console.log(`📱 Pairing with ${device.name}...`);
-      
-      const result = await LionDiagBluetooth.pairDevice({ address: device.address });
-      
-      if (result.success) {
-        device.isPaired = true;
-        this.saveDevice(device, true);
-        return true;
-      } else {
-        toast.error(`Failed to pair with ${device.name}`);
-        return false;
-      }
-    } catch (error) {
-      console.error('❌ Pairing failed:', error);
-      toast.error(`Pairing failed: ${error}`);
-      return false;
-    }
-  }
-
-  async connectToDevice(device: BluetoothServiceDevice): Promise<ConnectionResult> {
+  async connectToDevice(device: BluetoothDevice, timeout?: number): Promise<ConnectionResult> {
     try {
       console.log(`🔗 Connecting to ${device.name}...`);
       
-      // Disconnect from current device if any
       if (this.connectedDevice) {
         await this.disconnect();
       }
@@ -271,7 +335,6 @@ export class ComprehensiveBluetoothService {
         this.connectedDevice.isConnected = true;
         this.connectedDevice.lastConnected = new Date();
         
-        // Initialize ELM327 for OBD2 devices
         if (device.deviceType === 'ELM327' || device.deviceType === 'OBD2') {
           try {
             await LionDiagBluetooth.initializeELM327();
@@ -283,7 +346,8 @@ export class ComprehensiveBluetoothService {
 
         return {
           success: true,
-          device: this.connectedDevice
+          device: this.connectedDevice,
+          protocol: device.deviceType
         };
       } else {
         this.connectedDevice = null;
@@ -387,12 +451,11 @@ export class ComprehensiveBluetoothService {
     }, this.AUTO_RECONNECT_DELAY);
   }
 
-  // Device management methods
-  getDiscoveredDevices(): BluetoothServiceDevice[] {
+  getDiscoveredDevices(): BluetoothDevice[] {
     return [...this.discoveredDevices].sort((a, b) => b.compatibility - a.compatibility);
   }
 
-  getOBD2Devices(): BluetoothServiceDevice[] {
+  getOBD2Devices(): BluetoothDevice[] {
     return this.discoveredDevices
       .filter(device => device.deviceType === 'ELM327' || device.deviceType === 'OBD2')
       .sort((a, b) => b.compatibility - a.compatibility);
@@ -402,7 +465,7 @@ export class ComprehensiveBluetoothService {
     return [...this.savedDevices].sort((a, b) => b.lastConnected - a.lastConnected);
   }
 
-  getConnectedDevice(): BluetoothServiceDevice | null {
+  getConnectedDevice(): BluetoothDevice | null {
     return this.connectedDevice;
   }
 
@@ -411,11 +474,10 @@ export class ComprehensiveBluetoothService {
   }
 
   isScanning(): boolean {
-    return this.isScanning;
+    return this.scanning;
   }
 
-  // Storage methods
-  private saveDevice(device: BluetoothServiceDevice, autoReconnect: boolean = false): void {
+  private saveDevice(device: BluetoothDevice, autoReconnect: boolean = false): void {
     const existingIndex = this.savedDevices.findIndex(d => d.address === device.address);
     const savedDevice: SavedDevice = {
       address: device.address,
@@ -434,7 +496,7 @@ export class ComprehensiveBluetoothService {
     this.saveSavedDevices();
   }
 
-  private saveDeviceConnection(device: BluetoothServiceDevice): void {
+  private saveDeviceConnection(device: BluetoothDevice): void {
     this.saveDevice(device, true);
   }
 
@@ -442,7 +504,7 @@ export class ComprehensiveBluetoothService {
     return this.savedDevices.find(d => d.address === address);
   }
 
-  private getLastConnectedDevice(): BluetoothServiceDevice | null {
+  private getLastConnectedDevice(): BluetoothDevice | null {
     const savedDevices = this.getSavedDevices();
     if (savedDevices.length === 0) return null;
 
@@ -498,8 +560,7 @@ export class ComprehensiveBluetoothService {
     }
   }
 
-  // Helper methods
-  private convertToServiceDevice(device: BluetoothDevice): BluetoothServiceDevice {
+  private convertToServiceDevice(device: PluginBluetoothDevice): BluetoothDevice {
     return {
       id: device.address,
       address: device.address,
@@ -542,7 +603,6 @@ export class ComprehensiveBluetoothService {
     return 30;
   }
 
-  // Event system
   addEventListener(event: string, callback: Function): void {
     if (!this.eventListeners[event]) {
       this.eventListeners[event] = [];

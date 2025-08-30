@@ -27,14 +27,10 @@ export class EnhancedConnectionService {
     
     try {
       // Use the comprehensive Bluetooth service for real device discovery
-      const result = await comprehensiveBluetoothService.discoverAllDevices();
+      const result = await comprehensiveBluetoothService.scanForDevices(15000);
       
-      if (result.success) {
-        console.log(`Found ${result.devices.length} devices`);
-        return result.devices;
-      } else {
-        throw new Error(result.error || 'Device discovery failed');
-      }
+      console.log(`Found ${result.length} devices`);
+      return result;
 
     } catch (error) {
       console.error('Device discovery failed:', error);
