@@ -1,3 +1,4 @@
+
 import { LionDiagBluetooth, BluetoothDevice as PluginBluetoothDevice, ConnectionResult as PluginConnectionResult } from '../plugins/LionDiagBluetooth';
 import { BluetoothDevice, ConnectionResult } from './bluetooth/types';
 import { Emitter } from '../utils/emitter';
@@ -179,10 +180,6 @@ class EnhancedAndroidBluetoothService {
     } catch (error: any) {
       throw new Error(error.message || 'Command failed');
     }
-  }
-
-  public async attemptAutoReconnect() {
-      return LionDiagBluetooth.attemptAutoReconnect();
   }
 
   public getDiscoveredDevices(): BluetoothDevice[] {
