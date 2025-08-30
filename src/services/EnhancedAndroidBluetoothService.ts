@@ -1,3 +1,4 @@
+
 import { LionDiagBluetooth, BluetoothDevice as PluginBluetoothDevice, ConnectionResult as PluginConnectionResult } from '../plugins/LionDiagBluetooth';
 import { BluetoothDevice, ConnectionResult } from './bluetooth/types';
 import { Emitter } from '../utils/emitter';
@@ -89,7 +90,7 @@ class EnhancedAndroidBluetoothService {
       this.emitter.emit('disconnected', undefined);
     });
 
-    LionDiagBluetooth.addListener('pairingState', (state) => {
+    LionDiagBluetooth.addListener('pairingState', (state: any) => {
         // Ensure address is included in the state object
         const pairingState = {
             state: state.state || 'unknown',
