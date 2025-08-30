@@ -1,6 +1,5 @@
-
 apply plugin: 'com.android.application'
-
+apply plugin: 'kotlin-android'
 android {
     namespace = "com.lovable.liondiag307scan"
     compileSdk = 34
