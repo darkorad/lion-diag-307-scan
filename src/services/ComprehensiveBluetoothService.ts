@@ -1,3 +1,4 @@
+
 import { LionDiagBluetooth, BluetoothDevice as PluginBluetoothDevice } from '@/plugins/LionDiagBluetooth';
 import { toast } from 'sonner';
 
@@ -194,7 +195,7 @@ export class ComprehensiveBluetoothService {
 
   private setupEventListeners(): void {
     // Device discovery events
-    LionDiagBluetooth.addListener('deviceFound', (device: BluetoothDevice) => {
+    LionDiagBluetooth.addListener('deviceFound', (device: PluginBluetoothDevice) => {
       const serviceDevice = this.convertToServiceDevice(device);
       
       // Update or add device

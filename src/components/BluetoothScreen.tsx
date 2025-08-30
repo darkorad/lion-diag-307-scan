@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,13 +21,13 @@ import {
   Trash2,
   Star
 } from 'lucide-react';
-import { comprehensiveBluetoothService, BluetoothServiceDevice, SavedDevice } from '@/services/ComprehensiveBluetoothService';
+import { comprehensiveBluetoothService, BluetoothDevice, SavedDevice } from '@/services/ComprehensiveBluetoothService';
 import { toast } from 'sonner';
 
 const BluetoothScreen: React.FC = () => {
-  const [devices, setDevices] = useState<BluetoothServiceDevice[]>([]);
+  const [devices, setDevices] = useState<BluetoothDevice[]>([]);
   const [savedDevices, setSavedDevices] = useState<SavedDevice[]>([]);
-  const [connectedDevice, setConnectedDevice] = useState<BluetoothServiceDevice | null>(null);
+  const [connectedDevice, setConnectedDevice] = useState<BluetoothDevice | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [isConnecting, setIsConnecting] = useState<string | null>(null);
   const [isPairing, setIsPairing] = useState<string | null>(null);
@@ -76,7 +75,7 @@ const BluetoothScreen: React.FC = () => {
     // and properly remove them here
   };
 
-  const handleDeviceFound = (device: BluetoothServiceDevice) => {
+  const handleDeviceFound = (device: BluetoothDevice) => {
     setDevices(prev => {
       const existing = prev.find(d => d.address === device.address);
       if (existing) return prev;
@@ -100,7 +99,7 @@ const BluetoothScreen: React.FC = () => {
     }, 1000);
   };
 
-  const handleScanFinished = (data: { devices: BluetoothServiceDevice[] }) => {
+  const handleScanFinished = (data: { devices: BluetoothDevice[] }) => {
     setIsScanning(false);
     setScanProgress(100);
     setDevices(data.devices);
@@ -108,7 +107,7 @@ const BluetoothScreen: React.FC = () => {
     setTimeout(() => setScanProgress(0), 2000);
   };
 
-  const handleDeviceConnected = (device: BluetoothServiceDevice) => {
+  const handleDeviceConnected = (device: BluetoothDevice) => {
     setConnectedDevice(device);
     setIsConnecting(null);
     setSavedDevices(comprehensiveBluetoothService.getSavedDevices());
@@ -143,7 +142,7 @@ const BluetoothScreen: React.FC = () => {
     setIsScanning(false);
   };
 
-  const handlePairDevice = async (device: BluetoothServiceDevice) => {
+  const handlePairDevice = async (device: BluetoothDevice) => {
     setIsPairing(device.id);
     
     const success = await comprehensiveBluetoothService.pairDevice(device);
@@ -153,7 +152,7 @@ const BluetoothScreen: React.FC = () => {
     }
   };
 
-  const handleConnectDevice = async (device: BluetoothServiceDevice) => {
+  const handleConnectDevice = async (device: BluetoothDevice) => {
     setIsConnecting(device.id);
     
     const result = await comprehensiveBluetoothService.connectToDevice(device);
@@ -197,7 +196,7 @@ const BluetoothScreen: React.FC = () => {
     setSavedDevices([]);
   };
 
-  const getDeviceIcon = (device: BluetoothServiceDevice) => {
+  const getDeviceIcon = (device: BluetoothDevice) => {
     switch (device.deviceType) {
       case 'ELM327':
         return <Zap className="h-5 w-5 text-green-500" />;
