@@ -5,11 +5,12 @@ const config: CapacitorConfig = {
   appId: 'app.lovable.8961d3c3f07d43bda4712722432c1d2f',
   appName: 'lion-diag-307-scan',
   webDir: 'dist',
-  server: {
-    url: 'https://8961d3c3-f07d-43bd-a471-2722432c1d2f.lovableproject.com?forceHideBadge=true',
-    androidScheme: 'https',
-    cleartext: true
-  },
+  // Remove server configuration for production Android build
+  // server: {
+  //   url: 'https://8961d3c3-f07d-43bd-a471-2722432c1d2f.lovableproject.com?forceHideBadge=true',
+  //   androidScheme: 'https',
+  //   cleartext: true
+  // },
   android: {
     allowMixedContent: true,
     captureInput: true,
