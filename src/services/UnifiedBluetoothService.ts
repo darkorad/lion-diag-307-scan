@@ -2,7 +2,7 @@
 import { Capacitor } from '@capacitor/core';
 import { BluetoothDevice, ConnectionResult } from './bluetooth/types';
 import { webBluetoothService } from './WebBluetoothService';
-import { androidNativeBluetoothService } from './AndroidNativeBluetoothService';
+import { enhancedAndroidBluetoothService } from './EnhancedAndroidBluetoothService';
 
 export type { BluetoothDevice, ConnectionResult };
 
@@ -41,16 +41,16 @@ class UnifiedBluetoothServiceImpl implements UnifiedBluetoothService {
 
     try {
       if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
-        console.log('🤖 Attempting Android Native Bluetooth...');
-        const androidInitialized = await androidNativeBluetoothService.initialize();
+        console.log('🤖 Attempting Enhanced Android Bluetooth...');
+        const androidInitialized = await enhancedAndroidBluetoothService.initialize();
         
         if (androidInitialized) {
           this.currentService = 'android';
           this.isInitialized = true;
-          console.log('✅ Android Native Bluetooth service initialized');
+          console.log('✅ Enhanced Android Bluetooth service initialized');
           return true;
         } else {
-          console.log('❌ Android Native Bluetooth initialization failed');
+          console.log('❌ Enhanced Android Bluetooth initialization failed');
         }
       }
 
@@ -83,9 +83,9 @@ class UnifiedBluetoothServiceImpl implements UnifiedBluetoothService {
 
     try {
       if (this.currentService === 'android') {
-        const enabled = await androidNativeBluetoothService.isBluetoothEnabled();
-        console.log('🔵 Android Bluetooth enabled:', enabled);
-        return enabled;
+        const status = await enhancedAndroidBluetoothService.checkBluetoothStatus();
+        console.log('🔵 Android Bluetooth enabled:', status.enabled);
+        return status.enabled;
       } else if (this.currentService === 'web') {
         const enabled = await webBluetoothService.isBluetoothEnabled();
         console.log('🔵 Web Bluetooth enabled:', enabled);
@@ -106,7 +106,8 @@ class UnifiedBluetoothServiceImpl implements UnifiedBluetoothService {
     try {
       if (this.currentService === 'android') {
         console.log('🔵 Enabling Android Bluetooth...');
-        return await androidNativeBluetoothService.enableBluetooth();
+        const result = await enhancedAndroidBluetoothService.enableBluetooth();
+        return result.requested;
       } else if (this.currentService === 'web') {
         console.log('🔵 Web Bluetooth is browser-controlled');
         return true; // Web Bluetooth is controlled by browser
@@ -127,26 +128,7 @@ class UnifiedBluetoothServiceImpl implements UnifiedBluetoothService {
       console.log(`🔍 Starting device scan (timeout: ${timeout}ms)...`);
       
       if (this.currentService === 'android') {
-        // For Android, get both paired and discovered devices
-        console.log('📱 Using Android native scanning...');
-        
-        // First get paired devices
-        const pairedDevices = await androidNativeBluetoothService.getBondedDevices();
-        console.log(`📋 Found ${pairedDevices.length} paired devices`);
-        
-        // Start discovery for new devices
-        const discoveryStarted = await androidNativeBluetoothService.startDiscovery();
-        console.log('🔍 Discovery started:', discoveryStarted);
-        
-        // Wait a bit for discovery to find devices
-        await new Promise(resolve => setTimeout(resolve, Math.min(timeout, 8000)));
-        
-        // Stop discovery
-        await androidNativeBluetoothService.stopDiscovery();
-        
-        // For now, return paired devices (discovery results would need event listeners)
-        return pairedDevices;
-        
+        return await enhancedAndroidBluetoothService.scanForDevices();
       } else if (this.currentService === 'web') {
         console.log('🌐 Using Web Bluetooth scanning...');
         return await webBluetoothService.scanForDevices();
@@ -205,7 +187,7 @@ class UnifiedBluetoothServiceImpl implements UnifiedBluetoothService {
       console.log(`🔗 Connecting to ${device.name} via ${this.currentService}...`);
       
       if (this.currentService === 'android') {
-        return await androidNativeBluetoothService.connectToDevice(device);
+        return await enhancedAndroidBluetoothService.connectToDevice(device);
       } else if (this.currentService === 'web') {
         return await webBluetoothService.connectToDevice(device);
       }
@@ -269,7 +251,7 @@ class UnifiedBluetoothServiceImpl implements UnifiedBluetoothService {
   async disconnect(): Promise<boolean> {
     try {
       if (this.currentService === 'android') {
-        return await androidNativeBluetoothService.disconnect();
+        return await enhancedAndroidBluetoothService.disconnect();
       } else if (this.currentService === 'web') {
         return await webBluetoothService.disconnect();
       }
@@ -287,7 +269,7 @@ class UnifiedBluetoothServiceImpl implements UnifiedBluetoothService {
 
     try {
       if (this.currentService === 'android') {
-        return await androidNativeBluetoothService.sendCommand(command);
+        return await enhancedAndroidBluetoothService.sendCommand(command);
       } else if (this.currentService === 'web') {
         return await webBluetoothService.sendCommand(command);
       }
@@ -301,7 +283,7 @@ class UnifiedBluetoothServiceImpl implements UnifiedBluetoothService {
 
   isConnectedToDevice(): boolean {
     if (this.currentService === 'android') {
-      const device = androidNativeBluetoothService.getConnectedDevice();
+      const device = enhancedAndroidBluetoothService.getConnectedDevice();
       return device !== null;
     } else if (this.currentService === 'web') {
       const device = webBluetoothService.getConnectedDevice();
@@ -313,7 +295,7 @@ class UnifiedBluetoothServiceImpl implements UnifiedBluetoothService {
 
   getConnectedDevice(): BluetoothDevice | null {
     if (this.currentService === 'android') {
-      return androidNativeBluetoothService.getConnectedDevice();
+      return enhancedAndroidBluetoothService.getConnectedDevice();
     } else if (this.currentService === 'web') {
       return webBluetoothService.getConnectedDevice();
     }
@@ -323,7 +305,7 @@ class UnifiedBluetoothServiceImpl implements UnifiedBluetoothService {
 
   getConnectionStatus() {
     if (this.currentService === 'android') {
-      const device = androidNativeBluetoothService.getConnectedDevice();
+      const device = enhancedAndroidBluetoothService.getConnectedDevice();
       return {
         isConnected: device !== null,
         device: device,
