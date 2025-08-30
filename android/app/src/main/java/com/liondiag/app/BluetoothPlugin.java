@@ -75,6 +75,10 @@ public class BluetoothPlugin extends Plugin {
     private static final int MAX_RECONNECT_ATTEMPTS = 3;
     private int reconnectAttempts = 0;
     private Handler reconnectHandler;
+    private static final int RECONNECT_DELAY_MS = 5000;
+
+    // Pairing
+    private PluginCall pairingCall;
     
     @Override
     public void load() {
@@ -122,9 +126,7 @@ public class BluetoothPlugin extends Plugin {
                 result.put("count", discoveredDevices.size());
                 notifyListeners("discoveryFinished", result);
             } else if (BluetoothDevice.ACTION_BOND_STATE_CHANGED.equals(action)) {
-                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                int bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.BOND_NONE);
-                notifyPairingState(device, bondState);
+                handleBondStateChange(intent);
             } else if (BluetoothAdapter.ACTION_STATE_CHANGED.equals(action)) {
                 int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
                 handleBluetoothStateChange(state);
@@ -310,28 +312,31 @@ public class BluetoothPlugin extends Plugin {
             call.reject("Device address required");
             return;
         }
-        
+
         if (!hasRequiredPermissions()) {
             call.reject("Missing required permissions");
             return;
         }
-        
+
         BluetoothDevice device = bluetoothAdapter.getRemoteDevice(address);
         if (device == null) {
             call.reject("Device not found");
             return;
         }
-        
-        try {
-            boolean success = device.createBond();
+
+        if (device.getBondState() == BluetoothDevice.BOND_BONDED) {
             JSObject result = new JSObject();
-            result.put("success", success);
-            result.put("device", device.getName() != null ? device.getName() : "Unknown");
-            result.put("address", device.getAddress());
-            result.put("connected", false);
+            result.put("success", true);
+            result.put("message", "Device already paired");
             call.resolve(result);
-        } catch (Exception e) {
-            call.reject("Pairing failed", e);
+            return;
+        }
+
+        pairingCall = call;
+        boolean success = device.createBond();
+        if (!success) {
+            pairingCall = null;
+            call.reject("Failed to start pairing process");
         }
     }
     
@@ -343,56 +348,60 @@ public class BluetoothPlugin extends Plugin {
             call.reject("Device address required");
             return;
         }
-        
+
         if (!hasRequiredPermissions()) {
             call.reject("Missing required permissions");
             return;
         }
-        
-        // Disconnect from current device first
+
         if (isConnected) {
             disconnect();
         }
-        
+
         BluetoothDevice device = bluetoothAdapter.getRemoteDevice(address);
-        
+        final Handler timeoutHandler = new Handler(Looper.getMainLooper());
+        final Runnable timeoutRunnable = () -> {
+            if (bluetoothSocket != null && !bluetoothSocket.isConnected()) {
+                try {
+                    bluetoothSocket.close();
+                } catch (IOException e) {
+                    Log.e(TAG, "Failed to close socket on timeout", e);
+                }
+            }
+        };
+
         new Thread(() -> {
             try {
                 Log.d(TAG, "Connecting to device: " + device.getAddress());
-                
                 bluetoothSocket = device.createRfcommSocketToServiceRecord(SPP_UUID);
-                bluetoothSocket.connect();
                 
+                timeoutHandler.postDelayed(timeoutRunnable, 10000); // 10 second timeout
+                bluetoothSocket.connect();
+                timeoutHandler.removeCallbacks(timeoutRunnable);
+
                 inputStream = bluetoothSocket.getInputStream();
                 outputStream = bluetoothSocket.getOutputStream();
-                
+
                 connectedDevice = device;
                 isConnected = true;
                 reconnectAttempts = 0;
                 
-                // Save last connected device
                 saveLastConnectedDevice(device);
-                
+
                 mainHandler.post(() -> {
                     JSObject result = new JSObject();
                     result.put("success", true);
                     result.put("device", device.getName() != null ? device.getName() : "Unknown");
                     result.put("address", device.getAddress());
                     result.put("connected", true);
-                    
                     call.resolve(result);
                     notifyListeners("connected", result);
                 });
-                
+
             } catch (IOException e) {
+                timeoutHandler.removeCallbacks(timeoutRunnable);
                 Log.e(TAG, "Connection failed", e);
                 mainHandler.post(() -> {
-                    JSObject result = new JSObject();
-                    result.put("success", false);
-                    result.put("device", device.getName() != null ? device.getName() : "Unknown");
-                    result.put("address", device.getAddress());
-                    result.put("connected", false);
-                    
                     call.reject("Connection failed: " + e.getMessage());
                 });
             }
@@ -426,54 +435,53 @@ public class BluetoothPlugin extends Plugin {
     public void sendCommand(PluginCall call) {
         String command = call.getString("command");
         Integer timeout = call.getInt("timeout", 5000);
-        
+
         if (command == null) {
             call.reject("Command required");
             return;
         }
-        
+
         if (!isConnected || outputStream == null || inputStream == null) {
             call.reject("Not connected to any device");
             return;
         }
-        
+
         new Thread(() -> {
             try {
                 Log.d(TAG, "Sending command: " + command);
-                
-                outputStream.write((command + "\r\n").getBytes());
+                outputStream.write((command + "\r").getBytes());
                 outputStream.flush();
-                
-                // Read response with timeout
+
                 StringBuilder response = new StringBuilder();
                 long startTime = System.currentTimeMillis();
-                
+                char lastChar = ' ';
+
                 while (System.currentTimeMillis() - startTime < timeout) {
                     if (inputStream.available() > 0) {
-                        byte[] buffer = new byte[1024];
-                        int bytes = inputStream.read(buffer);
-                        String data = new String(buffer, 0, bytes);
-                        response.append(data);
+                        int bytes = inputStream.read();
+                        if (bytes == -1) break;
+
+                        lastChar = (char) bytes;
+                        response.append(lastChar);
                         
-                        if (data.contains(">") || data.contains("OK") || data.contains("ERROR")) {
+                        if (lastChar == '>') { // ELM327 prompt character
                             break;
                         }
                     }
-                    Thread.sleep(50);
+                    Thread.sleep(20);
                 }
-                
+
                 String responseStr = response.toString().trim();
                 Log.d(TAG, "Command response: " + responseStr);
-                
+
                 mainHandler.post(() -> {
                     JSObject result = new JSObject();
                     result.put("success", true);
                     result.put("command", command);
                     result.put("response", responseStr);
-                    result.put("timestamp", System.currentTimeMillis());
                     call.resolve(result);
                 });
-                
+
             } catch (Exception e) {
                 Log.e(TAG, "Command failed", e);
                 mainHandler.post(() -> {
@@ -542,27 +550,48 @@ public class BluetoothPlugin extends Plugin {
     @PluginMethod
     public void attemptAutoReconnect(PluginCall call) {
         String lastDeviceAddress = getLastConnectedDeviceAddress();
-        
+
         if (lastDeviceAddress == null) {
-            JSObject result = new JSObject();
-            result.put("success", false);
-            result.put("message", "No previous device found");
-            call.resolve(result);
+            call.reject("No previous device found");
             return;
         }
-        
+
         if (isConnected) {
-            JSObject result = new JSObject();
-            result.put("success", true);
-            result.put("message", "Already connected");
-            call.resolve(result);
+            call.resolve(new JSObject().put("success", true).put("message", "Already connected"));
             return;
         }
-        
-        // Attempt to reconnect
-        PluginCall reconnectCall = new PluginCall(call.getCallbackId(), "connectToDevice", call.getData());
-        reconnectCall.getData().putString("address", lastDeviceAddress);
-        connectToDevice(reconnectCall);
+
+        reconnectAttempts = 0;
+        tryAutoReconnect(lastDeviceAddress, call);
+    }
+
+    private void tryAutoReconnect(String address, PluginCall originalCall) {
+        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+            if (originalCall != null) {
+                originalCall.reject("Auto-reconnect failed after " + MAX_RECONNECT_ATTEMPTS + " attempts");
+            }
+            return;
+        }
+
+        reconnectAttempts++;
+        Log.d(TAG, "Auto-reconnect attempt " + reconnectAttempts + " to " + address);
+
+        PluginCall reconnectCall = new PluginCall("auto-reconnect", "connectToDevice", new JSObject());
+        reconnectCall.getData().put("address", address);
+
+        connectToDevice(new PluginCall(reconnectCall.getCallbackId(), reconnectCall.getMethodName(), reconnectCall.getData()) {
+            @Override
+            public void resolve(JSObject data) {
+                if (originalCall != null) {
+                    originalCall.resolve(data);
+                }
+            }
+
+            @Override
+            public void reject(String message, String code, Exception e) {
+                reconnectHandler.postDelayed(() -> tryAutoReconnect(address, originalCall), RECONNECT_DELAY_MS);
+            }
+        });
     }
     
     // Helper methods
@@ -625,8 +654,27 @@ public class BluetoothPlugin extends Plugin {
         notifyListeners("deviceFound", deviceObj);
     }
     
-    private void notifyPairingState(BluetoothDevice device, int bondState) {
+    @SuppressLint("MissingPermission")
+    private void handleBondStateChange(Intent intent) {
+        BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+        int bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.BOND_NONE);
+        int previousBondState = intent.getIntExtra(BluetoothDevice.EXTRA_PREVIOUS_BOND_STATE, BluetoothDevice.BOND_NONE);
+
         JSObject state = new JSObject();
+        state.put("device", device.getName() != null ? device.getName() : "Unknown");
+        state.put("address", device.getAddress());
+
+        if (pairingCall != null && pairingCall.getData().getString("address").equals(device.getAddress())) {
+            if (bondState == BluetoothDevice.BOND_BONDED) {
+                state.put("success", true);
+                state.put("message", "Pairing successful");
+                pairingCall.resolve(state);
+                pairingCall = null;
+            } else if (bondState == BluetoothDevice.BOND_NONE && previousBondState == BluetoothDevice.BOND_BONDING) {
+                pairingCall.reject("Pairing failed");
+                pairingCall = null;
+            }
+        }
         
         String stateStr;
         switch (bondState) {
@@ -640,9 +688,7 @@ public class BluetoothPlugin extends Plugin {
                 stateStr = "none";
                 break;
         }
-        
         state.put("state", stateStr);
-        state.put("device", device.getName() != null ? device.getName() : "Unknown");
         notifyListeners("pairingState", state);
     }
     
