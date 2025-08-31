@@ -15,9 +15,9 @@
     
     <!-- Legacy Bluetooth Permissions (for older Android versions) -->
     <uses-permission android:name="android.permission.BLUETOOTH" 
-        tools:maxSdkVersion="30" />
+        android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" 
-        tools:maxSdkVersion="30" />
+        android:maxSdkVersion="30" />
     
     <!-- Location Permissions (required for Bluetooth scanning on Android 6-11) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" 
@@ -26,9 +26,9 @@
     
     <!-- Storage Permissions -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        tools:maxSdkVersion="28" />
+        android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
-        tools:maxSdkVersion="32" />
+        android:maxSdkVersion="32" />
     
     <!-- Camera Permission -->
     <uses-permission android:name="android.permission.CAMERA" />
