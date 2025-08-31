@@ -1,47 +1,81 @@
-
 package com.lovable.liondiag307scan.bt
 
 import android.Manifest
 import android.app.Activity
 import android.bluetooth.*
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
+import android.content.*
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import java.io.IOException
 import java.util.*
-import java.util.concurrent.ConcurrentHashMap
+import kotlin.collections.HashSet
 
 /**
- * Enhanced Bluetooth Manager for reliable OBD2 connections
+ * Enhanced Bluetooth Manager for Lion Diag Scan
+ * Handles both Classic and BLE scanning, pairing, and connection
+ * Optimized for OBD2 adapters with proper permission handling
  */
 class EnhancedBluetoothManager(private val activity: Activity) {
     
     companion object {
         private const val TAG = "EnhancedBluetoothManager"
-        private val SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+        private val SPP_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805f9b34fb")
+        private const val REQUEST_ENABLE_BT = 1001
+        private const val REQUEST_PERMISSIONS = 1002
+        private const val DISCOVERY_TIMEOUT = 15000L // 15 seconds
+        private const val CONNECTION_TIMEOUT = 30000L // 30 seconds
     }
-    
-    private val bluetoothManager = activity.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-    private val bluetoothAdapter = bluetoothManager.adapter
-    
-    private var discoveryListener: BluetoothDiscoveryListener? = null
-    private var pairingListener: BluetoothPairingListener? = null
-    private var connectionListener: BluetoothConnectionListener? = null
-    
-    private val discoveredDevices = ConcurrentHashMap<String, BluetoothDevice>()
+
+    // Bluetooth Components
+    private val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
+    private val bluetoothManager: BluetoothManager? = activity.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
     private var currentSocket: BluetoothSocket? = null
-    private var currentDevice: BluetoothDevice? = null
-    private var isConnected = false
+    private var connectionThread: Thread? = null
     
+    // Discovery state
+    private var isScanning = false
+    private val discoveredDevices = mutableSetOf<BluetoothDevice>()
+    private var discoveryListener: BluetoothDiscoveryListener? = null
+    private var discoveryTimeoutHandler: Handler? = null
+    
+    // Connection state
+    private var connectionListener: BluetoothConnectionListener? = null
+    private var currentDevice: BluetoothDevice? = null
+    
+    // Pairing state
+    private var pairingListener: BluetoothPairingListener? = null
+
+    // Interfaces
+    interface BluetoothDiscoveryListener {
+        fun onDeviceFound(device: BluetoothDevice, rssi: Int?)
+        fun onDiscoveryStarted()
+        fun onDiscoveryFinished(devices: Set<BluetoothDevice>)
+        fun onDiscoveryError(error: String)
+    }
+
+    interface BluetoothConnectionListener {
+        fun onConnecting(device: BluetoothDevice)
+        fun onConnected(device: BluetoothDevice, socket: BluetoothSocket)
+        fun onDisconnected(device: BluetoothDevice)
+        fun onConnectionError(device: BluetoothDevice, error: String)
+    }
+
+    interface BluetoothPairingListener {
+        fun onPairingRequested(device: BluetoothDevice)
+        fun onPairingStarted(device: BluetoothDevice)
+        fun onPairingSuccess(device: BluetoothDevice)
+        fun onPairingFailed(device: BluetoothDevice, error: String)
+    }
+
+    // Broadcast receiver for Bluetooth events
     private val bluetoothReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            when (intent.action) {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
                 BluetoothDevice.ACTION_FOUND -> {
                     val device: BluetoothDevice? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
@@ -50,19 +84,26 @@ class EnhancedBluetoothManager(private val activity: Activity) {
                         intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
                     }
                     
+                    val rssi = intent.getShortExtra(BluetoothDevice.EXTRA_RSSI, Short.MIN_VALUE).toInt()
+
                     device?.let {
-                        val rssi = intent.getShortExtra(BluetoothDevice.EXTRA_RSSI, Short.MIN_VALUE).toInt()
-                        discoveredDevices[it.address] = it
-                        discoveryListener?.onDeviceFound(it, rssi)
+                        if (discoveredDevices.add(it)) {
+                            Log.d(TAG, "New device found: ${getDeviceName(it)} (${it.address}) RSSI: $rssi")
+                            discoveryListener?.onDeviceFound(it, if (rssi != Short.MIN_VALUE.toInt()) rssi else null)
+                        }
                     }
                 }
                 
                 BluetoothAdapter.ACTION_DISCOVERY_STARTED -> {
+                    Log.d(TAG, "Bluetooth discovery started")
                     discoveryListener?.onDiscoveryStarted()
                 }
                 
                 BluetoothAdapter.ACTION_DISCOVERY_FINISHED -> {
-                    discoveryListener?.onDiscoveryFinished(discoveredDevices.values.toSet())
+                    Log.d(TAG, "Bluetooth discovery finished. Found ${discoveredDevices.size} devices")
+                    isScanning = false
+                    discoveryListener?.onDiscoveryFinished(discoveredDevices.toSet())
+                    unregisterBluetoothReceiver()
                 }
                 
                 BluetoothDevice.ACTION_BOND_STATE_CHANGED -> {
@@ -73,304 +114,479 @@ class EnhancedBluetoothManager(private val activity: Activity) {
                         intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
                     }
                     
-                    device?.let {
-                        when (it.bondState) {
+                    val bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.ERROR)
+
+                    device?.let { dev ->
+                        when (bondState) {
                             BluetoothDevice.BOND_BONDING -> {
-                                pairingListener?.onPairingStarted(it)
+                                Log.d(TAG, "Pairing started with ${getDeviceName(dev)}")
+                                pairingListener?.onPairingStarted(dev)
                             }
                             BluetoothDevice.BOND_BONDED -> {
-                                pairingListener?.onPairingSuccess(it)
+                                Log.d(TAG, "Successfully paired with ${getDeviceName(dev)}")
+                                pairingListener?.onPairingSuccess(dev)
                             }
                             BluetoothDevice.BOND_NONE -> {
-                                pairingListener?.onPairingFailed(it, "Pairing cancelled or failed")
-                            }
-                            else -> {
-                                // Handle other bond states if needed
+                                Log.w(TAG, "Pairing failed or unpaired with ${getDeviceName(dev)}")
+                                pairingListener?.onPairingFailed(dev, "Pairing was cancelled or failed")
                             }
                         }
+                    }
+                }
+
+                BluetoothAdapter.ACTION_STATE_CHANGED -> {
+                    val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
+                    Log.d(TAG, "Bluetooth adapter state changed: $state")
+
+                    if (state == BluetoothAdapter.STATE_OFF) {
+                        // Clean up when Bluetooth is turned off
+                        stopDiscovery()
+                        disconnect()
                     }
                 }
             }
         }
     }
     
+    /**
+     * Check if device supports Bluetooth
+     */
     fun isBluetoothSupported(): Boolean {
         return bluetoothAdapter != null
     }
     
+    /**
+     * Check if Bluetooth is currently enabled
+     */
     fun isBluetoothEnabled(): Boolean {
         return bluetoothAdapter?.isEnabled == true
     }
     
+    /**
+     * Request to enable Bluetooth
+     */
     fun requestEnableBluetooth(): Boolean {
-        return try {
-            if (!hasAllRequiredPermissions()) {
-                Log.w(TAG, "Missing Bluetooth permissions")
-                false
-            } else {
+        if (!isBluetoothSupported()) return false
+
+        if (!isBluetoothEnabled()) {
+            if (hasBluetoothPermissions()) {
                 val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
-                activity.startActivityForResult(enableBtIntent, 1)
-                true
+                activity.startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT)
+                return true
+            } else {
+                Log.w(TAG, "Cannot enable Bluetooth without proper permissions")
+                return false
             }
-        } catch (e: SecurityException) {
-            Log.e(TAG, "Security exception requesting Bluetooth enable", e)
-            false
         }
+        return true
     }
     
+    /**
+     * Check if all required permissions are granted
+     */
     fun hasAllRequiredPermissions(): Boolean {
-        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            arrayOf(
-                Manifest.permission.BLUETOOTH_SCAN,
-                Manifest.permission.BLUETOOTH_CONNECT,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            )
+        return hasBluetoothPermissions() && hasLocationPermissions()
+    }
+
+    /**
+     * Check Bluetooth-specific permissions
+     */
+    private fun hasBluetoothPermissions(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // Android 12+ requires BLUETOOTH_SCAN and BLUETOOTH_CONNECT
+            hasPermission(Manifest.permission.BLUETOOTH_SCAN) &&
+            hasPermission(Manifest.permission.BLUETOOTH_CONNECT)
         } else {
-            arrayOf(
-                Manifest.permission.BLUETOOTH,
-                Manifest.permission.BLUETOOTH_ADMIN,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            )
+            // Pre-Android 12 requires BLUETOOTH and BLUETOOTH_ADMIN
+            hasPermission(Manifest.permission.BLUETOOTH) &&
+            hasPermission(Manifest.permission.BLUETOOTH_ADMIN)
         }
-        
-        return permissions.all { permission ->
-            ContextCompat.checkSelfPermission(activity, permission) == PackageManager.PERMISSION_GRANTED
+    }
+
+    /**
+     * Check location permissions (required for device discovery)
+     */
+    private fun hasLocationPermissions(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+        } else {
+            hasPermission(Manifest.permission.ACCESS_COARSE_LOCATION) ||
+            hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)
         }
     }
     
+    /**
+     * Request all required permissions
+     */
     fun requestAllPermissions(): Array<String> {
-        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            arrayOf(
-                Manifest.permission.BLUETOOTH_SCAN,
-                Manifest.permission.BLUETOOTH_CONNECT,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            )
+        val permissionsToRequest = mutableListOf<String>()
+
+        // Bluetooth permissions
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (!hasPermission(Manifest.permission.BLUETOOTH_SCAN)) {
+                permissionsToRequest.add(Manifest.permission.BLUETOOTH_SCAN)
+            }
+            if (!hasPermission(Manifest.permission.BLUETOOTH_CONNECT)) {
+                permissionsToRequest.add(Manifest.permission.BLUETOOTH_CONNECT)
+            }
         } else {
-            arrayOf(
-                Manifest.permission.BLUETOOTH,
-                Manifest.permission.BLUETOOTH_ADMIN,
-                Manifest.permission.ACCESS_FINE_LOCATION
+            if (!hasPermission(Manifest.permission.BLUETOOTH)) {
+                permissionsToRequest.add(Manifest.permission.BLUETOOTH)
+            }
+            if (!hasPermission(Manifest.permission.BLUETOOTH_ADMIN)) {
+                permissionsToRequest.add(Manifest.permission.BLUETOOTH_ADMIN)
+            }
+        }
+        
+        // Location permissions
+        if (!hasLocationPermissions()) {
+            permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+        
+        if (permissionsToRequest.isNotEmpty()) {
+            ActivityCompat.requestPermissions(
+                activity,
+                permissionsToRequest.toTypedArray(),
+                REQUEST_PERMISSIONS
             )
         }
         
-        val permissionsNeeded = permissions.filter { permission ->
-            ContextCompat.checkSelfPermission(activity, permission) != PackageManager.PERMISSION_GRANTED
-        }.toTypedArray()
-        
-        if (permissionsNeeded.isNotEmpty()) {
-            ActivityCompat.requestPermissions(activity, permissionsNeeded, 1)
-        }
-        
-        return permissionsNeeded
+        return permissionsToRequest.toTypedArray()
     }
     
+    /**
+     * Start device discovery (scanning)
+     */
     fun startDiscovery(listener: BluetoothDiscoveryListener): Boolean {
+        if (!isBluetoothSupported()) {
+            listener.onDiscoveryError("Bluetooth not supported on this device")
+            return false
+        }
+
+        if (!isBluetoothEnabled()) {
+            listener.onDiscoveryError("Bluetooth is not enabled")
+            return false
+        }
+
         if (!hasAllRequiredPermissions()) {
             listener.onDiscoveryError("Missing required permissions")
             return false
         }
         
-        if (!isBluetoothEnabled()) {
-            listener.onDiscoveryError("Bluetooth not enabled")
+        if (isScanning) {
+            Log.w(TAG, "Discovery already in progress")
             return false
         }
         
+        this.discoveryListener = listener
+        discoveredDevices.clear()
+
         try {
-            this.discoveryListener = listener
-            discoveredDevices.clear()
-            
-            // Register receiver
-            val filter = IntentFilter().apply {
-                addAction(BluetoothDevice.ACTION_FOUND)
-                addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED)
-                addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
-            }
-            activity.registerReceiver(bluetoothReceiver, filter)
+            // Register broadcast receiver
+            registerBluetoothReceiver()
             
             // Cancel any ongoing discovery
-            if (bluetoothAdapter?.isDiscovering == true) {
-                bluetoothAdapter.cancelDiscovery()
+            bluetoothAdapter?.cancelDiscovery()
+            
+            // Start discovery
+            val started = bluetoothAdapter?.startDiscovery() == true
+            if (started) {
+                isScanning = true
+                Log.d(TAG, "Starting Bluetooth device discovery")
+
+                // Set timeout for discovery
+                discoveryTimeoutHandler = Handler(Looper.getMainLooper())
+                discoveryTimeoutHandler?.postDelayed({
+                    if (isScanning) {
+                        Log.w(TAG, "Discovery timeout reached")
+                        stopDiscovery()
+                    }
+                }, DISCOVERY_TIMEOUT)
+
+                return true
+            } else {
+                listener.onDiscoveryError("Failed to start Bluetooth discovery")
+                unregisterBluetoothReceiver()
+                return false
             }
-            
-            return bluetoothAdapter?.startDiscovery() == true
-            
         } catch (e: SecurityException) {
-            Log.e(TAG, "Security exception during discovery", e)
+            Log.e(TAG, "Security exception during discovery start", e)
             listener.onDiscoveryError("Permission denied: ${e.message}")
             return false
         } catch (e: Exception) {
-            Log.e(TAG, "Error starting discovery", e)
-            listener.onDiscoveryError("Discovery failed: ${e.message}")
+            Log.e(TAG, "Unexpected error during discovery start", e)
+            listener.onDiscoveryError("Unexpected error: ${e.message}")
             return false
         }
     }
     
+    /**
+     * Stop device discovery
+     */
     fun stopDiscovery() {
+        if (!isScanning) return
+
         try {
-            if (bluetoothAdapter?.isDiscovering == true) {
-                bluetoothAdapter.cancelDiscovery()
-            }
-            
-            try {
-                activity.unregisterReceiver(bluetoothReceiver)
-            } catch (e: IllegalArgumentException) {
-                // Receiver not registered, ignore
-            }
-            
-            discoveryListener = null
-            
+            bluetoothAdapter?.cancelDiscovery()
+            isScanning = false
+            discoveryTimeoutHandler?.removeCallbacksAndMessages(null)
+            unregisterBluetoothReceiver()
+            Log.d(TAG, "Bluetooth discovery stopped")
         } catch (e: SecurityException) {
-            Log.e(TAG, "Security exception stopping discovery", e)
+            Log.e(TAG, "Security exception during discovery stop", e)
         }
     }
     
+    /**
+     * Get list of paired/bonded devices
+     */
     fun getPairedDevices(): Set<BluetoothDevice> {
+        if (!hasBluetoothPermissions()) {
+            Log.w(TAG, "Cannot get paired devices without Bluetooth permissions")
+            return emptySet()
+        }
+
         return try {
-            if (hasAllRequiredPermissions()) {
-                bluetoothAdapter?.bondedDevices ?: emptySet()
-            } else {
-                emptySet()
-            }
+            bluetoothAdapter?.bondedDevices ?: emptySet()
         } catch (e: SecurityException) {
             Log.e(TAG, "Security exception getting paired devices", e)
             emptySet()
         }
     }
     
+    /**
+     * Pair with a device
+     */
     fun pairDevice(device: BluetoothDevice, listener: BluetoothPairingListener): Boolean {
-        if (!hasAllRequiredPermissions()) {
-            listener.onPairingFailed(device, "Missing required permissions")
+        if (!hasBluetoothPermissions()) {
+            listener.onPairingFailed(device, "Missing Bluetooth permissions")
             return false
         }
         
+        this.pairingListener = listener
+
         try {
-            this.pairingListener = listener
+            // Check if already paired
+            if (device.bondState == BluetoothDevice.BOND_BONDED) {
+                listener.onPairingSuccess(device)
+                return true
+            }
             
             // Register for pairing events
-            val filter = IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
-            activity.registerReceiver(bluetoothReceiver, filter)
+            registerBluetoothReceiver()
             
+            // Start pairing
             listener.onPairingRequested(device)
-            return device.createBond()
+            val result = device.createBond()
+
+            if (!result) {
+                listener.onPairingFailed(device, "Failed to initiate pairing")
+                unregisterBluetoothReceiver()
+            }
             
+            return result
         } catch (e: SecurityException) {
-            Log.e(TAG, "Security exception during pairing", e)
             listener.onPairingFailed(device, "Permission denied: ${e.message}")
             return false
         } catch (e: Exception) {
-            Log.e(TAG, "Error during pairing", e)
-            listener.onPairingFailed(device, "Pairing failed: ${e.message}")
+            listener.onPairingFailed(device, "Pairing error: ${e.message}")
             return false
         }
     }
     
+    /**
+     * Connect to a device using SPP (Serial Port Profile)
+     */
     fun connectToDevice(device: BluetoothDevice, listener: BluetoothConnectionListener) {
-        if (!hasAllRequiredPermissions()) {
-            listener.onConnectionError(device, "Missing required permissions")
+        if (!hasBluetoothPermissions()) {
+            listener.onConnectionError(device, "Missing Bluetooth permissions")
             return
         }
         
-        Thread {
+        // Disconnect any existing connection
+        disconnect()
+
+        this.connectionListener = listener
+        this.currentDevice = device
+
+        listener.onConnecting(device)
+
+        connectionThread = Thread {
             try {
-                this.connectionListener = listener
-                listener.onConnecting(device)
+                Log.d(TAG, "Connecting to ${getDeviceName(device)} (${device.address})")
                 
-                // Cancel discovery to free up resources
-                if (bluetoothAdapter?.isDiscovering == true) {
-                    bluetoothAdapter.cancelDiscovery()
-                }
+                // Cancel discovery to improve connection reliability
+                bluetoothAdapter?.cancelDiscovery()
                 
-                // Create socket
-                val socket = device.createRfcommSocketToServiceRecord(SPP_UUID)
+                // Create socket with fallback strategies
+                val socket = createBluetoothSocket(device)
+                currentSocket = socket
                 
                 // Connect with timeout
-                socket.connect()
+                val connectRunnable = Runnable { socket.connect() }
+                val connectThread = Thread(connectRunnable)
+                connectThread.start()
+                connectThread.join(CONNECTION_TIMEOUT)
                 
-                currentSocket = socket
-                currentDevice = device
-                isConnected = true
+                if (connectThread.isAlive) {
+                    connectThread.interrupt()
+                    socket.close()
+                    throw IOException("Connection timeout after ${CONNECTION_TIMEOUT}ms")
+                }
                 
-                listener.onConnected(device, socket)
+                if (socket.isConnected) {
+                    Log.d(TAG, "Successfully connected to ${getDeviceName(device)}")
+                    Handler(Looper.getMainLooper()).post {
+                        listener.onConnected(device, socket)
+                    }
+                } else {
+                    throw IOException("Socket connection failed")
+                }
                 
-            } catch (e: IOException) {
-                Log.e(TAG, "Connection failed", e)
-                listener.onConnectionError(device, "Connection failed: ${e.message}")
-                cleanup()
-            } catch (e: SecurityException) {
-                Log.e(TAG, "Security exception during connection", e)
-                listener.onConnectionError(device, "Permission denied: ${e.message}")
-                cleanup()
             } catch (e: Exception) {
-                Log.e(TAG, "Unexpected error during connection", e)
-                listener.onConnectionError(device, "Unexpected error: ${e.message}")
-                cleanup()
+                Log.e(TAG, "Connection failed to ${getDeviceName(device)}", e)
+                Handler(Looper.getMainLooper()).post {
+                    listener.onConnectionError(device, "Connection failed: ${e.message}")
+                }
+
+                // Clean up
+                try {
+                    currentSocket?.close()
+                } catch (closeException: Exception) {
+                    Log.e(TAG, "Error closing socket after failed connection", closeException)
+                }
+                currentSocket = null
             }
-        }.start()
+        }
+
+        connectionThread?.start()
     }
     
+    /**
+     * Disconnect from current device
+     */
     fun disconnect() {
-        try {
-            currentSocket?.close()
-            
-            currentDevice?.let { device ->
-                connectionListener?.onDisconnected(device)
+        connectionThread?.interrupt()
+        connectionThread = null
+
+        currentSocket?.let { socket ->
+            try {
+                socket.close()
+                Log.d(TAG, "Disconnected from device")
+                currentDevice?.let { device ->
+                    connectionListener?.onDisconnected(device)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error closing socket", e)
             }
-            
-        } catch (e: IOException) {
-            Log.e(TAG, "Error closing socket", e)
-        } finally {
-            cleanup()
+        }
+
+        currentSocket = null
+        currentDevice = null
+    }
+    
+    /**
+     * Check if currently connected
+     */
+    fun isConnected(): Boolean {
+        return currentSocket?.isConnected == true
+    }
+    
+    /**
+     * Get current connected device
+     */
+    fun getCurrentDevice(): BluetoothDevice? {
+        return if (isConnected()) currentDevice else null
+    }
+    
+    /**
+     * Get current socket for data communication
+     */
+    fun getCurrentSocket(): BluetoothSocket? {
+        return if (isConnected()) currentSocket else null
+    }
+    
+    /**
+     * Create Bluetooth socket with fallback strategies
+     */
+    private fun createBluetoothSocket(device: BluetoothDevice): BluetoothSocket {
+        return try {
+            // Try insecure connection first (works better with most OBD2 adapters)
+            device.createInsecureRfcommSocketToServiceRecord(SPP_UUID)
+        } catch (e: Exception) {
+            try {
+                // Fallback to secure connection
+                device.createRfcommSocketToServiceRecord(SPP_UUID)
+            } catch (e2: Exception) {
+                // Last resort: use reflection for older devices
+                try {
+                    val method = device.javaClass.getMethod("createRfcommSocket", Int::class.javaPrimitiveType)
+                    method.invoke(device, 1) as BluetoothSocket
+                } catch (e3: Exception) {
+                    throw IOException("Failed to create Bluetooth socket", e3)
+                }
+            }
         }
     }
     
-    fun isConnected(): Boolean {
-        return isConnected && currentSocket?.isConnected == true
+    /**
+     * Register broadcast receiver for Bluetooth events
+     */
+    private fun registerBluetoothReceiver() {
+        try {
+            val filter = IntentFilter().apply {
+                addAction(BluetoothDevice.ACTION_FOUND)
+                addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED)
+                addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
+                addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+                addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
+            }
+            activity.registerReceiver(bluetoothReceiver, filter)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error registering Bluetooth receiver", e)
+        }
+    }
+
+    /**
+     * Unregister broadcast receiver
+     */
+    private fun unregisterBluetoothReceiver() {
+        try {
+            activity.unregisterReceiver(bluetoothReceiver)
+        } catch (e: Exception) {
+            // Receiver might not be registered, ignore
+        }
     }
     
-    fun getCurrentDevice(): BluetoothDevice? {
-        return if (isConnected) currentDevice else null
+    /**
+     * Get device name safely
+     */
+    private fun getDeviceName(device: BluetoothDevice): String {
+        return try {
+            if (hasBluetoothPermissions()) {
+                device.name ?: "Unknown Device"
+            } else {
+                "Unknown Device"
+            }
+        } catch (e: SecurityException) {
+            "Unknown Device"
+        }
     }
     
-    fun getBluetoothAdapter(): BluetoothAdapter? {
-        return bluetoothAdapter
+    /**
+     * Check if specific permission is granted
+     */
+    private fun hasPermission(permission: String): Boolean {
+        return ContextCompat.checkSelfPermission(activity, permission) == PackageManager.PERMISSION_GRANTED
     }
     
-    private fun cleanup() {
-        isConnected = false
-        currentDevice = null
-        currentSocket = null
-    }
-    
+    /**
+     * Clean up resources
+     */
     fun cleanup() {
         stopDiscovery()
         disconnect()
-        
-        try {
-            activity.unregisterReceiver(bluetoothReceiver)
-        } catch (e: IllegalArgumentException) {
-            // Receiver not registered, ignore
-        }
-    }
-    
-    // Listener interfaces
-    interface BluetoothDiscoveryListener {
-        fun onDeviceFound(device: BluetoothDevice, rssi: Int?)
-        fun onDiscoveryStarted()
-        fun onDiscoveryFinished(devices: Set<BluetoothDevice>)
-        fun onDiscoveryError(error: String)
-    }
-    
-    interface BluetoothPairingListener {
-        fun onPairingRequested(device: BluetoothDevice)
-        fun onPairingStarted(device: BluetoothDevice)
-        fun onPairingSuccess(device: BluetoothDevice)
-        fun onPairingFailed(device: BluetoothDevice, error: String)
-    }
-    
-    interface BluetoothConnectionListener {
-        fun onConnecting(device: BluetoothDevice)
-        fun onConnected(device: BluetoothDevice, socket: BluetoothSocket)
-        fun onDisconnected(device: BluetoothDevice)
-        fun onConnectionError(device: BluetoothDevice, error: String)
+        unregisterBluetoothReceiver()
+        discoveryTimeoutHandler?.removeCallbacksAndMessages(null)
     }
 }

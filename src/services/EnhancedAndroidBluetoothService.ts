@@ -1,16 +1,15 @@
-
 import { LionDiagBluetooth, BluetoothDevice as PluginBluetoothDevice, ConnectionResult as PluginConnectionResult } from '../plugins/LionDiagBluetooth';
 import { BluetoothDevice, ConnectionResult } from './bluetooth/types';
 import { Emitter } from '../utils/emitter';
 import { Capacitor } from '@capacitor/core';
 
 export type BluetoothServiceEvent = {
-  deviceFound: BluetoothDevice;
-  scanStarted: void;
-  scanStopped: void;
-  connected: BluetoothDevice;
-  disconnected: void;
-  pairingStateChanged: { state: string; device: string, address: string, success?: boolean, message?: string };
+  deviceFound: (device: BluetoothDevice) => void;
+  scanStarted: () => void;
+  scanStopped: () => void;
+  connected: (device: BluetoothDevice) => void;
+  disconnected: () => void;
+  pairingStateChanged: (state: { state: string; device: string, address: string, success?: boolean, message?: string }) => void;
 };
 
 class EnhancedAndroidBluetoothService {
@@ -63,12 +62,12 @@ class EnhancedAndroidBluetoothService {
     LionDiagBluetooth.addListener('discoveryStarted', () => {
       this.isScanning = true;
       this.discoveredDevices.clear();
-      this.emitter.emit('scanStarted', undefined);
+      this.emitter.emit('scanStarted');
     });
 
     LionDiagBluetooth.addListener('discoveryFinished', () => {
       this.isScanning = false;
-      this.emitter.emit('scanStopped', undefined);
+      this.emitter.emit('scanStopped');
     });
 
     LionDiagBluetooth.addListener('connected', (result: PluginConnectionResult) => {
@@ -87,19 +86,11 @@ class EnhancedAndroidBluetoothService {
         this.connectedDevice.isConnected = false;
       }
       this.connectedDevice = null;
-      this.emitter.emit('disconnected', undefined);
+      this.emitter.emit('disconnected');
     });
 
-    LionDiagBluetooth.addListener('pairingState', (state: any) => {
-        // Ensure address is included in the state object
-        const pairingState = {
-            state: state.state || 'unknown',
-            device: state.device || 'Unknown Device',
-            address: state.address || '',
-            success: state.success,
-            message: state.message
-        };
-        this.emitter.emit('pairingStateChanged', pairingState);
+    LionDiagBluetooth.addListener('pairingState', (state) => {
+        this.emitter.emit('pairingStateChanged', state);
     });
   }
 
@@ -188,6 +179,10 @@ class EnhancedAndroidBluetoothService {
     } catch (error: any) {
       throw new Error(error.message || 'Command failed');
     }
+  }
+
+  public async attemptAutoReconnect() {
+      return LionDiagBluetooth.attemptAutoReconnect();
   }
 
   public getDiscoveredDevices(): BluetoothDevice[] {
