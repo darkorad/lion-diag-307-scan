@@ -32,7 +32,7 @@ class EnhancedBluetoothManager(private val activity: Activity) {
     }
 
     // Bluetooth Components
-    private val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
+    internal val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
     private val bluetoothManager: BluetoothManager? = activity.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
     private var currentSocket: BluetoothSocket? = null
     private var connectionThread: Thread? = null
@@ -129,6 +129,9 @@ class EnhancedBluetoothManager(private val activity: Activity) {
                             BluetoothDevice.BOND_NONE -> {
                                 Log.w(TAG, "Pairing failed or unpaired with ${getDeviceName(dev)}")
                                 pairingListener?.onPairingFailed(dev, "Pairing was cancelled or failed")
+                            }
+                            else -> {
+                                // Ignore other states
                             }
                         }
                     }

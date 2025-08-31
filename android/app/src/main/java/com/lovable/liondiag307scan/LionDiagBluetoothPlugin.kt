@@ -75,8 +75,7 @@ class LionDiagBluetoothPlugin : Plugin() {
     /**
      * Request all required permissions
      */
-    @PluginMethod
-    fun requestPermissions(call: PluginCall) {
+    override fun requestPermissions(call: PluginCall) {
         if (!isInitialized) {
             call.reject("Plugin not initialized")
             return
@@ -458,8 +457,7 @@ class LionDiagBluetoothPlugin : Plugin() {
         Thread {
             try {
                 // Send command with carriage return
-                val commandWithCR = "$command\
-"
+                val commandWithCR = "$command\r"
                 outputStream?.write(commandWithCR.toByteArray(StandardCharsets.US_ASCII))
                 outputStream?.flush()
                 
@@ -529,13 +527,12 @@ class LionDiagBluetoothPlugin : Plugin() {
                 for (command in initCommands) {
                     Thread.sleep(200) // Small delay between commands
                     
-                    val commandCall = PluginCall(bridge, command, null, null)
-                    commandCall.data.put("command", command)
-                    commandCall.data.put("timeout", 3000)
-
                     try {
-                        sendCommandSync(command, 3000)?.let { response ->
+                        val response = sendCommandSync(command, 3000)
+                        if (response != null) {
                             responses.add("$command: $response")
+                        } else {
+                             responses.add("$command: ERROR - No response")
                         }
                     } catch (e: Exception) {
                         responses.add("$command: ERROR - ${e.message}")
@@ -545,8 +542,7 @@ class LionDiagBluetoothPlugin : Plugin() {
                 val result = JSObject().apply {
                     put("success", true)
                     put("message", "ELM327 initialized")
-                    put("responses", responses.joinToString("\
-"))
+                    put("responses", responses.joinToString("\n"))
                 }
                 
                 call.resolve(result)
@@ -562,8 +558,7 @@ class LionDiagBluetoothPlugin : Plugin() {
      */
     private fun sendCommandSync(command: String, timeout: Int): String? {
         return try {
-            val commandWithCR = "$command\
-"
+            val commandWithCR = "$command\r"
             outputStream?.write(commandWithCR.toByteArray(StandardCharsets.US_ASCII))
             outputStream?.flush()
             
