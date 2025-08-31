@@ -443,19 +443,7 @@ class EnhancedBluetoothManager(private val activity: Activity) {
                     throw IOException("Socket connection failed")
                 }
                 
-            } catch (e: Exception) {
-                Log.e(TAG, "Connection failed to ${getDeviceName(device)}", e)
-                Handler(Looper.getMainLooper()).post {
-                    listener.onConnectionError(device, "Connection failed: ${e.message}")
-                }
 
-                // Clean up
-                try {
-                    currentSocket?.close()
-                } catch (closeException: Exception) {
-                    Log.e(TAG, "Error closing socket after failed connection", closeException)
-                }
-                currentSocket = null
             }
         }
 
@@ -479,6 +467,7 @@ class EnhancedBluetoothManager(private val activity: Activity) {
             } catch (e: Exception) {
                 Log.e(TAG, "Error closing socket", e)
             }
+
         }
 
         currentSocket = null
@@ -506,27 +495,7 @@ class EnhancedBluetoothManager(private val activity: Activity) {
         return if (isConnected()) currentSocket else null
     }
     
-    /**
-     * Create Bluetooth socket with fallback strategies
-     */
-    private fun createBluetoothSocket(device: BluetoothDevice): BluetoothSocket {
-        return try {
-            // Try insecure connection first (works better with most OBD2 adapters)
-            device.createInsecureRfcommSocketToServiceRecord(SPP_UUID)
-        } catch (e: Exception) {
-            try {
-                // Fallback to secure connection
-                device.createRfcommSocketToServiceRecord(SPP_UUID)
-            } catch (e2: Exception) {
-                // Last resort: use reflection for older devices
-                try {
-                    val method = device.javaClass.getMethod("createRfcommSocket", Int::class.javaPrimitiveType)
-                    method.invoke(device, 1) as BluetoothSocket
-                } catch (e3: Exception) {
-                    throw IOException("Failed to create Bluetooth socket", e3)
-                }
-            }
-        }
+
     }
     
     /**
