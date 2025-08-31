@@ -1,4 +1,3 @@
-
 package com.lovable.liondiag307scan.bt
 
 import android.Manifest
@@ -295,15 +294,15 @@ class EnhancedBluetoothManager(private val activity: Activity) {
             } catch (e: IOException) {
                 Log.e(TAG, "Connection failed", e)
                 listener.onConnectionError(device, "Connection failed: ${e.message}")
-                cleanup()
+                cleanupConnection()
             } catch (e: SecurityException) {
                 Log.e(TAG, "Security exception during connection", e)
                 listener.onConnectionError(device, "Permission denied: ${e.message}")
-                cleanup()
+                cleanupConnection()
             } catch (e: Exception) {
                 Log.e(TAG, "Unexpected error during connection", e)
                 listener.onConnectionError(device, "Unexpected error: ${e.message}")
-                cleanup()
+                cleanupConnection()
             }
         }.start()
     }
@@ -319,7 +318,7 @@ class EnhancedBluetoothManager(private val activity: Activity) {
         } catch (e: IOException) {
             Log.e(TAG, "Error closing socket", e)
         } finally {
-            cleanup()
+            cleanupConnection()
         }
     }
     
@@ -335,7 +334,7 @@ class EnhancedBluetoothManager(private val activity: Activity) {
         return bluetoothAdapter
     }
     
-    private fun cleanup() {
+    private fun cleanupConnection() {
         isConnected = false
         currentDevice = null
         currentSocket = null
