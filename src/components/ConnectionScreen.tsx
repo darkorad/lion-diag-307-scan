@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -128,13 +127,7 @@ const ConnectionScreen: React.FC = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ConnectionPanel
-                isConnected={isConnected}
-                onConnectionChange={handleConnectionChange}
-                connectionStatus={connectionStatus}
-                onStatusChange={handleStatusChange}
-                vehicleInfo={vehicleInfo}
-              />
+              <ConnectionPanel />
             </CardContent>
           </Card>
         </TabsContent>

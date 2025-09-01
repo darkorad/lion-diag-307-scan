@@ -36,6 +36,7 @@ export interface CommandResult {
 export interface ConnectionHistory {
   deviceId: string;
   timestamp: Date;
+  connectionTime?: number;
   success: boolean;
   error?: string;
 }
