@@ -34,6 +34,11 @@ const ConnectionScreen: React.FC = () => {
     toast.success(`Successfully connected to ${device.name}`);
   };
 
+  const handleDeviceSelected = (device: BluetoothDevice) => {
+    // Handle device selection from ConnectionPanel
+    console.log('Device selected:', device);
+  };
+
   const handleConnectionChange = (connected: boolean) => {
     setIsConnected(connected);
     if (!connected) {
@@ -127,7 +132,7 @@ const ConnectionScreen: React.FC = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ConnectionPanel />
+              <ConnectionPanel onDeviceSelected={handleDeviceSelected} />
             </CardContent>
           </Card>
         </TabsContent>

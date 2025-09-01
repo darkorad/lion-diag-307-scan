@@ -1,4 +1,3 @@
-
 import { registerPlugin } from '@capacitor/core';
 
 export interface BluetoothDevice {
@@ -31,6 +30,7 @@ export interface ConnectionResult {
   device?: string;
   address?: string;
   connected: boolean;
+  message?: string;
 }
 
 export interface CommandResult {

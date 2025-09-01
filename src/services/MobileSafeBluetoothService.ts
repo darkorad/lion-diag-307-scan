@@ -1,61 +1,40 @@
+import { BluetoothDevice } from './bluetooth/types';
+import { ConnectionStatus } from './bluetooth/types';
 
-import { unifiedBluetoothService } from './UnifiedBluetoothService';
-import { BluetoothDevice, ConnectionResult, ConnectionStatus } from './bluetooth/types';
-
-// This service is now a wrapper around the UnifiedBluetoothService.
-// This is to ensure that all parts of the app use the same Bluetooth logic.
-// The long-term goal should be to refactor the components to use the UnifiedBluetoothService directly.
-
-export class MobileSafeBluetoothService {
+class MobileSafeBluetoothService {
   private static instance: MobileSafeBluetoothService;
+  private connectedDevice: BluetoothDevice | null = null;
 
-  static getInstance(): MobileSafeBluetoothService {
+  private constructor() {}
+
+  public static getInstance(): MobileSafeBluetoothService {
     if (!MobileSafeBluetoothService.instance) {
       MobileSafeBluetoothService.instance = new MobileSafeBluetoothService();
     }
     return MobileSafeBluetoothService.instance;
   }
 
-  async initialize(): Promise<boolean> {
-    return unifiedBluetoothService.initialize();
+  public setConnectedDevice(device: BluetoothDevice): void {
+    this.connectedDevice = { ...device, isConnected: true };
   }
 
-  async isBluetoothEnabled(): Promise<boolean> {
-    return unifiedBluetoothService.isBluetoothEnabled();
+  public clearConnectedDevice(): void {
+    if (this.connectedDevice) {
+      this.connectedDevice.isConnected = false;
+    }
+    this.connectedDevice = null;
   }
 
-  async enableBluetooth(): Promise<boolean> {
-    return unifiedBluetoothService.enableBluetooth();
-  }
-
-  async scanForDevices(): Promise<BluetoothDevice[]> {
-    return unifiedBluetoothService.scanForDevices();
-  }
-
-  async connectToDevice(device: BluetoothDevice): Promise<ConnectionResult> {
-    return unifiedBluetoothService.connectToDevice(device);
-  }
-
-  async disconnect(): Promise<boolean> {
-    return unifiedBluetoothService.disconnect();
-  }
-
-  async sendCommand(command: string): Promise<string> {
-    return unifiedBluetoothService.sendCommand(command);
+  public getDevice(): BluetoothDevice | null {
+    return this.connectedDevice;
   }
 
   getConnectionStatus(): ConnectionStatus {
-    return unifiedBluetoothService.getConnectionStatus();
-  }
-
-  isConnected(): boolean {
-    return unifiedBluetoothService.isConnectedToDevice();
-  }
-
-  getConnectedDevice(): BluetoothDevice | null {
-    return unifiedBluetoothService.getConnectedDevice();
+    if (this.connectedDevice?.isConnected) {
+      return 'connected';
+    }
+    return 'disconnected';
   }
 }
 
 export const mobileSafeBluetoothService = MobileSafeBluetoothService.getInstance();
-export type { BluetoothDevice, ConnectionResult, ConnectionStatus };
