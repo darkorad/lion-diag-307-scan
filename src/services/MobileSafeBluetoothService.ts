@@ -1,7 +1,6 @@
-
 import { BluetoothDevice, ConnectionStatus } from './bluetooth/types';
 
-export { BluetoothDevice };
+export type { BluetoothDevice };
 
 class MobileSafeBluetoothService {
   private static instance: MobileSafeBluetoothService;
