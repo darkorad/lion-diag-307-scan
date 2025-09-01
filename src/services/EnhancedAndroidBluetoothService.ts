@@ -9,7 +9,7 @@ export type BluetoothServiceEvent = {
   scanStopped: void;
   connected: BluetoothDevice;
   disconnected: void;
-  pairingStateChanged: { state: string; device: string, address: string, success?: boolean, message?: string };
+  pairingStateChanged: { state: string; device: string; address: string; success?: boolean; message?: string };
 };
 
 class EnhancedAndroidBluetoothService {
@@ -62,12 +62,12 @@ class EnhancedAndroidBluetoothService {
     LionDiagBluetooth.addListener('discoveryStarted', () => {
       this.isScanning = true;
       this.discoveredDevices.clear();
-      this.emitter.emit('scanStarted');
+      this.emitter.emit('scanStarted', undefined);
     });
 
     LionDiagBluetooth.addListener('discoveryFinished', () => {
       this.isScanning = false;
-      this.emitter.emit('scanStopped');
+      this.emitter.emit('scanStopped', undefined);
     });
 
     LionDiagBluetooth.addListener('connected', (result: PluginConnectionResult) => {
@@ -86,11 +86,19 @@ class EnhancedAndroidBluetoothService {
         this.connectedDevice.isConnected = false;
       }
       this.connectedDevice = null;
-      this.emitter.emit('disconnected');
+      this.emitter.emit('disconnected', undefined);
     });
 
     LionDiagBluetooth.addListener('pairingState', (state) => {
-        this.emitter.emit('pairingStateChanged', state);
+        // Add required address field with fallback
+        const pairingData = {
+          state: state.state,
+          device: state.device,
+          address: state.device, // Use device name as fallback for address
+          success: undefined,
+          message: undefined
+        };
+        this.emitter.emit('pairingStateChanged', pairingData);
     });
   }
 
