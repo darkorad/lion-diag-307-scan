@@ -222,10 +222,6 @@ class EnhancedAndroidBluetoothService {
     }
   }
 
-  public async attemptAutoReconnect() {
-      return LionDiagBluetooth.attemptAutoReconnect();
-  }
-
   public getDiscoveredDevices(): BluetoothDevice[] {
     return Array.from(this.discoveredDevices.values());
   }

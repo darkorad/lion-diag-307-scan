@@ -32,3 +32,10 @@ export interface CommandResult {
   response?: string;
   error?: string;
 }
+
+export interface ConnectionHistory {
+  deviceId: string;
+  timestamp: Date;
+  success: boolean;
+  error?: string;
+}

@@ -11,7 +11,7 @@ import {
   HelpCircle,
   AlertCircle
 } from 'lucide-react';
-import ConnectionPanel from './ConnectionPanel';
+import { ConnectionPanel } from './ConnectionPanel';
 import ProfessionalConnectionPanel from './ProfessionalConnectionPanel';
 import SimplifiedBluetoothConnection from './SimplifiedBluetoothConnection';
 import BackButton from './BackButton';

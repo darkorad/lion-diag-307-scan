@@ -1,4 +1,3 @@
-
 import { BluetoothDevice } from '@/services/MobileSafeBluetoothService';
 import { mobileSafeBluetoothService } from '@/services/MobileSafeBluetoothService';
 
@@ -61,7 +60,7 @@ export class VehicleModulesService {
       await this.initialize();
       
       const status = mobileSafeBluetoothService.getConnectionStatus();
-      if (!status.isConnected) {
+      if (status !== 'connected') {
         throw new Error('Not connected to OBD2 device');
       }
 
@@ -107,7 +106,7 @@ export class VehicleModulesService {
   async sendCommand(command: string): Promise<string> {
     try {
       const status = mobileSafeBluetoothService.getConnectionStatus();
-      if (!status.isConnected) {
+      if (status !== 'connected') {
         throw new Error('Not connected to OBD2 device');
       }
 
