@@ -33,17 +33,6 @@ class ErrorBoundary extends React.Component<
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('Error caught by ErrorBoundary:', error, errorInfo);
     
-    // Use the error logging service
-    import('./services/ErrorLoggingService').then(({ errorLoggingService, ErrorCategory, ErrorSeverity }) => {
-      errorLoggingService.logError(
-        `UI Error: ${error.message}`,
-        ErrorSeverity.ERROR,
-        ErrorCategory.UI,
-        error,
-        { component: this.props.fallbackComponent || 'Unknown', errorInfo }
-      );
-    });
-    
     this.setState({
       hasError: true,
       error,

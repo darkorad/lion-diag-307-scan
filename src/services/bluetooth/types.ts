@@ -8,7 +8,6 @@ export interface BluetoothDevice {
   deviceType: 'ELM327' | 'OBD2' | 'Generic';
   compatibility: number;
   rssi?: number;
-  connectionQuality?: 'excellent' | 'good' | 'fair' | 'poor';
 }
 
 export interface ConnectionResult {
@@ -16,21 +15,20 @@ export interface ConnectionResult {
   device?: BluetoothDevice;
   error?: string;
   strategy?: string;
-  connectionTime?: number;
+  message?: string;
+  recoverable?: boolean;
 }
 
-export interface ConnectionStatus {
-  isConnected: boolean;
-  device?: BluetoothDevice | null;
-  lastConnected?: Date;
-  quality?: string;
-  strategy?: string | null;
-}
+export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
-export interface ConnectionHistory {
-  deviceName: string;
-  deviceId: string;
-  connectionTime: number;
+export interface ScanResult {
+  devices: BluetoothDevice[];
   success: boolean;
-  dataReceived?: boolean;
+  error?: string;
+}
+
+export interface CommandResult {
+  success: boolean;
+  response?: string;
+  error?: string;
 }
