@@ -1,5 +1,4 @@
-import { BluetoothDevice } from '@/services/MobileSafeBluetoothService';
-import { mobileSafeBluetoothService } from '@/services/MobileSafeBluetoothService';
+import { BluetoothDevice, mobileSafeBluetoothService } from '@/services/MobileSafeBluetoothService';
 
 export interface ModuleInfo {
   id: string;

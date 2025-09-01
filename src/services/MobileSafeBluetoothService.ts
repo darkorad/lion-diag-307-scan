@@ -1,5 +1,7 @@
-import { BluetoothDevice } from './bluetooth/types';
-import { ConnectionStatus } from './bluetooth/types';
+
+import { BluetoothDevice, ConnectionStatus } from './bluetooth/types';
+
+export { BluetoothDevice };
 
 class MobileSafeBluetoothService {
   private static instance: MobileSafeBluetoothService;
@@ -12,6 +14,10 @@ class MobileSafeBluetoothService {
       MobileSafeBluetoothService.instance = new MobileSafeBluetoothService();
     }
     return MobileSafeBluetoothService.instance;
+  }
+
+  public async initialize(): Promise<boolean> {
+    return true;
   }
 
   public setConnectedDevice(device: BluetoothDevice): void {
@@ -29,11 +35,18 @@ class MobileSafeBluetoothService {
     return this.connectedDevice;
   }
 
-  getConnectionStatus(): ConnectionStatus {
+  public getConnectionStatus(): ConnectionStatus {
     if (this.connectedDevice?.isConnected) {
       return 'connected';
     }
     return 'disconnected';
+  }
+
+  public async sendCommand(command: string): Promise<string> {
+    if (!this.connectedDevice) {
+      throw new Error('No device connected');
+    }
+    return `Response to ${command}`;
   }
 }
 
