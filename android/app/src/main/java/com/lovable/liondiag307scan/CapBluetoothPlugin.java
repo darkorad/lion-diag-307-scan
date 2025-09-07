@@ -172,7 +172,7 @@ public class CapBluetoothPlugin extends Plugin {
                 outputStream.flush();
 
                 // Read response until '>' prompt
-                byte[] buffer = new byte(4096);
+                byte[] buffer = new byte[4096];
                 StringBuilder response = new StringBuilder();
                 
                 long startTime = System.currentTimeMillis();

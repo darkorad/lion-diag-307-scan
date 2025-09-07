@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"name": "lion-diag-307-scan",
+			"path": "lion-diag-307-scan"
+		},
+		{
+			"name": "lion-diag-307-scan",
+			"path": "../lion-diag-307-scan"
+		}
+	],
+	"settings": {}
+}

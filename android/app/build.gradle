@@ -1,3 +1,4 @@
+
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
@@ -15,7 +16,6 @@ android {
         versionCode 1
         versionName "1.0"
 
-        // Room schema output (if you use Room)
         javaCompileOptions {
             annotationProcessorOptions {
                 arguments += ["room.schemaLocation": "$projectDir/schemas".toString()]
@@ -25,7 +25,7 @@ android {
 
     buildTypes {
         debug {
-            // debug settings
+            debuggable true
         }
         release {
             minifyEnabled false
@@ -34,19 +34,16 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "17"
     }
 
     buildFeatures {
-        // Enable view binding if your project uses it
         viewBinding true
-        // enable compose only if your app uses it
-        // compose true
     }
 
     packagingOptions {
@@ -70,20 +67,16 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'com.google.android.material:material:1.11.0'
 
-    // Optional: lifecycle / viewmodel
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.2'
     implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2'
 
-    // Room (if used)
     implementation "androidx.room:room-runtime:2.6.1"
     kapt "androidx.room:room-compiler:2.6.1"
     implementation "androidx.room:room-ktx:2.6.1"
 
-    // Optional: Coroutines
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"
 
-    // Capacitor Android runtime (if your project uses Capacitor; adjust version)
     implementation project(':capacitor-android')
-
-    // Add other plugin dependencies your project needs (Bluetooth plugin, etc.)
 }
+
+apply from: 'capacitor.build.gradle'

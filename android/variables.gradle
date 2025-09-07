@@ -1,11 +1,10 @@
 
-
 ext {
-    minSdkVersion = 23
+    minSdkVersion = 24
     compileSdkVersion = 34
     targetSdkVersion = 34
     androidxActivityVersion = '1.8.2'
-    androidxAppCompatVersion = '1.6.1'
+    androidxAppCompatVersion = '1.7.0'
     androidxCoordinatorLayoutVersion = '1.2.0'
     androidxCoreVersion = '1.12.0'
     androidxFragmentVersion = '1.6.2'
@@ -15,15 +14,11 @@ ext {
     coordinatorLayoutVersion = '1.2.0'
     junitVersion = '4.13.2'
     
-    // Compatible build tools version for API 34
     buildToolsVersion = '34.0.0'
     
-    // Use compatible Kotlin version with JVM 17
     kotlinCompilerExtensionVersion = '1.5.4'
     kotlinVersion = '1.9.10'
     
-    // Force JVM 17 for all projects
     javaVersion = JavaVersion.VERSION_17
     kotlinJvmTarget = "17"
 }
-

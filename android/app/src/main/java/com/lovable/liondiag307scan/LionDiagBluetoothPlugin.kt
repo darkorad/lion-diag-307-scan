@@ -7,7 +7,7 @@ import com.getcapacitor.*
 import com.getcapacitor.annotation.CapacitorPlugin
 import com.getcapacitor.annotation.Permission
 import com.getcapacitor.annotation.PermissionCallback
-import com.getcapacitor.annotation.PluginMethod
+import com.getcapacitor.PluginMethod
 import com.lovable.liondiag307scan.bt.EnhancedBluetoothManager
 import org.json.JSONArray
 import org.json.JSONObject
@@ -471,8 +471,9 @@ class LionDiagBluetoothPlugin : Plugin() {
                 while (!response.contains(">") && 
                        (System.currentTimeMillis() - startTime) < timeout) {
                     
-                    if (inputStream?.available() ?: 0 > 0) {
-                        val bytesRead = inputStream?.read(buffer) ?: 0
+                    val available = inputStream?.available() ?: 0
+                    if (available > 0) {
+                        val bytesRead: Int = inputStream?.read(buffer) ?: 0
                         if (bytesRead > 0) {
                             response.append(String(buffer, 0, bytesRead, StandardCharsets.US_ASCII))
                         }
@@ -569,8 +570,9 @@ class LionDiagBluetoothPlugin : Plugin() {
             while (!response.contains(">") && 
                    (System.currentTimeMillis() - startTime) < timeout) {
                 
-                if (inputStream?.available() ?: 0 > 0) {
-                    val bytesRead = inputStream?.read(buffer) ?: 0
+                val available = inputStream?.available() ?: 0
+                if (available > 0) {
+                    val bytesRead: Int = inputStream?.read(buffer) ?: 0
                     if (bytesRead > 0) {
                         response.append(String(buffer, 0, bytesRead, StandardCharsets.US_ASCII))
                     }
