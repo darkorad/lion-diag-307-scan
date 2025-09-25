@@ -1,9 +1,16 @@
+import { BluetoothDevice } from './bluetooth/types';
 
-import { BluetoothDevice, ConnectionResult } from './bluetooth/types';
+interface WebBluetoothDevice extends BluetoothDevice {
+  gatt?: BluetoothRemoteGATTServer;
+  characteristic?: BluetoothRemoteGATTCharacteristic;
+}
 
 export class WebBluetoothService {
   private static instance: WebBluetoothService;
-  private connectedDevice: BluetoothDevice | null = null;
+  private connectedDevice: WebBluetoothDevice | null = null;
+  private bluetoothDevice: BluetoothDevice | null = null;
+
+  private constructor() {}
 
   static getInstance(): WebBluetoothService {
     if (!WebBluetoothService.instance) {
@@ -12,161 +19,228 @@ export class WebBluetoothService {
     return WebBluetoothService.instance;
   }
 
-  async initialize(): Promise<boolean> {
-    try {
-      console.log('🌐 Initializing Web Bluetooth Service...');
-      
-      if (!navigator.bluetooth) {
-        console.log('❌ Web Bluetooth not available');
-        return false;
-      }
-      
-      console.log('✅ Web Bluetooth service initialized');
-      return true;
-      
-    } catch (error) {
-      console.error('❌ Web Bluetooth initialization failed:', error);
-      return false;
+  /**
+   * Check if Web Bluetooth is supported
+   */
+  isWebBluetoothSupported(): boolean {
+    return 'bluetooth' in navigator;
+  }
+
+  /**
+   * Request Bluetooth device
+   */
+  async requestDevice(): Promise<BluetoothDevice | null> {
+    if (!this.isWebBluetoothSupported()) {
+      throw new Error('Web Bluetooth is not supported in this browser');
     }
-  }
 
-  async isBluetoothEnabled(): Promise<boolean> {
     try {
-      if (!navigator.bluetooth) {
-        return false;
-      }
-      
-      // Web Bluetooth API doesn't have a direct way to check if Bluetooth is enabled
-      // We'll assume it's enabled if the API is available
-      return true;
-      
-    } catch (error) {
-      console.error('❌ Error checking Web Bluetooth status:', error);
-      return false;
-    }
-  }
-
-  async enableBluetooth(): Promise<boolean> {
-    // Web Bluetooth API doesn't allow programmatically enabling Bluetooth
-    // This would require user interaction
-    return true;
-  }
-
-  async scanForDevices(): Promise<BluetoothDevice[]> {
-    try {
-      console.log('🔍 Starting Web Bluetooth device scan...');
-      
-      if (!navigator.bluetooth) {
-        throw new Error('Web Bluetooth not available');
-      }
-      
-      // Request device with OBD2 service filters
+      // Request a Bluetooth device with specific services
       const device = await navigator.bluetooth.requestDevice({
-        filters: [
-          { services: ['0000fff0-0000-1000-8000-00805f9b34fb'] }, // Common OBD2 service
-          { namePrefix: 'ELM327' },
-          { namePrefix: 'OBD' },
-          { namePrefix: 'VGATE' },
-        ],
-        optionalServices: ['00001101-0000-1000-8000-00805f9b34fb'] // SPP UUID
+        // For OBD2 devices, we typically look for serial port profile
+        acceptAllDevices: true,
+        optionalServices: [
+          '00001101-0000-1000-8000-00805f9b34fb', // SPP UUID
+          0x1101, // Serial Port Profile
+          'battery_service'
+        ]
       });
-      
+
+      // Add event listeners for disconnection
+      device.addEventListener('gattserverdisconnected', () => {
+        this.onDeviceDisconnected();
+      });
+
+      // Convert to our standard BluetoothDevice format
       const bluetoothDevice: BluetoothDevice = {
         id: device.id,
-        address: device.id, // Web Bluetooth doesn't expose MAC address
         name: device.name || 'Unknown Device',
-        isPaired: false,
+        address: device.id, // Web Bluetooth uses ID as address
+        isPaired: true, // Web Bluetooth devices are effectively paired when selected
         isConnected: false,
-        deviceType: this.identifyDeviceType(device.name || ''),
-        compatibility: this.calculateCompatibility(device.name || '')
+        deviceType: this.determineDeviceType(device.name || 'Unknown Device'),
+        compatibility: this.calculateCompatibility(device.name || 'Unknown Device')
       };
-      
-      return [bluetoothDevice];
-      
+
+      this.bluetoothDevice = bluetoothDevice;
+      return bluetoothDevice;
     } catch (error) {
-      console.error('❌ Web Bluetooth scan failed:', error);
-      return [];
+      console.error('Error requesting Bluetooth device:', error);
+      throw error;
     }
   }
 
-  async connectToDevice(device: BluetoothDevice): Promise<ConnectionResult> {
+  /**
+   * Connect to a Bluetooth device
+   */
+  async connectToDevice(device: BluetoothDevice): Promise<boolean> {
+    if (!this.isWebBluetoothSupported()) {
+      throw new Error('Web Bluetooth is not supported in this browser');
+    }
+
     try {
-      console.log(`🔗 Connecting to ${device.name} via Web Bluetooth...`);
-      
-      if (!navigator.bluetooth) {
-        throw new Error('Web Bluetooth not available');
-      }
-      
-      // For Web Bluetooth, we need to get the device again
-      const webDevice = await navigator.bluetooth.requestDevice({
-        filters: [{ name: device.name }],
-        optionalServices: ['00001101-0000-1000-8000-00805f9b34fb']
+      // Request the device again to get the BluetoothDevice object with GATT server
+      const bluetoothDevice = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: [
+          '00001101-0000-1000-8000-00805f9b34fb', // SPP UUID
+          0x1101, // Serial Port Profile
+          'battery_service'
+        ]
       });
+
+      // Connect to GATT server
+      const server = await bluetoothDevice.gatt!.connect();
       
-      const server = await webDevice.gatt?.connect();
-      if (!server) {
-        throw new Error('Failed to connect to GATT server');
+      // Look for the serial port service
+      let service: BluetoothRemoteGATTService | null = null;
+      try {
+        service = await server.getPrimaryService('00001101-0000-1000-8000-00805f9b34fb');
+      } catch {
+        // Try alternative service UUIDs
+        try {
+          service = await server.getPrimaryService(0x1101);
+        } catch {
+          // If we can't find the specific service, we'll use the first available service
+          const services = await server.getPrimaryServices();
+          if (services.length > 0) {
+            service = services[0];
+          }
+        }
       }
-      
-      this.connectedDevice = { ...device, isConnected: true };
-      
-      return {
-        success: true,
-        device: this.connectedDevice,
-        strategy: 'Web Bluetooth GATT'
-      };
-      
-    } catch (error) {
-      console.error(`❌ Web Bluetooth connection failed:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Connection failed'
-      };
-    }
-  }
 
-  async disconnect(): Promise<boolean> {
-    try {
-      this.connectedDevice = null;
-      console.log('🔌 Web Bluetooth disconnected');
+      if (!service) {
+        throw new Error('Could not find compatible service on device');
+      }
+
+      // Get characteristics (we'll use the first writable characteristic)
+      const characteristics = await service.getCharacteristics();
+      if (characteristics.length === 0) {
+        throw new Error('No characteristics found on service');
+      }
+
+      // Store the connected device with GATT information
+      this.connectedDevice = {
+        ...device,
+        isConnected: true,
+        gatt: server,
+        characteristic: characteristics[0]
+      };
+
       return true;
-      
     } catch (error) {
-      console.error('❌ Web Bluetooth disconnect failed:', error);
-      return false;
+      console.error('Error connecting to device:', error);
+      throw error;
     }
   }
 
+  /**
+   * Disconnect from current device
+   */
+  async disconnect(): Promise<void> {
+    try {
+      if (this.connectedDevice && this.connectedDevice.gatt) {
+        this.connectedDevice.gatt.disconnect();
+      }
+      this.connectedDevice = null;
+      this.bluetoothDevice = null;
+    } catch (error) {
+      console.error('Error disconnecting:', error);
+    }
+  }
+
+  /**
+   * Send command to connected device
+   */
   async sendCommand(command: string): Promise<string> {
-    if (!this.connectedDevice) {
-      throw new Error('No device connected');
+    if (!this.connectedDevice || !this.connectedDevice.characteristic) {
+      throw new Error('Not connected to any device');
     }
-    
-    // Web Bluetooth command sending would require GATT characteristics
-    console.log(`📤 Web Bluetooth command: ${command}`);
-    return 'NO DATA'; // Placeholder
+
+    try {
+      // Convert command to ArrayBuffer
+      const encoder = new TextEncoder();
+      const data = encoder.encode(command);
+      
+      // Write to characteristic
+      await this.connectedDevice.characteristic.writeValueWithoutResponse(data);
+      
+      // For OBD2 responses, we might need to read the response
+      // This depends on the specific device implementation
+      try {
+        const response = await this.connectedDevice.characteristic.readValue();
+        const decoder = new TextDecoder();
+        return decoder.decode(response);
+      } catch {
+        // If we can't read a response, return a default OK response
+        return 'OK\r>';
+      }
+    } catch (error) {
+      console.error('Error sending command:', error);
+      throw error;
+    }
   }
 
+  /**
+   * Check if connected
+   */
+  isConnected(): boolean {
+    return !!this.connectedDevice && this.connectedDevice.isConnected;
+  }
+
+  /**
+   * Get connected device
+   */
   getConnectedDevice(): BluetoothDevice | null {
     return this.connectedDevice;
   }
 
-  private identifyDeviceType(name: string): 'ELM327' | 'OBD2' | 'Generic' {
-    const lowerName = name.toLowerCase();
-    
-    if (lowerName.includes('elm327') || lowerName.includes('elm 327')) return 'ELM327';
-    if (lowerName.includes('obd')) return 'OBD2';
-    
-    return 'Generic';
+  /**
+   * Handle device disconnection
+   */
+  private onDeviceDisconnected(): void {
+    console.log('Device disconnected');
+    this.connectedDevice = null;
+    this.bluetoothDevice = null;
   }
 
+  /**
+   * Determine device type based on name
+   */
+  private determineDeviceType(name: string): BluetoothDevice['deviceType'] {
+    const lowerName = name.toLowerCase();
+    if (lowerName.includes('elm327') || lowerName.includes('obd')) {
+      return 'ELM327';
+    } else if (lowerName.includes('scanner') || lowerName.includes('diagnostic')) {
+      return 'OBD2';
+    } else {
+      return 'Generic';
+    }
+  }
+
+  /**
+   * Calculate compatibility score
+   */
   private calculateCompatibility(name: string): number {
     const lowerName = name.toLowerCase();
-    
-    if (lowerName.includes('elm327')) return 0.95;
-    if (lowerName.includes('obd')) return 0.75;
-    
-    return 0.5;
+    if (lowerName.includes('elm327')) {
+      return 95; // High compatibility
+    } else if (lowerName.includes('obd')) {
+      return 85; // Good compatibility
+    } else if (lowerName.includes('scanner') || lowerName.includes('diagnostic')) {
+      return 75; // Moderate compatibility
+    } else {
+      return 50; // Unknown compatibility
+    }
+  }
+
+  /**
+   * Scan for devices (Web Bluetooth doesn't support general scanning)
+   */
+  async scanForDevices(): Promise<BluetoothDevice[]> {
+    // Web Bluetooth doesn't support general scanning
+    // We need to use requestDevice to let the user select a device
+    throw new Error('Web Bluetooth requires user interaction to select devices. Use requestDevice() instead.');
   }
 }
 

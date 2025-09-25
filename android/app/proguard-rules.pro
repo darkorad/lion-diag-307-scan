@@ -1,4 +1,3 @@
-
 # Add project specific ProGuard rules here.
 # You can control the set of applied configuration files using the
 # proguardFiles setting in build.gradle.
@@ -20,24 +19,3 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
-
-# Keep Bluetooth LE related classes
--keep class com.capacitorjs.community.plugins.bluetoothle.** { *; }
--keep class android.bluetooth.** { *; }
-
-# Suppress warnings for deprecated Bluetooth API usage
--dontwarn android.bluetooth.**
--dontwarn com.capacitorjs.community.plugins.bluetoothle.**
-
-# Keep Capacitor plugins
--keep class com.getcapacitor.** { *; }
--keep class com.capacitorjs.plugins.** { *; }
-
-# Keep Cordova plugins
--keep class org.apache.cordova.** { *; }
-
-# General Android rules
--keepattributes *Annotation*
--keepclassmembers class * {
-    @android.webkit.JavascriptInterface <methods>;
-}

@@ -1,31 +1,26 @@
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
 
-// Top-level build.gradle
 buildscript {
-    ext.kotlin_version = "1.9.10"
+    
     repositories {
         google()
         mavenCentral()
     }
     dependencies {
-        classpath "com.android.tools.build:gradle:8.1.1"
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        classpath 'com.android.tools.build:gradle:8.2.1'
+        classpath 'com.google.gms:google-services:4.4.0'
+
+        // NOTE: Do not place your application dependencies here; they belong
+        // in the individual module build.gradle files
     }
 }
 
-allprojects {
-    // Dependency resolution strategy goes here (project-level)
-    configurations.all {
-        resolutionStrategy {
-            // Force Kotlin stdlib to a single version to avoid conflicts
-            force "org.jetbrains.kotlin:kotlin-stdlib:1.9.10"
-            force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.10"
+apply from: "variables.gradle"
 
-            eachDependency { details ->
-                if (details.requested.group == "org.jetbrains.kotlin") {
-                    details.useVersion "1.9.10"
-                }
-            }
-        }
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
     }
 }
 

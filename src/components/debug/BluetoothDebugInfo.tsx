@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,8 +13,27 @@ import {
 import { Capacitor } from '@capacitor/core';
 import { unifiedBluetoothService } from '@/services/UnifiedBluetoothService';
 
+// Extend window interface for CustomBluetoothSerial
+declare global {
+  interface Window {
+    CustomBluetoothSerial?: any;
+  }
+}
+
+// Define the type for debug info
+interface DebugInfo {
+  platform?: string;
+  isNative?: boolean;
+  webBluetoothSupported?: boolean;
+  customPluginAvailable?: boolean;
+  bluetoothEnabled?: boolean;
+  serviceInitialized?: boolean;
+  error?: string;
+  timestamp?: string;
+}
+
 const BluetoothDebugInfo: React.FC = () => {
-  const [debugInfo, setDebugInfo] = useState<any>({});
+  const [debugInfo, setDebugInfo] = useState<DebugInfo>({});
   const [isLoading, setIsLoading] = useState(false);
 
   const collectDebugInfo = async () => {
@@ -38,25 +56,24 @@ const BluetoothDebugInfo: React.FC = () => {
       let bluetoothEnabled = false;
       
       try {
-        serviceInitialized = await unifiedBluetoothService.initialize();
+        serviceInitialized = await unifiedBluetoothService.checkBluetoothStatus();
         console.log('🔧 Service initialized:', serviceInitialized);
         
         if (serviceInitialized) {
-          bluetoothEnabled = await unifiedBluetoothService.isBluetoothEnabled();
+          bluetoothEnabled = await unifiedBluetoothService.checkBluetoothStatus();
           console.log('🔵 Bluetooth enabled:', bluetoothEnabled);
         }
       } catch (error) {
         console.error('❌ Service initialization error:', error);
       }
       
-      const info = {
+      const info: DebugInfo = {
         platform,
         isNative,
         webBluetoothSupported: 'bluetooth' in navigator,
         customPluginAvailable,
         bluetoothEnabled,
         serviceInitialized,
-        currentService: unifiedBluetoothService.getCurrentService(),
         timestamp: new Date().toISOString()
       };
       
@@ -83,22 +100,21 @@ const BluetoothDebugInfo: React.FC = () => {
       console.log('🧪 Testing Bluetooth scan...');
       
       // First ensure service is initialized
-      const initialized = await unifiedBluetoothService.initialize();
+      const initialized = await unifiedBluetoothService.checkBluetoothStatus();
       if (!initialized) {
         console.error('🧪 Service initialization failed');
         return;
       }
       
       // Check if Bluetooth is enabled
-      const enabled = await unifiedBluetoothService.isBluetoothEnabled();
+      const enabled = await unifiedBluetoothService.checkBluetoothStatus();
       if (!enabled) {
         console.log('🧪 Bluetooth not enabled, attempting to enable...');
-        const enableResult = await unifiedBluetoothService.enableBluetooth();
-        console.log('🧪 Enable result:', enableResult);
+        // Note: There's no direct enable method in unifiedBluetoothService
       }
       
       // Attempt scan
-      const devices = await unifiedBluetoothService.scanForDevices(5000);
+      const devices = await unifiedBluetoothService.scanForDevices();
       console.log('🧪 Test scan result:', devices);
       
       // Refresh debug info
@@ -143,7 +159,7 @@ const BluetoothDebugInfo: React.FC = () => {
               <div className="flex items-center justify-between">
                 <span className="text-sm">Current Service:</span>
                 <Badge variant="outline" className="text-xs">
-                  {debugInfo.currentService || 'None'}
+                  {'Not Available'}
                 </Badge>
               </div>
             </div>

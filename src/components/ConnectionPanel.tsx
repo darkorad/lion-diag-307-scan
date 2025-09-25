@@ -33,12 +33,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 
-import { enhancedConnectionService } from '@/services/EnhancedConnectionService';
 import { nativeBluetoothService } from '@/services/NativeBluetoothService';
-import { BluetoothDevice, ConnectionResult } from '@/services/bluetooth/types';
+import { BluetoothServiceDevice, ServiceConnectionResult } from '@/services/NativeBluetoothService';
 
 interface ConnectionPanelProps {
-  onDeviceSelected: (device: BluetoothDevice | null) => void;
+  onDeviceSelected: (device: BluetoothServiceDevice | null) => void;
   onConnectionStatusChange?: (status: 'disconnected' | 'connecting' | 'connected' | 'error') => void;
 }
 
@@ -47,43 +46,13 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
   onConnectionStatusChange 
 }) => {
   const [isScanning, setIsScanning] = useState(false);
-  const [devices, setDevices] = useState<BluetoothDevice[]>([]);
-  const [selectedDevice, setSelectedDevice] = useState<BluetoothDevice | null>(null);
+  const [devices, setDevices] = useState<BluetoothServiceDevice[]>([]);
+  const [selectedDevice, setSelectedDevice] = useState<BluetoothServiceDevice | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
   const [isConnecting, setIsConnecting] = useState(false);
   const [showTroubleshooting, setShowTroubleshooting] = useState(false);
   const [showDeviceDetails, setShowDeviceDetails] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const mockDevices: BluetoothDevice[] = [
-    {
-      id: 'mock-elm327-001',
-      name: 'ELM327 Bluetooth',
-      address: 'AA:BB:CC:DD:EE:01',
-      isPaired: false,
-      isConnected: false,
-      deviceType: 'ELM327',
-      compatibility: 95
-    },
-    {
-      id: 'mock-obd2-002', 
-      name: 'OBDII Scanner',
-      address: 'AA:BB:CC:DD:EE:02',
-      isPaired: true,
-      isConnected: false,
-      deviceType: 'OBD2',
-      compatibility: 88
-    },
-    {
-      id: 'mock-vgate-003',
-      name: 'Vgate iCar Pro',
-      address: 'AA:BB:CC:DD:EE:03',
-      isPaired: false,
-      isConnected: false,
-      deviceType: 'ELM327',
-      compatibility: 92
-    }
-  ];
 
   const startScan = useCallback(async () => {
     setIsScanning(true);
@@ -94,23 +63,23 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
       const scannedDevices = await nativeBluetoothService.scanForDevices();
       setDevices(scannedDevices);
       toast.success(`Found ${scannedDevices.length} devices`);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Scan failed:', error);
-      setErrorMessage(error.message || 'Scan failed');
-      toast.error(`Scan failed: ${error.message || 'Unknown error'}`);
+      setErrorMessage((error as Error).message || 'Scan failed');
+      toast.error(`Scan failed: ${(error as Error).message || 'Unknown error'}`);
     } finally {
       setIsScanning(false);
     }
   }, []);
 
-  const connectToDevice = useCallback(async (device: BluetoothDevice) => {
+  const connectToDevice = useCallback(async (device: BluetoothServiceDevice) => {
     setIsConnecting(true);
     setConnectionStatus('connecting');
     setErrorMessage(null);
     onConnectionStatusChange?.('connecting');
 
     try {
-      const result: ConnectionResult = await nativeBluetoothService.connectToDevice(device);
+      const result: ServiceConnectionResult = await nativeBluetoothService.connectToDevice(device);
 
       if (result.success && result.device) {
         setSelectedDevice(result.device);
@@ -123,12 +92,12 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
         setErrorMessage(result.error || 'Connection failed');
         toast.error(`Connection failed: ${result.error || 'Unknown error'}`);
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Connection failed:', error);
       setConnectionStatus('error');
       onConnectionStatusChange?.('error');
-      setErrorMessage(error.message || 'Connection failed');
-      toast.error(`Connection failed: ${error.message || 'Unknown error'}`);
+      setErrorMessage((error as Error).message || 'Connection failed');
+      toast.error(`Connection failed: ${(error as Error).message || 'Unknown error'}`);
     } finally {
       setIsConnecting(false);
     }
@@ -149,16 +118,16 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
         setErrorMessage('Disconnection failed');
         toast.error('Disconnection failed');
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Disconnection failed:', error);
-      setErrorMessage(error.message || 'Disconnection failed');
-      toast.error(`Disconnection failed: ${error.message || 'Unknown error'}`);
+      setErrorMessage((error as Error).message || 'Disconnection failed');
+      toast.error(`Disconnection failed: ${(error as Error).message || 'Unknown error'}`);
     } finally {
       setIsConnecting(false);
     }
   }, [onConnectionStatusChange]);
 
-  const handleDeviceSelect = (device: BluetoothDevice) => {
+  const handleDeviceSelect = (device: BluetoothServiceDevice) => {
     setSelectedDevice(device);
     setShowDeviceDetails(true);
   };
@@ -174,7 +143,7 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
     setShowTroubleshooting(true);
   };
 
-  const handlePairDevice = async (device: BluetoothDevice) => {
+  const handlePairDevice = async (device: BluetoothServiceDevice) => {
     try {
       const success = await nativeBluetoothService.pairDevice(device);
       if (success) {
@@ -188,9 +157,9 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
       } else {
         toast.error(`Failed to pair with ${device.name}`);
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Pairing failed:', error);
-      toast.error(`Pairing failed: ${error.message || 'Unknown error'}`);
+      toast.error(`Pairing failed: ${(error as Error).message || 'Unknown error'}`);
     }
   };
 

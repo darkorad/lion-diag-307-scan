@@ -2,7 +2,7 @@
 import React from 'react';
 import EnhancedNativeBluetoothManager from '@/components/EnhancedNativeBluetoothManager';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { BluetoothDevice } from '@/plugins/LionDiagBluetooth';
+import { BluetoothDevice } from '@/services/bluetooth/types';
 import { toast } from 'sonner';
 
 const BluetoothTest: React.FC = () => {

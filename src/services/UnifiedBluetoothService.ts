@@ -1,421 +1,378 @@
+import { BluetoothDevice, ConnectionStatus, ConnectionResult, ScanResult } from './bluetooth/types';
+import { mobileSafeBluetoothService } from './MobileSafeBluetoothService';
+import { enhancedBluetoothService } from '../obd2/enhanced-bluetooth-service';
+import { BluetoothLe, ScanResultInternal } from '@capacitor-community/bluetooth-le';
+import { androidBluetoothPermissionService } from './AndroidBluetoothPermissionService';
 
-import { Capacitor } from '@capacitor/core';
-import { BluetoothDevice, ConnectionResult } from './bluetooth/types';
-import { webBluetoothService } from './WebBluetoothService';
-import { enhancedAndroidBluetoothService } from './EnhancedAndroidBluetoothService';
-import { errorLoggingService, ErrorCategory, ErrorSeverity } from './ErrorLoggingService';
+export class UnifiedBluetoothService {
+  private static instance: UnifiedBluetoothService;
+  private currentConnectionType: 'ble' | 'classic' | null = null;
+  private connectedDeviceId: string | null = null;
+  private isScanning = false;
+  private discoveredDevices: Map<string, BluetoothDevice> = new Map();
 
-export type { BluetoothDevice, ConnectionResult };
+  private constructor() {}
 
-interface UnifiedBluetoothService {
-  initialize(): Promise<boolean>;
-  isBluetoothEnabled(): Promise<boolean>;
-  enableBluetooth(): Promise<boolean>;
-  scanForDevices(timeout?: number): Promise<BluetoothDevice[]>;
-  discoverAllOBD2Devices(): Promise<BluetoothDevice[]>;
-  connectToDevice(device: BluetoothDevice): Promise<ConnectionResult>;
-  smartConnect(device: BluetoothDevice): Promise<ConnectionResult>;
-  disconnect(): Promise<boolean>;
-  sendCommand(command: string): Promise<string>;
-  getConnectionStatus(): any;
-  getCurrentService(): string;
-  resetConnectionAttempts(address: string): void;
-  getConnectionAttempts(address: string): number;
-  isConnectedToDevice(): boolean;
-  getConnectedDevice(): BluetoothDevice | null;
-}
+  public static getInstance(): UnifiedBluetoothService {
+    if (!UnifiedBluetoothService.instance) {
+      UnifiedBluetoothService.instance = new UnifiedBluetoothService();
+    }
+    return UnifiedBluetoothService.instance;
+  }
 
-class UnifiedBluetoothServiceImpl implements UnifiedBluetoothService {
-  private currentService: 'android' | 'web' | null = null;
-  private isInitialized = false;
-  private connectionAttempts: { [address: string]: number } = {};
+  /**
+   * Check if Bluetooth is available and enabled
+   */
+  public async checkBluetoothStatus(): Promise<boolean> {
+    try {
+      // Check if Bluetooth is enabled
+      const result = await BluetoothLe.isEnabled();
+      return result.value;
+    } catch (error) {
+      console.warn('Bluetooth not available:', error);
+      return false;
+    }
+  }
 
-  async initialize(): Promise<boolean> {
-    if (this.isInitialized) {
-      console.log('🔄 Service already initialized, using existing service');
+  /**
+   * Request Bluetooth permissions
+   */
+  public async requestBluetoothPermissions(): Promise<boolean> {
+    try {
+      // Use the Android Bluetooth permission service
+      return await androidBluetoothPermissionService.requestBluetoothPermissions();
+    } catch (error) {
+      console.error('Failed to request Bluetooth permissions:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Enable Bluetooth
+   */
+  public async enableBluetooth(): Promise<boolean> {
+    try {
+      // Request to enable Bluetooth through system dialog
+      await BluetoothLe.requestEnable();
       return true;
-    }
-
-    console.log('🔧 Initializing UnifiedBluetoothService...');
-    console.log('📱 Platform:', Capacitor.getPlatform());
-    console.log('🏠 Native platform:', Capacitor.isNativePlatform());
-
-    try {
-      if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
-        console.log('🤖 Attempting Enhanced Android Bluetooth...');
-        const androidInitialized = await enhancedAndroidBluetoothService.initialize();
-        
-        if (androidInitialized) {
-          this.currentService = 'android';
-          this.isInitialized = true;
-          console.log('✅ Enhanced Android Bluetooth service initialized');
-          return true;
-        } else {
-          console.log('❌ Enhanced Android Bluetooth initialization failed');
-        }
-      }
-
-      // Fallback to Web Bluetooth
-      console.log('🌐 Using Web Bluetooth...');
-      const webInitialized = await webBluetoothService.initialize();
-      
-      if (webInitialized) {
-        this.currentService = 'web';
-        this.isInitialized = true;
-        console.log('✅ Web Bluetooth service initialized');
-        return true;
-      } else {
-        console.log('❌ Web Bluetooth initialization failed');
-      }
-
-      return false;
-
     } catch (error) {
-      console.error('❌ UnifiedBluetoothService initialization failed:', error);
-      return false;
+      console.error('Failed to enable Bluetooth:', error);
+      // Try the alternative method
+      return await androidBluetoothPermissionService.requestSystemBluetoothEnable();
     }
   }
 
-  async isBluetoothEnabled(): Promise<boolean> {
-    if (!this.isInitialized) {
-      console.log('🔄 Service not initialized, attempting initialization...');
-      await this.initialize();
-    }
-
+  /**
+   * Scan for devices using Bluetooth LE
+   */
+  public async scanForDevices(): Promise<ScanResult> {
     try {
-      if (this.currentService === 'android') {
-        const status = await enhancedAndroidBluetoothService.checkBluetoothStatus();
-        console.log('🔵 Android Bluetooth enabled:', status.enabled);
-        return status.enabled;
-      } else if (this.currentService === 'web') {
-        const enabled = await webBluetoothService.isBluetoothEnabled();
-        console.log('🔵 Web Bluetooth enabled:', enabled);
-        return enabled;
+      // Request permissions
+      const hasPermissions = await this.requestBluetoothPermissions();
+      if (!hasPermissions) {
+        return {
+          devices: [],
+          success: false,
+          error: 'Bluetooth permissions not granted'
+        };
       }
-      return false;
-    } catch (error) {
-      console.error('❌ Error checking Bluetooth status:', error);
-      return false;
-    }
-  }
 
-  async enableBluetooth(): Promise<boolean> {
-    if (!this.isInitialized) {
-      await this.initialize();
-    }
-
-    try {
-      if (this.currentService === 'android') {
-        console.log('🔵 Enabling Android Bluetooth...');
-        const result = await enhancedAndroidBluetoothService.enableBluetooth();
-        return result.requested;
-      } else if (this.currentService === 'web') {
-        console.log('🔵 Web Bluetooth is browser-controlled');
-        return true; // Web Bluetooth is controlled by browser
-      }
-      return false;
-    } catch (error) {
-      console.error('❌ Error enabling Bluetooth:', error);
-      return false;
-    }
-  }
-
-  async scanForDevices(timeout: number = 10000): Promise<BluetoothDevice[]> {
-    if (!this.isInitialized) {
-      await this.initialize();
-    }
-
-    try {
-      console.log(`🔍 Starting device scan (timeout: ${timeout}ms)...`);
-      
-      if (this.currentService === 'android') {
-        return await enhancedAndroidBluetoothService.scanForDevices();
-      } else if (this.currentService === 'web') {
-        console.log('🌐 Using Web Bluetooth scanning...');
-        return await webBluetoothService.scanForDevices();
-      }
-      
-      console.log('❌ No Bluetooth service available');
-      return [];
-      
-    } catch (error) {
-      console.error('❌ Device scan failed:', error);
-      return [];
-    }
-  }
-
-  async discoverAllOBD2Devices(): Promise<BluetoothDevice[]> {
-    console.log('🔍 Discovering all OBD2 devices...');
-    
-    try {
-      const allDevices = await this.scanForDevices(12000);
-      console.log(`📋 Total devices found: ${allDevices.length}`);
-      
-      // Filter for potential OBD2 devices
-      const obd2Devices = allDevices.filter(device => {
-        const name = device.name.toLowerCase();
-        const isOBD2 = name.includes('elm327') || 
-                      name.includes('obd') || 
-                      name.includes('vgate') || 
-                      name.includes('konnwei') ||
-                      name.includes('autel') ||
-                      name.includes('icar') ||
-                      name.includes('bluetooth') ||
-                      device.isPaired; // Include all paired devices as potential OBD2
-        
-        if (isOBD2) {
-          console.log(`✅ Potential OBD2 device: ${device.name} (${device.address})`);
-        }
-        
-        return isOBD2;
-      });
-      
-      console.log(`🎯 OBD2 devices found: ${obd2Devices.length}`);
-      return obd2Devices;
-      
-    } catch (error) {
-      console.error('❌ OBD2 discovery failed:', error);
-      return [];
-    }
-  }
-
-  async connectToDevice(device: BluetoothDevice): Promise<ConnectionResult> {
-    if (!this.isInitialized) {
-      await this.initialize();
-    }
-
-    // Track connection attempts
-    const currentAttempts = this.getConnectionAttempts(device.address);
-    this.connectionAttempts[device.address] = currentAttempts + 1;
-    
-    try {
-      console.log(`📱 Connecting to ${device.name} (${device.address}), attempt ${currentAttempts + 1}`);
-      
-      if (this.currentService === 'android') {
-        const result = await enhancedAndroidBluetoothService.connectToDevice(device);
-        
-        if (result.success) {
-          // Reset attempts on success
-          this.resetConnectionAttempts(device.address);
-          errorLoggingService.logInfo(
-            `Connected to ${device.name} successfully using Android Bluetooth`,
-            ErrorCategory.BLUETOOTH,
-            { deviceName: device.name, deviceAddress: device.address, service: 'android' }
-          );
-        } else if (currentAttempts >= 2) {
-          // After 3 failed attempts, provide more helpful error message
-          result.error = `Unable to connect to ${device.name}. Please ensure the device is powered on, in range, and not connected to another app.`;
-          errorLoggingService.logError(
-            `Failed to connect to ${device.name} after ${currentAttempts + 1} attempts`,
-            ErrorSeverity.WARNING,
-            ErrorCategory.BLUETOOTH,
-            new Error(result.error),
-            { deviceName: device.name, deviceAddress: device.address, attempts: currentAttempts + 1 }
-          );
-        }
-        
-        return result;
-      } else if (this.currentService === 'web') {
-        const result = await webBluetoothService.connectToDevice(device);
-        
-        if (result.success) {
-          this.resetConnectionAttempts(device.address);
-          errorLoggingService.logInfo(
-            `Connected to ${device.name} successfully using Web Bluetooth`,
-            ErrorCategory.BLUETOOTH,
-            { deviceName: device.name, deviceAddress: device.address, service: 'web' }
-          );
-        } else if (currentAttempts >= 2) {
-          result.error = `Unable to connect to ${device.name}. Please ensure your browser supports Web Bluetooth and the device is powered on.`;
-          errorLoggingService.logError(
-            `Failed to connect to ${device.name} after ${currentAttempts + 1} attempts`,
-            ErrorSeverity.WARNING,
-            ErrorCategory.BLUETOOTH,
-            new Error(result.error),
-            { deviceName: device.name, deviceAddress: device.address, attempts: currentAttempts + 1 }
-          );
-        }
-        
-        return result;
-      }
-      
-      errorLoggingService.logError(
-        'No Bluetooth service available',
-        ErrorSeverity.ERROR,
-        ErrorCategory.BLUETOOTH,
-        new Error('No Bluetooth service available'),
-        { deviceName: device.name, deviceAddress: device.address }
-      );
-      
-      return {
-        success: false,
-        error: 'No Bluetooth service available. Please ensure Bluetooth is enabled on your device.'
-      };
-    } catch (error) {
-      console.error('❌ Connection failed:', error);
-      
-      let errorMessage = 'Connection failed';
-      
-      if (error instanceof Error) {
-        errorMessage = error.message;
-        
-        // Provide more user-friendly error messages
-        if (errorMessage.includes('timeout')) {
-          errorMessage = `Connection to ${device.name} timed out. The device may be out of range or powered off.`;
-        } else if (errorMessage.includes('permission')) {
-          errorMessage = 'Bluetooth permission denied. Please grant Bluetooth permissions in your settings.';
-        } else if (errorMessage.includes('busy') || errorMessage.includes('in use')) {
-          errorMessage = `${device.name} is already connected to another application. Please disconnect it first.`;
-        }
-      }
-      
-      errorLoggingService.logError(
-        `Connection error with ${device.name}: ${errorMessage}`,
-        ErrorSeverity.ERROR,
-        ErrorCategory.BLUETOOTH,
-        error instanceof Error ? error : new Error(errorMessage),
-        { deviceName: device.name, deviceAddress: device.address, attempts: currentAttempts + 1 }
-      );
-      
-      return {
-        success: false,
-        error: errorMessage
-      };
-    }
-  }
-
-  async smartConnect(device: BluetoothDevice): Promise<ConnectionResult> {
-    console.log(`🧠 Smart connecting to ${device.name}...`);
-    
-    // Increment connection attempts
-    this.connectionAttempts[device.address] = (this.connectionAttempts[device.address] || 0) + 1;
-    
-    try {
-      // First attempt: Direct connection
-      const result = await this.connectToDevice(device);
-      
-      if (result.success) {
-        // Reset attempts on success
-        this.connectionAttempts[device.address] = 0;
-        return result;
-      }
-      
-      // If direct connection fails, try enabling Bluetooth first
-      console.log('🔄 Direct connection failed, checking Bluetooth status...');
-      const isEnabled = await this.isBluetoothEnabled();
-      
+      // Enable Bluetooth if needed
+      const isEnabled = await this.checkBluetoothStatus();
       if (!isEnabled) {
-        console.log('🔵 Bluetooth disabled, attempting to enable...');
         const enabled = await this.enableBluetooth();
-        
-        if (enabled) {
-          // Wait a moment then try connecting again
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          return await this.connectToDevice(device);
+        if (!enabled) {
+          return {
+            devices: [],
+            success: false,
+            error: 'Failed to enable Bluetooth. Please enable Bluetooth in your device settings.'
+          };
         }
       }
+
+      // Initialize Bluetooth LE
+      await BluetoothLe.initialize();
+
+      // Clear previous scan results
+      this.discoveredDevices.clear();
+      this.isScanning = true;
+
+      // Set up scan listener
+      const scanListener = await BluetoothLe.addListener('onScanResult', (result: ScanResultInternal) => {
+        if (result.device) {
+          const device = result.device.name || `Unknown Device (${result.device.deviceId.substring(0, 5)})`;
+          const bluetoothDevice: BluetoothDevice = {
+            id: result.device.deviceId,
+            name: device,
+            address: result.device.deviceId,
+            isPaired: false, // Will be updated when we check paired status
+            isConnected: false,
+            deviceType: this.determineDeviceType(device),
+            compatibility: this.calculateCompatibility(device),
+            rssi: result.rssi
+          };
+          
+          // Store the device
+          this.discoveredDevices.set(result.device.deviceId, bluetoothDevice);
+        }
+      });
+
+      // Start LE scanning
+      await BluetoothLe.startEnabledNotifications();
+      await BluetoothLe.requestLEScan({
+        services: [],
+        allowDuplicates: false,
+        scanMode: 2 // SCAN_MODE_LOW_LATENCY
+      });
+
+      // Scan for 10 seconds
+      await new Promise(resolve => setTimeout(resolve, 10000));
+
+      // Stop scanning
+      await BluetoothLe.stopLEScan();
+      await scanListener.remove();
+      this.isScanning = false;
+
+      // Get paired devices
+      const pairedDevices = await this.getPairedDevices();
       
-      return result;
+      // Combine discovered and paired devices
+      const allDevices = Array.from(this.discoveredDevices.values());
       
+      // Update paired status for discovered devices
+      pairedDevices.forEach(pairedDevice => {
+        const discoveredDevice = allDevices.find(d => d.id === pairedDevice.id);
+        if (discoveredDevice) {
+          discoveredDevice.isPaired = true;
+        } else {
+          allDevices.push(pairedDevice);
+        }
+      });
+
+      return {
+        devices: allDevices,
+        success: true
+      };
     } catch (error) {
-      console.error('❌ Smart connect failed:', error);
+      this.isScanning = false;
+      console.error('Scan error:', error);
+      return {
+        devices: [],
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred during scanning'
+      };
+    }
+  }
+
+  /**
+   * Get paired devices
+   */
+  private async getPairedDevices(): Promise<BluetoothDevice[]> {
+    try {
+      // Get bonded devices
+      const result = await BluetoothLe.getBondedDevices();
+      const devices: BluetoothDevice[] = result.devices.map(device => ({
+        id: device.deviceId,
+        name: device.name || `Unknown Device (${device.deviceId.substring(0, 5)})`,
+        address: device.deviceId,
+        isPaired: true,
+        isConnected: false,
+        deviceType: this.determineDeviceType(device.name || 'Unknown Device'),
+        compatibility: this.calculateCompatibility(device.name || 'Unknown Device')
+      }));
+      return devices;
+    } catch (error) {
+      console.error('Failed to get paired devices:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Pair with a device
+   */
+  public async pairDevice(deviceId: string): Promise<boolean> {
+    try {
+      // Create bond with the device
+      await BluetoothLe.createBond({ deviceId });
+      return true;
+    } catch (error) {
+      console.error('Failed to pair device:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Connect to a device using Bluetooth LE
+   */
+  public async connectToDevice(device: BluetoothDevice): Promise<ConnectionResult> {
+    try {
+      // Request permissions
+      const hasPermissions = await this.requestBluetoothPermissions();
+      if (!hasPermissions) {
+        return {
+          success: false,
+          error: 'Bluetooth permissions not granted'
+        };
+      }
+
+      // Enable Bluetooth if needed
+      const isEnabled = await this.checkBluetoothStatus();
+      if (!isEnabled) {
+        const enabled = await this.enableBluetooth();
+        if (!enabled) {
+          return {
+            success: false,
+            error: 'Failed to enable Bluetooth. Please enable Bluetooth in your device settings.'
+          };
+        }
+      }
+
+      // Initialize Bluetooth LE
+      await BluetoothLe.initialize();
+
+      // Connect to the device
+      try {
+        await BluetoothLe.connect({ deviceId: device.id, timeout: 10000 });
+        
+        // Store the connected device ID
+        this.connectedDeviceId = device.id;
+        this.currentConnectionType = 'ble';
+
+        // Set the device in the mobile safe service
+        mobileSafeBluetoothService.setConnectedDevice(device);
+
+        return {
+          success: true,
+          device: {
+            ...device,
+            isConnected: true
+          },
+          strategy: 'ble'
+        };
+      } catch (connectError) {
+        // Try to connect using the enhanced Bluetooth service as fallback
+        const enhancedResult = await enhancedBluetoothService.connectToDevice(device);
+        if (enhancedResult) {
+          this.currentConnectionType = 'classic';
+          this.connectedDeviceId = device.id;
+          
+          return {
+            success: true,
+            device: {
+              ...device,
+              isConnected: true
+            },
+            strategy: 'classic'
+          };
+        }
+        
+        throw connectError;
+      }
+    } catch (error) {
+      console.error('Connection error:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Smart connect failed'
+        error: error instanceof Error ? error.message : 'Connection failed. Please try again.'
       };
     }
   }
 
-  async disconnect(): Promise<boolean> {
+  /**
+   * Disconnect from current device
+   */
+  public async disconnect(): Promise<void> {
     try {
-      if (this.currentService === 'android') {
-        return await enhancedAndroidBluetoothService.disconnect();
-      } else if (this.currentService === 'web') {
-        return await webBluetoothService.disconnect();
-      }
-      return false;
-    } catch (error) {
-      console.error('❌ Disconnect failed:', error);
-      return false;
-    }
-  }
-
-  async sendCommand(command: string): Promise<string> {
-    if (!this.isInitialized) {
-      throw new Error('Service not initialized');
-    }
-
-    try {
-      if (this.currentService === 'android') {
-        return await enhancedAndroidBluetoothService.sendCommand(command);
-      } else if (this.currentService === 'web') {
-        return await webBluetoothService.sendCommand(command);
+      if (this.connectedDeviceId) {
+        await BluetoothLe.disconnect({ deviceId: this.connectedDeviceId });
       }
       
-      throw new Error('No Bluetooth service available');
+      if (this.currentConnectionType === 'classic') {
+        await enhancedBluetoothService.disconnect();
+      } else if (this.currentConnectionType === 'ble') {
+        mobileSafeBluetoothService.clearConnectedDevice();
+      }
+      
+      this.currentConnectionType = null;
+      this.connectedDeviceId = null;
     } catch (error) {
-      console.error('❌ Send command failed:', error);
-      throw error;
+      console.error('Error disconnecting:', error);
     }
   }
 
-  isConnectedToDevice(): boolean {
-    if (this.currentService === 'android') {
-      const device = enhancedAndroidBluetoothService.getConnectedDevice();
-      return device !== null;
-    } else if (this.currentService === 'web') {
-      const device = webBluetoothService.getConnectedDevice();
-      return device !== null;
+  /**
+   * Send command to connected device
+   */
+  public async sendCommand(command: string): Promise<string> {
+    if (this.currentConnectionType === 'classic') {
+      return enhancedBluetoothService.sendObdCommand(command);
+    } else if (this.currentConnectionType === 'ble') {
+      return mobileSafeBluetoothService.sendCommand(command);
+    } else {
+      throw new Error('No device connected');
     }
-    
-    return false;
   }
 
-  getConnectedDevice(): BluetoothDevice | null {
-    if (this.currentService === 'android') {
-      return enhancedAndroidBluetoothService.getConnectedDevice();
-    } else if (this.currentService === 'web') {
-      return webBluetoothService.getConnectedDevice();
+  /**
+   * Get connection status
+   */
+  public getConnectionStatus(): ConnectionStatus {
+    if (this.currentConnectionType === 'classic') {
+      return enhancedBluetoothService.isConnected() ? 'connected' : 'disconnected';
+    } else if (this.currentConnectionType === 'ble') {
+      return mobileSafeBluetoothService.getConnectionStatus();
+    } else {
+      return 'disconnected';
     }
-    
-    return null;
   }
 
-  getConnectionStatus() {
-    if (this.currentService === 'android') {
-      const device = enhancedAndroidBluetoothService.getConnectedDevice();
-      return {
-        isConnected: device !== null,
-        device: device,
-        service: 'android'
-      };
-    } else if (this.currentService === 'web') {
-      const device = webBluetoothService.getConnectedDevice();
-      return {
-        isConnected: device !== null,
-        device: device,
-        service: 'web'
-      };
+  /**
+   * Get connected device
+   */
+  public getConnectedDevice(): BluetoothDevice | null {
+    if (this.currentConnectionType === 'classic') {
+      const device = enhancedBluetoothService.getConnectedDevice();
+      return device ? {
+        ...device,
+        isConnected: true,
+        deviceType: this.determineDeviceType(device.name),
+        compatibility: this.calculateCompatibility(device.name)
+      } : null;
+    } else if (this.currentConnectionType === 'ble') {
+      return mobileSafeBluetoothService.getDevice();
+    } else {
+      return null;
     }
-    
-    return {
-      isConnected: false,
-      device: null,
-      service: 'none'
-    };
   }
 
-  getCurrentService(): string {
-    return this.currentService || 'none';
+  /**
+   * Determine device type based on name
+   */
+  private determineDeviceType(name: string): BluetoothDevice['deviceType'] {
+    const lowerName = name.toLowerCase();
+    if (lowerName.includes('elm327') || lowerName.includes('obd')) {
+      return 'ELM327';
+    } else if (lowerName.includes('scanner') || lowerName.includes('diagnostic')) {
+      return 'OBD2';
+    } else {
+      return 'Generic';
+    }
   }
 
-  resetConnectionAttempts(address: string): void {
-    this.connectionAttempts[address] = 0;
-  }
-
-  getConnectionAttempts(address: string): number {
-    return this.connectionAttempts[address] || 0;
+  /**
+   * Calculate compatibility score
+   */
+  private calculateCompatibility(name: string): number {
+    const lowerName = name.toLowerCase();
+    if (lowerName.includes('elm327')) {
+      return 95; // High compatibility
+    } else if (lowerName.includes('obd')) {
+      return 85; // Good compatibility
+    } else if (lowerName.includes('scanner') || lowerName.includes('diagnostic')) {
+      return 75; // Moderate compatibility
+    } else {
+      return 50; // Unknown compatibility
+    }
   }
 }
 
-export const unifiedBluetoothService = new UnifiedBluetoothServiceImpl();
+export const unifiedBluetoothService = UnifiedBluetoothService.getInstance();

@@ -1,42 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import React, { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { List, ListItem } from '@/components/ui/list';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-  Car, 
-  Bluetooth, 
   Search, 
-  Settings,
   BarChart3,
   AlertTriangle,
   Loader2,
-  XCircle,
-  Gauge,
-  Zap,
-  FileWarning,
   CheckCircle,
-  RefreshCw,
-  Wrench,
-  ChevronRight,
-  Info,
-  RotateCw,
-  Cpu,
-  Thermometer,
-  Fuel,
-  Activity
+  Bot
 } from 'lucide-react';
 import { obd2Service } from '@/services/OBD2Service';
 import { toast } from 'sonner';
-import { Progress } from '@/components/ui/progress';
+import AIAssistantPanel from '@/components/AIAssistantPanel';
 
 const Diagnostics: React.FC = () => {
-  const [liveData, setLiveData] = useState<any[]>([]);
-  const [troubleCodes, setTroubleCodes] = useState<any[]>([]);
+  const [liveData, setLiveData] = useState<{pid: string; name: string; value: string; timestamp: Date}[]>([]);
+  const [troubleCodes, setTroubleCodes] = useState<{code: string; description: string; status: string}[]>([]);
   const [isReading, setIsReading] = useState(false);
   const [isReadingCodes, setIsReadingCodes] = useState(false);
 
@@ -127,7 +109,7 @@ const Diagnostics: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/20 p-4">
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
         <div className="text-center space-y-4">
           <div className="flex items-center justify-center gap-3 mb-6">
@@ -141,96 +123,108 @@ const Diagnostics: React.FC = () => {
           </p>
         </div>
 
-        {/* Live Data */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" />
-                Live Data
-              </span>
-              <Button onClick={readLiveData} disabled={isReading} size="sm">
-                {isReading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Reading...
-                  </>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-6">
+            {/* Live Data */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5" />
+                    Live Data
+                  </span>
+                  <Button onClick={readLiveData} disabled={isReading} size="sm">
+                    {isReading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Reading...
+                      </>
+                    ) : (
+                      <>
+                        <Search className="mr-2 h-4 w-4" />
+                        Read Live Data
+                      </>
+                    )}
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {liveData.length > 0 ? (
+                  <List>
+                    {liveData.map((item, index) => (
+                      <ListItem key={index} className="flex items-center justify-between">
+                        <span>{item.name} ({item.pid})</span>
+                        <Badge variant="secondary">{item.value}</Badge>
+                      </ListItem>
+                    ))}
+                  </List>
                 ) : (
-                  <>
-                    <Search className="mr-2 h-4 w-4" />
-                    Read Live Data
-                  </>
+                  <Alert>
+                    <AlertDescription>
+                      No live data available. Click "Read Live Data" to fetch real-time engine parameters.
+                    </AlertDescription>
+                  </Alert>
                 )}
-              </Button>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {liveData.length > 0 ? (
-              <List>
-                {liveData.map((item, index) => (
-                  <ListItem key={index} className="flex items-center justify-between">
-                    <span>{item.name} ({item.pid})</span>
-                    <Badge variant="secondary">{item.value}</Badge>
-                  </ListItem>
-                ))}
-              </List>
-            ) : (
-              <Alert>
-                <AlertDescription>
-                  No live data available. Click "Read Live Data" to fetch real-time engine parameters.
-                </AlertDescription>
-              </Alert>
-            )}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
 
-        {/* Trouble Codes */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5" />
-                Trouble Codes
-              </span>
-              <div className="flex items-center space-x-2">
-                <Button onClick={readTroubleCodes} disabled={isReadingCodes} size="sm">
-                  {isReadingCodes ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Reading...
-                    </>
-                  ) : (
-                    <>
-                      <Search className="mr-2 h-4 w-4" />
-                      Read Codes
-                    </>
-                  )}
-                </Button>
-                <Button onClick={clearTroubleCodes} disabled={troubleCodes.length === 0} variant="outline" size="sm">
-                  Clear Codes
-                </Button>
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {troubleCodes.length > 0 ? (
-              <List>
-                {troubleCodes.map((code, index) => (
-                  <ListItem key={index} className="flex items-center justify-between">
-                    <span>{code.code}</span>
-                    <Badge variant="destructive">{code.status}</Badge>
-                  </ListItem>
-                ))}
-              </List>
-            ) : (
-              <Alert>
-                <AlertDescription>
-                  No trouble codes found. Click "Read Codes" to scan for diagnostic trouble codes (DTCs).
-                </AlertDescription>
-              </Alert>
-            )}
-          </CardContent>
-        </Card>
+            {/* Trouble Codes */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5" />
+                    Trouble Codes
+                  </span>
+                  <div className="flex items-center space-x-2">
+                    <Button onClick={readTroubleCodes} disabled={isReadingCodes} size="sm">
+                      {isReadingCodes ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Reading...
+                        </>
+                      ) : (
+                        <>
+                          <Search className="mr-2 h-4 w-4" />
+                          Read Codes
+                        </>
+                      )}
+                    </Button>
+                    <Button onClick={clearTroubleCodes} disabled={troubleCodes.length === 0} variant="outline" size="sm">
+                      Clear Codes
+                    </Button>
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {troubleCodes.length > 0 ? (
+                  <List>
+                    {troubleCodes.map((code, index) => (
+                      <ListItem key={index} className="flex items-center justify-between">
+                        <span>{code.code}</span>
+                        <Badge variant="destructive">{code.status}</Badge>
+                      </ListItem>
+                    ))}
+                  </List>
+                ) : (
+                  <Alert>
+                    <AlertDescription>
+                      No trouble codes found. Click "Read Codes" to scan for diagnostic trouble codes (DTCs).
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* AI Assistant Panel */}
+          <div>
+            <AIAssistantPanel 
+              dtcCodes={troubleCodes.map(code => code.code)}
+              liveData={liveData.reduce((acc, item) => ({...acc, [item.pid]: item.value}), {})}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -6,6 +6,9 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
+    deps: {
+      inline: ['@capacitor/core']
+    }
   },
   resolve: {
     alias: {

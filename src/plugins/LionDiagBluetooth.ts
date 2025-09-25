@@ -1,148 +1,61 @@
-import { registerPlugin } from '@capacitor/core';
+import { PluginListenerHandle } from '@capacitor/core';
 
 export interface BluetoothDevice {
-  name: string;
+  name?: string;
   address: string;
-  type: number;
-  bonded: boolean;
-  rssi?: number;
-  compatibility: number;
-}
-
-export interface BluetoothStatus {
-  supported: boolean;
-  enabled: boolean;
-  hasPermissions: boolean;
-}
-
-export interface PermissionResult {
-  granted: boolean;
-  message: string;
-}
-
-export interface DiscoveryResult {
-  devices: BluetoothDevice[];
-  count: number;
-}
-
-export interface ConnectionResult {
-  success: boolean;
-  device?: string;
-  address?: string;
-  connected: boolean;
-  message?: string;
-}
-
-export interface CommandResult {
-  success: boolean;
-  command: string;
-  response: string;
-  timestamp: number;
+  bondState?: number;
 }
 
 export interface LionDiagBluetoothPlugin {
-  /**
-   * Check Bluetooth status and permissions
-   */
-  checkBluetoothStatus(): Promise<BluetoothStatus>;
-
-  /**
-   * Request all required Bluetooth permissions
-   */
-  requestPermissions(): Promise<PermissionResult>;
-
-  /**
-   * Enable Bluetooth if not enabled
-   */
-  enableBluetooth(): Promise<{ requested: boolean; message: string }>;
-
-  /**
-   * Start device discovery/scanning
-   */
-  startDiscovery(): Promise<{ success: boolean; message: string }>;
-
-  /**
-   * Stop device discovery
-   */
-  stopDiscovery(): Promise<{ success: boolean; message: string }>;
-
-  /**
-   * Get paired/bonded devices
-   */
-  getPairedDevices(): Promise<DiscoveryResult>;
-
-  /**
-   * Pair with a device
-   */
-  pairDevice(options: { address: string }): Promise<ConnectionResult>;
-
-  /**
-   * Connect to a device
-   */
-  connectToDevice(options: { address: string }): Promise<ConnectionResult>;
-
-  /**
-   * Disconnect from current device
-   */
-  disconnect(): Promise<{ success: boolean; message: string }>;
-
-  /**
-   * Check connection status
-   */
-  isConnected(): Promise<ConnectionResult>;
-
-  /**
-   * Send OBD2 command to connected device
-   */
-  sendCommand(options: { command: string; timeout?: number }): Promise<CommandResult>;
-
-  /**
-   * Initialize ELM327 adapter with optimal settings
-   */
-  initializeELM327(): Promise<{ success: boolean; message: string; responses: string }>;
-
-  // Event listeners
+  initialize(): Promise<void>;
+  enableBluetooth(): Promise<{ enabled: boolean }>;
+  startDiscovery(): Promise<void>;
+  stopDiscovery(): Promise<void>;
+  pairDevice(options: { address: string }): Promise<void>;
+  connectToDevice(options: { address: string }): Promise<void>;
+  disconnectDevice(): Promise<void>;
+  sendCommand(options: { command: string }): Promise<void>;
+  isConnected(): Promise<{ connected: boolean }>;
+  
   addListener(
     eventName: 'deviceFound',
-    listenerFunc: (device: BluetoothDevice) => void,
-  ): Promise<void>;
-
-  addListener(
-    eventName: 'discoveryStarted',
-    listenerFunc: () => void,
-  ): Promise<void>;
-
+    listenerFunc: (device: BluetoothDevice) => void
+  ): Promise<PluginListenerHandle> & PluginListenerHandle;
+  
   addListener(
     eventName: 'discoveryFinished',
-    listenerFunc: (result: DiscoveryResult) => void,
-  ): Promise<void>;
-
+    listenerFunc: () => void
+  ): Promise<PluginListenerHandle> & PluginListenerHandle;
+  
   addListener(
-    eventName: 'discoveryError',
-    listenerFunc: (error: { error: string }) => void,
-  ): Promise<void>;
-
+    eventName: 'pairingStarted',
+    listenerFunc: (data: { address: string }) => void
+  ): Promise<PluginListenerHandle> & PluginListenerHandle;
+  
   addListener(
-    eventName: 'pairingState',
-    listenerFunc: (state: { state: string; device: string }) => void,
-  ): Promise<void>;
-
+    eventName: 'pairingSuccess',
+    listenerFunc: (data: { address: string }) => void
+  ): Promise<PluginListenerHandle> & PluginListenerHandle;
+  
   addListener(
-    eventName: 'connectionState',
-    listenerFunc: (state: { state: string; device: string }) => void,
-  ): Promise<void>;
-
+    eventName: 'pairingFailed',
+    listenerFunc: (data: { address: string; error: string }) => void
+  ): Promise<PluginListenerHandle> & PluginListenerHandle;
+  
   addListener(
-    eventName: 'connected',
-    listenerFunc: (result: ConnectionResult) => void,
-  ): Promise<void>;
-
+    eventName: 'deviceConnected',
+    listenerFunc: (data: { address: string }) => void
+  ): Promise<PluginListenerHandle> & PluginListenerHandle;
+  
   addListener(
-    eventName: 'disconnected',
-    listenerFunc: (result: { device: string; connected: boolean }) => void,
-  ): Promise<void>;
-
+    eventName: 'connectionFailed',
+    listenerFunc: (data: { address: string; error: string }) => void
+  ): Promise<PluginListenerHandle> & PluginListenerHandle;
+  
+  addListener(
+    eventName: 'dataReceived',
+    listenerFunc: (data: { data: string }) => void
+  ): Promise<PluginListenerHandle> & PluginListenerHandle;
+  
   removeAllListeners(): Promise<void>;
 }
-
-export const LionDiagBluetooth = registerPlugin<LionDiagBluetoothPlugin>('BluetoothPlugin');

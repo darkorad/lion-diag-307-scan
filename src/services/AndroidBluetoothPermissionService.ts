@@ -1,5 +1,5 @@
-
 import { Capacitor } from '@capacitor/core';
+import { BluetoothLe } from '@capacitor-community/bluetooth-le';
 
 export class AndroidBluetoothPermissionService {
   private static instance: AndroidBluetoothPermissionService;
@@ -20,40 +20,27 @@ export class AndroidBluetoothPermissionService {
         return true;
       }
 
-      // Check if our custom Bluetooth plugin is available
-      if ((window as any).CustomBluetoothSerial) {
-        console.log('📱 CustomBluetoothSerial plugin found, requesting permissions...');
-        
-        try {
-          // Try to use our custom plugin to request permissions
-          const result = await (window as any).CustomBluetoothSerial.requestPermissions();
-          console.log('✅ Custom Bluetooth permissions result:', result);
-          return result.granted || false;
-        } catch (error) {
-          console.error('❌ Custom Bluetooth permission request failed:', error);
-        }
-      }
-
-      // Fallback: Try to enable Bluetooth through system dialog
-      console.log('⚠️ Using fallback Bluetooth enable method');
-      return await this.requestSystemBluetoothEnable();
-
+      // Request Bluetooth permissions using the Bluetooth LE plugin
+      // This will automatically handle the permission requests on Android
+      await BluetoothLe.initialize();
+      console.log('✅ Bluetooth permissions granted');
+      return true;
     } catch (error) {
       console.error('❌ Bluetooth permission request failed:', error);
       return false;
     }
   }
 
-  private async requestSystemBluetoothEnable(): Promise<boolean> {
+  async requestSystemBluetoothEnable(): Promise<boolean> {
     try {
-      // On Android, we need to request the user to enable Bluetooth
-      // This would typically show a system dialog
+      // On Android, request the user to enable Bluetooth
+      // This will show a system dialog
       console.log('🔵 Requesting system Bluetooth enable...');
-
-      // For now, we'll return true and let the user manually enable it
-      // In a real implementation, this would trigger the Android Bluetooth enable dialog
+      
+      // Use the Bluetooth LE plugin to request enable
+      await BluetoothLe.requestEnable();
+      console.log('✅ Bluetooth enabled');
       return true;
-
     } catch (error) {
       console.error('❌ System Bluetooth enable failed:', error);
       return false;
@@ -78,24 +65,22 @@ export class AndroidBluetoothPermissionService {
       };
 
       if (Capacitor.getPlatform() === 'android') {
-        // Check if CustomBluetoothSerial plugin is available
-        if ((window as any).CustomBluetoothSerial) {
-          try {
-            const status = await (window as any).CustomBluetoothSerial.getStatus();
-            console.log('📊 Bluetooth status from plugin:', status);
-            
-            return {
-              enabled: status.enabled || false,
-              permissions: {
-                bluetooth: status.permissions?.bluetooth || false,
-                bluetoothConnect: status.permissions?.connect || false,
-                bluetoothScan: status.permissions?.scan || false,
-                location: status.permissions?.location || false
-              }
-            };
-          } catch (error) {
-            console.error('❌ Failed to get Bluetooth status from plugin:', error);
-          }
+        try {
+          // Check if Bluetooth is enabled using the Bluetooth LE plugin
+          const result = await BluetoothLe.isEnabled();
+          console.log('📊 Bluetooth status:', result);
+          
+          return {
+            enabled: result.value,
+            permissions: {
+              bluetooth: result.value,
+              bluetoothConnect: result.value,
+              bluetoothScan: result.value,
+              location: true // We assume location permission is granted if we got here
+            }
+          };
+        } catch (error) {
+          console.error('❌ Failed to get Bluetooth status:', error);
         }
       }
 

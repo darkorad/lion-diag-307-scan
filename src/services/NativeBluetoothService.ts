@@ -1,4 +1,3 @@
-
 import { LionDiagBluetooth, BluetoothDevice, BluetoothStatus } from '@/plugins/LionDiagBluetooth';
 import { toast } from 'sonner';
 
@@ -25,7 +24,7 @@ export class NativeBluetoothService {
   private connectedDevice: BluetoothServiceDevice | null = null;
   private discoveredDevices: BluetoothServiceDevice[] = [];
   private isInitialized = false;
-  private eventListeners: { [key: string]: Function[] } = {};
+  private eventListeners: { [key: string]: ((data?: unknown) => void)[] } = {};
 
   static getInstance(): NativeBluetoothService {
     if (!NativeBluetoothService.instance) {
@@ -278,14 +277,14 @@ export class NativeBluetoothService {
   }
 
   // Event management
-  addEventListener(event: string, callback: Function): void {
+  addEventListener(event: string, callback: (data?: unknown) => void): void {
     if (!this.eventListeners[event]) {
       this.eventListeners[event] = [];
     }
     this.eventListeners[event].push(callback);
   }
 
-  removeEventListener(event: string, callback: Function): void {
+  removeEventListener(event: string, callback: (data?: unknown) => void): void {
     if (this.eventListeners[event]) {
       this.eventListeners[event] = this.eventListeners[event].filter(cb => cb !== callback);
     }
@@ -356,7 +355,7 @@ export class NativeBluetoothService {
     return 'Generic';
   }
 
-  private notifyListeners(event: string, data: any): void {
+  private notifyListeners(event: string, data?: unknown): void {
     if (this.eventListeners[event]) {
       this.eventListeners[event].forEach(callback => {
         try {

@@ -1,5 +1,4 @@
-
-import { Home, Car, Settings, Info, Wrench, Cpu, Radio, Shield, Bluetooth, Activity, TestTube } from "lucide-react";
+import { Home, Car, Settings, Info, Wrench, Cpu, Radio, Shield, Bluetooth, Activity, TestTube, Eye } from "lucide-react";
 import Index from "./pages/Index";
 import ProfessionalDiagnostics from "./pages/ProfessionalDiagnostics";
 import VehicleSpecific from "./pages/VehicleSpecific";
@@ -9,6 +8,8 @@ import SettingsPage from "./pages/SettingsPage";
 import ConnectionsPage from "./components/ConnectionsPage";
 import LiveDataPage from "./pages/LiveDataPage";
 import BluetoothTest from "./pages/BluetoothTest";
+import PreviewPage from "./components/PreviewPage";
+import SystemTestingPanel from "./components/SystemTestingPanel";
 
 export const navItems = [
   {
@@ -42,6 +43,12 @@ export const navItems = [
     page: <LiveDataPage />,
   },
   {
+    title: "Preview Screen",
+    to: "/preview",
+    icon: <Eye className="h-4 w-4" />,
+    page: <PreviewPage />,
+  },
+  {
     title: "Settings",
     to: "/settings",
     icon: <Settings className="h-4 w-4" />,
@@ -58,5 +65,11 @@ export const navItems = [
     to: "/bluetooth-test",
     icon: <TestTube className="h-4 w-4" />,
     page: <BluetoothTest />,
+  },
+  {
+    title: "System Testing",
+    to: "/system-testing",
+    icon: <TestTube className="h-4 w-4" />,
+    page: <SystemTestingPanel />,
   },
 ];

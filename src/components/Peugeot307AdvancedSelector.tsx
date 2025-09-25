@@ -9,7 +9,11 @@ import {
   Settings,
   Wrench,
   AlertTriangle,
-  CheckCircle
+  CheckCircle,
+  Zap,
+  Thermometer,
+  Wind,
+  Fuel
 } from 'lucide-react';
 import Peugeot307AdvancedPanel from './Peugeot307AdvancedPanel';
 
@@ -23,6 +27,10 @@ interface Peugeot307AdvancedSelectorProps {
       hasAdvancedFunctions?: boolean;
       supportsComfortFunctions?: boolean;
       supportsBSIAccess?: boolean;
+      hasDPF?: boolean;
+      hasEGR?: boolean;
+      hasTurbo?: boolean;
+      fuelType?: string;
     };
   };
 }
@@ -43,6 +51,7 @@ const Peugeot307AdvancedSelector: React.FC<Peugeot307AdvancedSelectorProps> = ({
       <Peugeot307AdvancedPanel 
         isConnected={isConnected}
         onBack={() => setShowAdvancedPanel(false)}
+        vehicleProfileId={selectedEngine?.id}
       />
     );
   }
@@ -106,6 +115,56 @@ const Peugeot307AdvancedSelector: React.FC<Peugeot307AdvancedSelectorProps> = ({
               </ul>
             </Card>
 
+            {/* Engine Diagnostics */}
+            <Card className="p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Zap className="h-4 w-4 text-green-500" />
+                <h3 className="font-semibold">Engine Diagnostics</h3>
+              </div>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>• Oil temperature monitoring</li>
+                <li>• Turbo pressure analysis</li>
+                {selectedEngine?.specificParameters?.hasTurbo && (
+                  <li className="flex items-center gap-1">
+                    <Wind className="h-3 w-3" />
+                    Turbocharger diagnostics
+                  </li>
+                )}
+                <li>• Fuel system parameters</li>
+                {selectedEngine?.specificParameters?.fuelType === 'diesel' && (
+                  <li className="flex items-center gap-1">
+                    <Fuel className="h-3 w-3" />
+                    Diesel-specific monitoring
+                  </li>
+                )}
+              </ul>
+            </Card>
+
+            {/* Emission Control */}
+            <Card className="p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Thermometer className="h-4 w-4 text-orange-500" />
+                <h3 className="font-semibold">Emission Control</h3>
+              </div>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                {selectedEngine?.specificParameters?.hasDPF && (
+                  <li className="flex items-center gap-1">
+                    <Wind className="h-3 w-3" />
+                    DPF regeneration control
+                  </li>
+                )}
+                {selectedEngine?.specificParameters?.hasEGR && (
+                  <li className="flex items-center gap-1">
+                    <Thermometer className="h-3 w-3" />
+                    EGR valve testing
+                  </li>
+                )}
+                <li>• AdBlue level monitoring</li>
+                <li>• NOx sensor diagnostics</li>
+                <li>• Catalyst efficiency</li>
+              </ul>
+            </Card>
+
             {/* Diagnostics */}
             <Card className="p-4">
               <div className="flex items-center gap-2 mb-2">
@@ -138,6 +197,16 @@ const Peugeot307AdvancedSelector: React.FC<Peugeot307AdvancedSelectorProps> = ({
                 {supportsAdvanced && (
                   <Badge className="bg-blue-100 text-blue-800">
                     Advanced Functions Supported
+                  </Badge>
+                )}
+                {selectedEngine?.specificParameters?.hasDPF && (
+                  <Badge className="bg-orange-100 text-orange-800">
+                    DPF Equipped
+                  </Badge>
+                )}
+                {selectedEngine?.specificParameters?.hasEGR && (
+                  <Badge className="bg-purple-100 text-purple-800">
+                    EGR Equipped
                   </Badge>
                 )}
               </div>

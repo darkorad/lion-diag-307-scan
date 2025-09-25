@@ -1,53 +1,79 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Progress } from '@/components/ui/progress';
+import { 
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardHeader, 
+  CardTitle 
+} from '@/components/ui/card';
+import { 
+  Tabs, 
+  TabsContent, 
+  TabsList, 
+  TabsTrigger 
+} from '@/components/ui/tabs';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
+import { 
+  Badge 
+} from '@/components/ui/badge';
+import { 
+  Input 
+} from '@/components/ui/input';
+import { 
+  Button 
+} from '@/components/ui/button';
+import { 
+  Progress 
+} from '@/components/ui/progress';
 import { 
   Wrench, 
   Settings, 
-  AlertTriangle, 
-  CheckCircle, 
-  Clock, 
+  RefreshCw, 
+  FileText, 
   Search, 
-  Filter,
-  Zap,
-  Shield,
-  Cpu,
-  Car,
-  Battery,
-  Thermometer,
-  RefreshCw,
-  PlayCircle,
-  PauseCircle,
+  Play, 
   StopCircle,
-  Download,
+  Car,
+  Zap,
+  Gauge,
+  Database,
+  Shield,
+  Thermometer,
+  Fuel,
+  Activity,
+  Cpu,
   Upload,
-  FileText,
-  Star
+  PlayCircle,
+  Clock,
+  AlertTriangle,
+  AlertCircle,
+  HelpCircle,
+  BookOpen
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { VehicleProfile } from '@/types/vehicle';
 import { 
   SPECIAL_FUNCTIONS, 
   PROFESSIONAL_MODULES, 
-  PROFESSIONAL_CATEGORIES,
-  SPECIAL_FUNCTION_CATEGORIES,
-  SpecialFunction,
+  SpecialFunction, 
   ManufacturerModule 
 } from '@/constants/professionalDiagnosticDatabase';
-import { enhancedNativeBluetoothService } from '@/services/EnhancedNativeBluetoothService';
-import { toast } from 'sonner';
+import SystemScanReport from './SystemScanReport';
+import { systemScanService, FullSystemScanReport } from '@/services/SystemScanService';
+import { unifiedBluetoothService } from '@/services/UnifiedBluetoothService';
+import { Label } from '@/components/ui/label';
+import FunctionWizard from '@/components/ui/wizard';
+import { HelpIcon } from '@/components/ui/help-tooltip';
+import TutorialGuide from './TutorialGuide';
 
 interface ProfessionalDiagnosticCenterProps {
-  selectedVehicle?: {
-    make: string;
-    model: string;
-    year: number;
-    engine?: string;
-  };
+  selectedVehicle: VehicleProfile | null;
 }
 
 const ProfessionalDiagnosticCenter: React.FC<ProfessionalDiagnosticCenterProps> = ({ 
@@ -63,6 +89,11 @@ const ProfessionalDiagnosticCenter: React.FC<ProfessionalDiagnosticCenterProps> 
   const [connectionStatus, setConnectionStatus] = useState(false);
   const [availableFunctions, setAvailableFunctions] = useState<SpecialFunction[]>([]);
   const [availableModules, setAvailableModules] = useState<ManufacturerModule[]>([]);
+  const [systemScanReport, setSystemScanReport] = useState<FullSystemScanReport | null>(null);
+  const [showWizard, setShowWizard] = useState(false);
+  const [wizardFunction, setWizardFunction] = useState<SpecialFunction | null>(null);
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [tutorialCompleted, setTutorialCompleted] = useState(false);
 
   useEffect(() => {
     // Load functions and modules based on selected vehicle
@@ -88,7 +119,7 @@ const ProfessionalDiagnosticCenter: React.FC<ProfessionalDiagnosticCenterProps> 
 
   const checkConnectionStatus = async () => {
     try {
-      const connected = await enhancedNativeBluetoothService.isConnected();
+      const connected = unifiedBluetoothService.getConnectionStatus() === 'connected';
       setConnectionStatus(connected);
     } catch (error) {
       setConnectionStatus(false);
@@ -134,7 +165,7 @@ const ProfessionalDiagnosticCenter: React.FC<ProfessionalDiagnosticCenterProps> 
       // Send actual OBD2 command if available
       if (functionData.command) {
         try {
-          const response = await enhancedNativeBluetoothService.sendCommand(functionData.command);
+          const response = await unifiedBluetoothService.sendCommand(functionData.command);
           console.log('Function response:', response);
         } catch (error) {
           console.warn('Command execution failed:', error);
@@ -175,7 +206,7 @@ const ProfessionalDiagnosticCenter: React.FC<ProfessionalDiagnosticCenterProps> 
   };
 
   const FunctionCard: React.FC<{ func: SpecialFunction }> = ({ func }) => (
-    <Card className="hover:shadow-md transition-shadow cursor-pointer">
+    <Card className="hover:shadow-md transition-shadow">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
@@ -207,330 +238,431 @@ const ProfessionalDiagnosticCenter: React.FC<ProfessionalDiagnosticCenterProps> 
         </div>
         
         {func.warnings.length > 0 && (
-          <Alert className="py-2">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription className="text-xs">
-              {func.warnings[0]}
-              {func.warnings.length > 1 && ` (+${func.warnings.length - 1} more)`}
-            </AlertDescription>
-          </Alert>
+          <div className="rounded-md border border-yellow-500 bg-yellow-50 p-2">
+            <div className="flex items-center gap-1">
+              <AlertTriangle className="h-4 w-4 text-yellow-500" />
+              <span className="text-xs text-yellow-700">
+                {func.warnings[0]}
+                {func.warnings.length > 1 && ` (+${func.warnings.length - 1} more)`}
+              </span>
+            </div>
+          </div>
         )}
         
         <div className="flex gap-2">
           <Button 
-            onClick={() => executeSpecialFunction(func)}
-            disabled={isExecuting || !connectionStatus}
+            onClick={() => {
+              setWizardFunction(func);
+              setShowWizard(true);
+            }}
             className="flex-1"
             size="sm"
           >
-            {isExecuting && selectedFunction?.id === func.id ? (
-              <>
-                <RefreshCw className="h-3 w-3 animate-spin mr-1" />
-                Executing...
-              </>
-            ) : (
-              <>
-                <PlayCircle className="h-3 w-3 mr-1" />
-                Execute
-              </>
-            )}
+            <PlayCircle className="h-3 w-3 mr-1" />
+            Execute with Wizard
           </Button>
-          <Button variant="outline" size="sm">
-            <FileText className="h-3 w-3" />
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => executeSpecialFunction(func)}
+            disabled={isExecuting || !connectionStatus}
+          >
+            <PlayCircle className="h-3 w-3 mr-1" />
+            Quick Execute
           </Button>
         </div>
       </CardContent>
     </Card>
   );
 
-  return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-2xl font-bold flex items-center gap-2">
-                  🦁 Professional Diagnostic Center
-                </CardTitle>
-                <p className="text-muted-foreground mt-1">
-                  Advanced OBD2 diagnostics and special functions
-                </p>
-              </div>
-              <div className="flex items-center gap-4">
-                {selectedVehicle && (
-                  <div className="text-right">
-                    <div className="font-semibold">{selectedVehicle.make} {selectedVehicle.model}</div>
-                    <div className="text-sm text-muted-foreground">{selectedVehicle.year}</div>
-                  </div>
-                )}
-                <Badge className={connectionStatus ? 'bg-green-500' : 'bg-red-500'}>
-                  {connectionStatus ? (
-                    <>
-                      <CheckCircle className="h-3 w-3 mr-1" />
-                      Connected
-                    </>
-                  ) : (
-                    <>
-                      <AlertTriangle className="h-3 w-3 mr-1" />
-                      Disconnected
-                    </>
-                  )}
-                </Badge>
-              </div>
-            </div>
-          </CardHeader>
-        </Card>
+  // Add the system scan handler
+  const handleSystemScan = async () => {
+    try {
+      const report = await systemScanService.performFullSystemScan();
+      setSystemScanReport(report);
+      toast.success('Full system scan completed successfully');
+    } catch (error) {
+      toast.error('Failed to perform system scan');
+      console.error('System scan error:', error);
+    }
+  };
 
-        {/* Execution Progress */}
-        {isExecuting && selectedFunction && (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold">Executing: {selectedFunction.name}</h3>
-                  <Button variant="outline" size="sm">
-                    <StopCircle className="h-4 w-4 mr-1" />
-                    Cancel
-                  </Button>
+  // Handle wizard completion
+  const handleWizardComplete = (result: { success: boolean; functionId: string }) => {
+    setShowWizard(false);
+    setWizardFunction(null);
+    
+    if (result.success) {
+      toast.success(`Function completed successfully`);
+    } else {
+      toast.error(`Function failed`);
+    }
+  };
+
+  // Handle tutorial completion
+  const handleTutorialComplete = () => {
+    setShowTutorial(false);
+    setTutorialCompleted(true);
+    localStorage.setItem('lionDiagTutorialCompleted', 'true');
+  };
+
+  // Show tutorial on first visit
+  useEffect(() => {
+    const completed = localStorage.getItem('lionDiagTutorialCompleted');
+    if (!completed) {
+      setShowTutorial(true);
+    } else {
+      setTutorialCompleted(true);
+    }
+  }, []);
+
+  return (
+    <div className="space-y-6">
+      {/* Tutorial Modal */}
+      <TutorialGuide 
+        isOpen={showTutorial}
+        onClose={() => setShowTutorial(false)}
+        onComplete={handleTutorialComplete}
+      />
+      
+      {/* Wizard Modal */}
+      {showWizard && wizardFunction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <FunctionWizard 
+            functionData={wizardFunction} 
+            onClose={() => {
+              setShowWizard(false);
+              setWizardFunction(null);
+            }}
+            onComplete={handleWizardComplete}
+          />
+        </div>
+      )}
+      
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-3xl font-bold tracking-tight">Professional Diagnostic Center</h2>
+            <HelpIcon 
+              content="The Professional Diagnostic Center provides advanced vehicle diagnostics and special functions. Use the tabs below to access different diagnostic features."
+            />
+          </div>
+          <p className="text-muted-foreground">
+            Advanced vehicle diagnostics and special functions
+          </p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setShowTutorial(true)}
+            className="flex items-center gap-1"
+          >
+            <BookOpen className="h-4 w-4" />
+            Tutorial
+          </Button>
+          <div className={`flex items-center space-x-1 ${connectionStatus ? 'text-green-500' : 'text-red-500'}`}>
+            {connectionStatus ? (
+              <div className="w-3 h-3 rounded-full bg-green-500"></div>
+            ) : (
+              <div className="w-3 h-3 rounded-full bg-red-500"></div>
+            )}
+            <span className="text-sm font-medium">
+              {connectionStatus ? 'Connected' : 'Disconnected'}
+            </span>
+          </div>
+          {selectedVehicle && (
+            <Badge variant="secondary">
+              {selectedVehicle.make} {selectedVehicle.model}
+            </Badge>
+          )}
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="special-functions">Special Functions</TabsTrigger>
+          <TabsTrigger value="modules">Vehicle Modules</TabsTrigger>
+          <TabsTrigger value="live-data">Live Data</TabsTrigger>
+          <TabsTrigger value="reports">Reports</TabsTrigger>
+        </TabsList>
+
+        {/* Overview Tab */}
+        <TabsContent value="overview" className="space-y-4">
+          {/* Quick Actions */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setActiveTab('special-functions')}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-sm font-medium">Special Functions</CardTitle>
+                  <HelpIcon 
+                    content="Access special vehicle functions like DPF regeneration, service resets, adaptations, and coding operations."
+                    side="right"
+                  />
                 </div>
-                <Progress value={executionProgress} className="w-full" />
-                <div className="text-sm text-muted-foreground">
-                  Progress: {executionProgress}% - Estimated time: {selectedFunction.estimatedTime}
+                <Wrench className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{availableFunctions.length}</div>
+                <p className="text-xs text-muted-foreground">Available functions</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setActiveTab('modules')}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-sm font-medium">Vehicle Modules</CardTitle>
+                  <HelpIcon 
+                    content="View and interact with all vehicle control modules including engine, transmission, ABS, airbag, climate, and body control modules."
+                    side="right"
+                  />
+                </div>
+                <Settings className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{availableModules.length}</div>
+                <p className="text-xs text-muted-foreground">Detected modules</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={handleSystemScan}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-sm font-medium">System Scan</CardTitle>
+                  <HelpIcon 
+                    content="Perform a complete system scan of all vehicle modules to detect fault codes and diagnose issues across all systems."
+                    side="right"
+                  />
+                </div>
+                <RefreshCw className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">Full</div>
+                <p className="text-xs text-muted-foreground">Complete vehicle scan</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setActiveTab('reports')}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-sm font-medium">Reports</CardTitle>
+                  <HelpIcon 
+                    content="View, analyze, and export detailed diagnostic reports in various formats for professional use."
+                    side="right"
+                  />
+                </div>
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">Export</div>
+                <p className="text-xs text-muted-foreground">Diagnostic reports</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Recent Activity */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Activity</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center space-x-4">
+                  <div className="bg-primary/10 p-2 rounded-full">
+                    <Wrench className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Oil Service Reset</p>
+                    <p className="text-xs text-muted-foreground">Completed 2 hours ago</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-4">
+                  <div className="bg-primary/10 p-2 rounded-full">
+                    <RefreshCw className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">System Scan</p>
+                    <p className="text-xs text-muted-foreground">Completed 1 day ago</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-4">
+                  <div className="bg-primary/10 p-2 rounded-full">
+                    <Settings className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Throttle Adaptation</p>
+                    <p className="text-xs text-muted-foreground">Completed 3 days ago</p>
+                  </div>
                 </div>
               </div>
             </CardContent>
           </Card>
-        )}
+        </TabsContent>
 
-        {/* Main Content */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="special-functions">Special Functions</TabsTrigger>
-            <TabsTrigger value="modules">Vehicle Modules</TabsTrigger>
-            <TabsTrigger value="live-data">Live Data</TabsTrigger>
-            <TabsTrigger value="reports">Reports</TabsTrigger>
-          </TabsList>
-
-          {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {Object.entries(PROFESSIONAL_CATEGORIES).map(([category, data]) => (
-                <Card key={category} className="hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <span className="text-2xl">{data.icon}</span>
-                      {category}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground mb-3">{data.description}</p>
-                    <div className="space-y-1">
-                      {data.functions.slice(0, 3).map((func, index) => (
-                        <div key={index} className="flex items-center gap-2 text-xs">
-                          <CheckCircle className="h-3 w-3 text-green-500" />
-                          {func}
-                        </div>
-                      ))}
-                      {data.functions.length > 3 && (
-                        <div className="text-xs text-muted-foreground">
-                          +{data.functions.length - 3} more functions
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            {/* Quick Actions */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <Button variant="outline" className="h-20 flex flex-col gap-2">
-                    <Thermometer className="h-6 w-6" />
-                    <span className="text-xs">DPF Regen</span>
-                  </Button>
-                  <Button variant="outline" className="h-20 flex flex-col gap-2">
-                    <RefreshCw className="h-6 w-6" />
-                    <span className="text-xs">Service Reset</span>
-                  </Button>
-                  <Button variant="outline" className="h-20 flex flex-col gap-2">
-                    <Settings className="h-6 w-6" />
-                    <span className="text-xs">Adaptations</span>
-                  </Button>
-                  <Button variant="outline" className="h-20 flex flex-col gap-2">
-                    <PlayCircle className="h-6 w-6" />
-                    <span className="text-xs">Component Test</span>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Special Functions Tab */}
-          <TabsContent value="special-functions" className="space-y-6">
-            {/* Filters */}
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex flex-col md:flex-row gap-4">
-                  <div className="flex-1">
-                    <Label htmlFor="search">Search Functions</Label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="search"
-                        placeholder="Search special functions..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
-                  </div>
-                  <div className="w-full md:w-48">
-                    <Label htmlFor="category">Category</Label>
-                    <select
-                      id="category"
-                      value={selectedCategory}
-                      onChange={(e) => setSelectedCategory(e.target.value)}
-                      className="w-full p-2 border rounded-md"
-                    >
-                      <option value="all">All Categories</option>
-                      <option value="DPF">DPF Management</option>
-                      <option value="Service Reset">Service Reset</option>
-                      <option value="Adaptation">Adaptations</option>
-                      <option value="Coding">Coding</option>
-                      <option value="Programming">Programming</option>
-                      <option value="Calibration">Calibration</option>
-                      <option value="Test">Component Testing</option>
-                    </select>
+        {/* Special Functions Tab */}
+        <TabsContent value="special-functions" className="space-y-4">
+          {/* Filters */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <CardTitle>Special Functions</CardTitle>
+                <HelpIcon 
+                  content="Filter and search special vehicle functions by category or keyword. Use the wizard for step-by-step guidance."
+                />
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1">
+                  <Label htmlFor="search">Search Functions</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="search"
+                      placeholder="Search special functions..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
                   </div>
                 </div>
+                <div className="w-full md:w-48">
+                  <Label htmlFor="category">Category</Label>
+                  <select
+                    id="category"
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    className="w-full p-2 border rounded-md"
+                  >
+                    <option value="all">All Categories</option>
+                    <option value="DPF">DPF Management</option>
+                    <option value="Service Reset">Service Reset</option>
+                    <option value="Adaptation">Adaptations</option>
+                    <option value="Coding">Coding</option>
+                    <option value="Programming">Programming</option>
+                    <option value="Calibration">Calibration</option>
+                    <option value="Test">Component Testing</option>
+                  </select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Functions Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredFunctions.map((func) => (
+              <FunctionCard key={func.id} func={func} />
+            ))}
+          </div>
+
+          {filteredFunctions.length === 0 && (
+            <Card>
+              <CardContent className="pt-6 text-center py-12">
+                <Search className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No functions found</h3>
+                <p className="text-muted-foreground">
+                  Try adjusting your search terms or category filter.
+                </p>
               </CardContent>
             </Card>
+          )}
+        </TabsContent>
 
-            {/* Functions Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredFunctions.map((func) => (
-                <FunctionCard key={func.id} func={func} />
-              ))}
-            </div>
-
-            {filteredFunctions.length === 0 && (
-              <Card>
-                <CardContent className="pt-6 text-center py-12">
-                  <Search className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No functions found</h3>
-                  <p className="text-muted-foreground">
-                    Try adjusting your search terms or category filter.
-                  </p>
+        {/* Vehicle Modules Tab */}
+        <TabsContent value="modules" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <CardTitle>Vehicle Modules</CardTitle>
+                <HelpIcon 
+                  content="View all available vehicle control modules. Each module represents a specific system in your vehicle that can be diagnosed and controlled."
+                />
+              </div>
+            </CardHeader>
+          </Card>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {availableModules.map((module) => (
+              <Card key={module.id} className="hover:shadow-md transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <CardTitle className="text-lg">{module.name}</CardTitle>
+                    <Badge variant="outline">{module.manufacturer}</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">{module.description}</p>
+                  
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium">ECU Address: {module.ecuAddress}</div>
+                    
+                    <div>
+                      <div className="text-sm font-medium mb-1">Supported Functions:</div>
+                      <div className="flex flex-wrap gap-1">
+                        {module.supportedFunctions.map((func, index) => (
+                          <Badge key={index} variant="secondary" className="text-xs">
+                            {func}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <div className="text-sm font-medium mb-1">Common Issues:</div>
+                      <ul className="text-xs text-muted-foreground space-y-1">
+                        {module.commonIssues.slice(0, 2).map((issue, index) => (
+                          <li key={index} className="flex items-start gap-1">
+                            <AlertTriangle className="h-3 w-3 text-yellow-500 mt-0.5 flex-shrink-0" />
+                            {issue}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button size="sm" className="flex-1">
+                      <Cpu className="h-3 w-3 mr-1" />
+                      Connect
+                    </Button>
+                    <Button variant="outline" size="sm">
+                      <FileText className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
-            )}
-          </TabsContent>
+            ))}
+          </div>
+        </TabsContent>
 
-          {/* Vehicle Modules Tab */}
-          <TabsContent value="modules" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {availableModules.map((module) => (
-                <Card key={module.id} className="hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <CardTitle className="text-lg">{module.name}</CardTitle>
-                      <Badge variant="outline">{module.manufacturer}</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-sm text-muted-foreground">{module.description}</p>
-                    
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium">ECU Address: {module.ecuAddress}</div>
-                      
-                      <div>
-                        <div className="text-sm font-medium mb-1">Supported Functions:</div>
-                        <div className="flex flex-wrap gap-1">
-                          {module.supportedFunctions.map((func, index) => (
-                            <Badge key={index} variant="secondary" className="text-xs">
-                              {func}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <div className="text-sm font-medium mb-1">Common Issues:</div>
-                        <ul className="text-xs text-muted-foreground space-y-1">
-                          {module.commonIssues.slice(0, 2).map((issue, index) => (
-                            <li key={index} className="flex items-start gap-1">
-                              <AlertTriangle className="h-3 w-3 text-yellow-500 mt-0.5 flex-shrink-0" />
-                              {issue}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                    
-                    <div className="flex gap-2">
-                      <Button size="sm" className="flex-1">
-                        <Cpu className="h-3 w-3 mr-1" />
-                        Connect
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <FileText className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
+        {/* Live Data Tab */}
+        <TabsContent value="live-data" className="space-y-6">
+          <Card>
+            <CardContent className="pt-6 text-center py-12">
+              <Activity className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Live Data Stream</h3>
+              <p className="text-muted-foreground mb-4">
+                Connect to vehicle to view real-time sensor data and parameters.
+              </p>
+              <Button disabled={!connectionStatus}>
+                <PlayCircle className="h-4 w-4 mr-2" />
+                Start Live Data Stream
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-          {/* Live Data Tab */}
-          <TabsContent value="live-data" className="space-y-6">
-            <Card>
-              <CardContent className="pt-6 text-center py-12">
-                <Battery className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Live Data Stream</h3>
-                <p className="text-muted-foreground mb-4">
-                  Connect to vehicle to view real-time sensor data and parameters.
-                </p>
-                <Button disabled={!connectionStatus}>
-                  <PlayCircle className="h-4 w-4 mr-2" />
-                  Start Live Data Stream
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Reports Tab */}
-          <TabsContent value="reports" className="space-y-6">
-            <Card>
-              <CardContent className="pt-6 text-center py-12">
-                <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Diagnostic Reports</h3>
-                <p className="text-muted-foreground mb-4">
-                  Generate comprehensive diagnostic reports and export results.
-                </p>
-                <div className="flex gap-2 justify-center">
-                  <Button variant="outline">
-                    <Download className="h-4 w-4 mr-2" />
-                    Export Report
-                  </Button>
-                  <Button variant="outline">
-                    <Upload className="h-4 w-4 mr-2" />
-                    Import Data
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
+        {/* Reports Tab */}
+        <TabsContent value="reports" className="space-y-6">
+          <SystemScanReport 
+            initialReport={systemScanReport} 
+            onBack={() => setActiveTab('overview')}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

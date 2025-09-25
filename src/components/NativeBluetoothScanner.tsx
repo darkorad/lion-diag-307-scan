@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,7 +18,7 @@ import {
   Link,
   Shield
 } from 'lucide-react';
-import { nativeBluetoothService, BluetoothServiceDevice } from '@/services/NativeBluetoothService';
+import { nativeBluetoothService, BluetoothServiceDevice, ServiceConnectionResult } from '@/services/NativeBluetoothService';
 import { toast } from 'sonner';
 
 interface NativeBluetoothScannerProps {
@@ -163,7 +162,7 @@ const NativeBluetoothScanner: React.FC<NativeBluetoothScannerProps> = ({
 
     try {
       console.log(`🔗 Connecting to ${device.name}...`);
-      const result = await nativeBluetoothService.connectToDevice(device);
+      const result: ServiceConnectionResult = await nativeBluetoothService.connectToDevice(device);
       
       if (result.success && result.device) {
         setConnectedDevice(result.device);
@@ -208,11 +207,11 @@ const NativeBluetoothScanner: React.FC<NativeBluetoothScannerProps> = ({
   };
 
   const getCompatibilityBadge = (compatibility: number) => {
-    if (compatibility >= 0.8) {
+    if (compatibility >= 95) {
       return <Badge className="bg-green-500 text-white">Excellent</Badge>;
-    } else if (compatibility >= 0.6) {
+    } else if (compatibility >= 80) {
       return <Badge className="bg-blue-500 text-white">Good</Badge>;
-    } else if (compatibility >= 0.3) {
+    } else if (compatibility >= 60) {
       return <Badge className="bg-yellow-500 text-white">Fair</Badge>;
     } else {
       return <Badge variant="secondary">Unknown</Badge>;

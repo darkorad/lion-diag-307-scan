@@ -1,31 +1,41 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Progress } from '@/components/ui/progress';
-import { toast } from 'sonner';
 import { 
-  Bluetooth, 
-  BluetoothConnected, 
-  Search, 
-  Settings, 
+  Search,
+  Bluetooth,
+  BluetoothConnected,
+  BluetoothSearching,
+  Power,
   RefreshCw,
-  Signal,
-  Star,
-  AlertTriangle,
-  CheckCircle,
+  X,
+  Check,
   XCircle,
   Clock,
   Zap,
   Shield,
-  Wifi
+  Wifi,
+  AlertTriangle,
+  CheckCircle,
+  Settings,
+  Signal,
+  Star
 } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
 import { enhancedNativeBluetoothService } from '@/services/EnhancedNativeBluetoothService';
-import { BluetoothDevice, BluetoothStatus } from '@/plugins/LionDiagBluetooth';
+import { BluetoothDevice } from '@/services/EnhancedNativeBluetoothService';
+
+// Define the BluetoothStatus interface
+interface BluetoothStatus {
+  supported: boolean;
+  enabled: boolean;
+  hasPermissions: boolean;
+}
 
 interface EnhancedNativeBluetoothManagerProps {
   onDeviceConnected?: (device: BluetoothDevice) => void;
@@ -95,7 +105,7 @@ const EnhancedNativeBluetoothManager: React.FC<EnhancedNativeBluetoothManagerPro
     enhancedNativeBluetoothService.on('scanStarted', handleScanStarted);
     enhancedNativeBluetoothService.on('scanFinished', handleScanFinished);
     enhancedNativeBluetoothService.on('scanError', handleScanError);
-    enhancedNativeBluetoothService.on('connected', handleDeviceConnected);
+    enhancedNativeBluetoothService.on('connected', handleDeviceConnectedEvent);
     enhancedNativeBluetoothService.on('disconnected', handleDeviceDisconnected);
     enhancedNativeBluetoothService.on('pairingStateChanged', handlePairingStateChanged);
   };
@@ -105,7 +115,7 @@ const EnhancedNativeBluetoothManager: React.FC<EnhancedNativeBluetoothManagerPro
     enhancedNativeBluetoothService.off('scanStarted', handleScanStarted);
     enhancedNativeBluetoothService.off('scanFinished', handleScanFinished);
     enhancedNativeBluetoothService.off('scanError', handleScanError);
-    enhancedNativeBluetoothService.off('connected', handleDeviceConnected);
+    enhancedNativeBluetoothService.off('connected', handleDeviceConnectedEvent);
     enhancedNativeBluetoothService.off('disconnected', handleDeviceDisconnected);
     enhancedNativeBluetoothService.off('pairingStateChanged', handlePairingStateChanged);
   };
@@ -153,7 +163,7 @@ const EnhancedNativeBluetoothManager: React.FC<EnhancedNativeBluetoothManagerPro
     toast.error(`Scan failed: ${error}`);
   }, []);
   
-  const handleDeviceConnected = useCallback((result: any) => {
+  const handleDeviceConnectedEvent = useCallback((result: any) => {
     const device = devices.find(d => d.address === result.address) || 
                   pairedDevices.find(d => d.address === result.address);
     
@@ -285,9 +295,9 @@ const EnhancedNativeBluetoothManager: React.FC<EnhancedNativeBluetoothManagerPro
   
   // Utility functions
   const getDeviceIcon = (device: BluetoothDevice) => {
-    if (device.compatibility >= 0.8) {
+    if (device.compatibility >= 90) {
       return <BluetoothConnected className="h-4 w-4 text-blue-500" />;
-    } else if (device.compatibility >= 0.5) {
+    } else if (device.compatibility >= 70) {
       return <Bluetooth className="h-4 w-4 text-green-500" />;
     } else {
       return <Bluetooth className="h-4 w-4 text-gray-500" />;
@@ -295,13 +305,13 @@ const EnhancedNativeBluetoothManager: React.FC<EnhancedNativeBluetoothManagerPro
   };
   
   const getCompatibilityBadge = (compatibility: number) => {
-    if (compatibility >= 0.8) {
+    if (compatibility >= 90) {
       return <Badge className="bg-green-500 text-xs">Excellent</Badge>;
-    } else if (compatibility >= 0.6) {
+    } else if (compatibility >= 70) {
       return <Badge className="bg-blue-500 text-xs">Very Good</Badge>;
-    } else if (compatibility >= 0.4) {
+    } else if (compatibility >= 50) {
       return <Badge className="bg-yellow-500 text-xs">Good</Badge>;
-    } else if (compatibility >= 0.2) {
+    } else if (compatibility >= 30) {
       return <Badge className="bg-orange-500 text-xs">Fair</Badge>;
     } else {
       return <Badge variant="secondary" className="text-xs">Unknown</Badge>;
@@ -573,9 +583,9 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
   isPaired
 }) => {
   const getDeviceIcon = (device: BluetoothDevice) => {
-    if (device.compatibility >= 0.8) {
+    if (device.compatibility >= 90) {
       return <BluetoothConnected className="h-4 w-4 text-blue-500" />;
-    } else if (device.compatibility >= 0.5) {
+    } else if (device.compatibility >= 70) {
       return <Bluetooth className="h-4 w-4 text-green-500" />;
     } else {
       return <Bluetooth className="h-4 w-4 text-gray-500" />;
@@ -583,13 +593,13 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
   };
   
   const getCompatibilityBadge = (compatibility: number) => {
-    if (compatibility >= 0.8) {
+    if (compatibility >= 90) {
       return <Badge className="bg-green-500 text-xs">Excellent</Badge>;
-    } else if (compatibility >= 0.6) {
+    } else if (compatibility >= 70) {
       return <Badge className="bg-blue-500 text-xs">Very Good</Badge>;
-    } else if (compatibility >= 0.4) {
+    } else if (compatibility >= 50) {
       return <Badge className="bg-yellow-500 text-xs">Good</Badge>;
-    } else if (compatibility >= 0.2) {
+    } else if (compatibility >= 30) {
       return <Badge className="bg-orange-500 text-xs">Fair</Badge>;
     } else {
       return <Badge variant="secondary" className="text-xs">Unknown</Badge>;
@@ -643,4 +653,4 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
   );
 };
 
-export default EnhancedNativeBluetoothManager;
+export default EnhancedNativeBluetoothManager

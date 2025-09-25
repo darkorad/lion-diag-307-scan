@@ -2,7 +2,7 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'app.lovable.8961d3c3f07d43bda4712722432c1d2f',
+  appId: 'com.lovable.liondiag307scan',
   appName: 'lion-diag-307-scan',
   webDir: 'dist',
   // Remove server configuration for production Android build
