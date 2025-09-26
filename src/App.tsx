@@ -13,6 +13,7 @@ import LiveDataPage from '@/pages/LiveDataPage';
 import BluetoothTest from '@/pages/BluetoothTest';
 import PreviewPage from '@/components/PreviewPage';
 import SystemTestingPage from '@/pages/SystemTestingPage';
+import TroubleCodesPage from '@/pages/TroubleCodesPage';
 import NotFound from '@/pages/NotFound';
 
 function App() {
@@ -32,6 +33,7 @@ function App() {
             <Route path="live-data" element={<LiveDataPage />} />
             <Route path="bluetooth-test" element={<BluetoothTest />} />
             <Route path="system-testing" element={<SystemTestingPage />} />
+            <Route path="trouble-codes" element={<TroubleCodesPage />} />
             <Route path="preview" element={<PreviewPage />} />
             <Route path="*" element={<NotFound />} />
           </Route>

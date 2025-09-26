@@ -29,10 +29,14 @@ import {
   Eye,
   Lock,
   Thermometer,
-  Gauge
+  Gauge,
+  Search,
+  Download
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { enhancedOBD2Service } from '@/services/EnhancedOBD2Service';
+import { vinDecodingService, DecodedVIN } from '@/services/VINDecodingService';
+import { peugeotDiagnosticService } from '@/services/PeugeotDiagnosticService';
 
 interface PeugeotDiagboxEmulatorProps {
   isConnected: boolean;
@@ -82,6 +86,11 @@ const PeugeotDiagboxEmulator: React.FC<PeugeotDiagboxEmulatorProps> = ({ isConne
   const [isPinAuthenticated, setIsPinAuthenticated] = useState(false);
   const [hiddenFunctions, setHiddenFunctions] = useState<HiddenFunction[]>([]);
   const [advancedFunctions, setAdvancedFunctions] = useState<AdvancedFunction[]>([]);
+  const [isAutoSearching, setIsAutoSearching] = useState(false);
+  const [autoSearchProgress, setAutoSearchProgress] = useState(0);
+  const [decodedVIN, setDecodedVIN] = useState<DecodedVIN | null>(null);
+  const [retrievedPIN, setRetrievedPIN] = useState<string | null>(null);
+  const [vehicleProfileId, setVehicleProfileId] = useState<string>('peugeot_307_hdi');
 
   // Peugeot ECU modules database
   const peugeotECUs: ECUModule[] = [
@@ -272,7 +281,12 @@ const PeugeotDiagboxEmulator: React.FC<PeugeotDiagboxEmulatorProps> = ({ isConne
 
     if (func.riskLevel === 'high') {
       const confirmed = window.confirm(
-        `⚠️ HIGH RISK OPERATION\n\n${func.name}\n${func.description}\n\nThis operation can potentially damage your vehicle or affect safety systems. Are you absolutely sure you want to continue?`
+        `⚠️ HIGH RISK OPERATION
+
+${func.name}
+${func.description}
+
+This operation can potentially damage your vehicle or affect safety systems. Are you absolutely sure you want to continue?`
       );
       if (!confirmed) return;
     }
@@ -325,6 +339,76 @@ const PeugeotDiagboxEmulator: React.FC<PeugeotDiagboxEmulatorProps> = ({ isConne
       setAdvancedFunctions([]);
     }
   }, [selectedEcu]);
+
+  // Auto-search VIN and retrieve PIN function
+  const autoSearchVINAndPIN = async () => {
+    if (!isConnected) {
+      toast.error('Not connected to vehicle');
+      return;
+    }
+
+    setIsAutoSearching(true);
+    setAutoSearchProgress(0);
+    setDecodedVIN(null);
+    setRetrievedPIN(null);
+
+    try {
+      // Step 1: Read VIN from vehicle (20% progress)
+      setAutoSearchProgress(20);
+      toast.info('Reading VIN from vehicle...');
+      
+      let vin = '';
+      try {
+        // Try standard OBD2 VIN request
+        const vinResponse = await enhancedOBD2Service.sendCommand('0902');
+        if (vinResponse && vinResponse.length > 6) {
+          // Extract VIN from response (simplified)
+          vin = vinResponse.substring(6).replace(/\s/g, '').trim();
+        }
+      } catch (error) {
+        console.warn('Standard VIN read failed, trying alternative method:', error);
+        // Try alternative method for PSA vehicles
+        try {
+          const altResponse = await enhancedOBD2Service.sendCommand('22F190');
+          if (altResponse && altResponse.length > 6) {
+            vin = altResponse.substring(6).replace(/\s/g, '').trim();
+          }
+        } catch (altError) {
+          console.error('Alternative VIN read failed:', altError);
+        }
+      }
+
+      if (!vin || vin.length < 17) {
+        throw new Error('Failed to read valid VIN from vehicle');
+      }
+
+      // Step 2: Decode VIN (40% progress)
+      setAutoSearchProgress(40);
+      toast.info('Decoding VIN...');
+      
+      const decoded = await vinDecodingService.decodeVIN(vin);
+      setDecodedVIN(decoded);
+
+      // Step 3: Retrieve PIN (60% progress)
+      setAutoSearchProgress(60);
+      toast.info('Retrieving security PIN...');
+      
+      // In a real implementation, we would determine the correct profile based on the decoded VIN
+      // For now, we'll use a default profile
+      const pin = await peugeotDiagnosticService.readPin(vehicleProfileId);
+      setRetrievedPIN(pin);
+
+      // Step 4: Complete (100% progress)
+      setAutoSearchProgress(100);
+      toast.success('VIN auto-search and PIN retrieval completed successfully!');
+    } catch (error) {
+      console.error('Auto-search failed:', error);
+      toast.error(`Auto-search failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setAutoSearchProgress(0);
+    } finally {
+      setIsAutoSearching(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -631,6 +715,89 @@ const PeugeotDiagboxEmulator: React.FC<PeugeotDiagboxEmulatorProps> = ({ isConne
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Auto-search VIN and PIN section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Search className="h-5 w-5" />
+              Auto VIN Search & PIN Retrieval
+            </div>
+            <Button
+              onClick={autoSearchVINAndPIN}
+              disabled={!isConnected || isAutoSearching}
+              className="flex items-center gap-2"
+            >
+              {isAutoSearching && <RefreshCw className="h-4 w-4 animate-spin" />}
+              {isAutoSearching ? 'Searching...' : 'Auto Search'}
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isAutoSearching && (
+            <div className="space-y-4">
+              <Progress value={autoSearchProgress} className="w-full" />
+              <p className="text-sm text-muted-foreground text-center">
+                {autoSearchProgress < 20 && 'Connecting to vehicle...'}
+                {autoSearchProgress >= 20 && autoSearchProgress < 40 && 'Reading VIN from vehicle...'}
+                {autoSearchProgress >= 40 && autoSearchProgress < 60 && 'Decoding VIN...'}
+                {autoSearchProgress >= 60 && autoSearchProgress < 100 && 'Retrieving security PIN...'}
+                {autoSearchProgress === 100 && 'Process completed!'}
+              </p>
+            </div>
+          )}
+
+          {decodedVIN && (
+            <div className="mt-4 p-4 border rounded-lg bg-muted">
+              <h3 className="font-medium mb-2">Vehicle Identification</h3>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span className="font-medium">VIN:</span> {decodedVIN.vin}
+                </div>
+                <div>
+                  <span className="font-medium">Make:</span> {decodedVIN.make}
+                </div>
+                <div>
+                  <span className="font-medium">Model:</span> {decodedVIN.model || 'Unknown'}
+                </div>
+                <div>
+                  <span className="font-medium">Year:</span> {decodedVIN.year || 'Unknown'}
+                </div>
+                <div>
+                  <span className="font-medium">Engine:</span> {decodedVIN.engine || 'Unknown'}
+                </div>
+                <div>
+                  <span className="font-medium">Confidence:</span> {decodedVIN.confidence}%
+                </div>
+              </div>
+            </div>
+          )}
+
+          {retrievedPIN && (
+            <div className="mt-4 p-4 border rounded-lg bg-blue-50">
+              <h3 className="font-medium mb-2 flex items-center gap-2">
+                <Key className="h-4 w-4" />
+                Security PIN
+              </h3>
+              <div className="text-center">
+                <div className="text-2xl font-bold tracking-widest">{retrievedPIN}</div>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Use this PIN for advanced functions requiring authentication
+                </p>
+              </div>
+            </div>
+          )}
+
+          {!isAutoSearching && !decodedVIN && !retrievedPIN && (
+            <p className="text-sm text-muted-foreground">
+              Click "Auto Search" to automatically retrieve your vehicle's VIN and security PIN.
+              This enables access to advanced diagnostic functions.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
     </div>
   );
 };

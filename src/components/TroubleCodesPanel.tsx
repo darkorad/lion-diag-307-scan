@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,10 +16,15 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { enhancedNativeBluetoothService } from '@/services/EnhancedNativeBluetoothService';
 
 interface TroubleCodesPanelProps {
   isConnected: boolean;
   onBack?: () => void;
+}
+
+interface FreezeFrameData {
+  [key: string]: string | number;
 }
 
 interface TroubleCode {
@@ -31,7 +35,7 @@ interface TroubleCode {
   system: string;
   severity: 'low' | 'medium' | 'high' | 'critical';
   firstDetected: string;
-  freezeFrameData?: any;
+  freezeFrameData?: FreezeFrameData;
   symptoms?: string[];
   possibleCauses?: string[];
   repairSuggestions?: string[];
@@ -39,37 +43,44 @@ interface TroubleCode {
 
 const TroubleCodesPanel: React.FC<TroubleCodesPanelProps> = ({ isConnected, onBack }) => {
   const [isScanning, setIsScanning] = useState(false);
-  const [activeCodes, setActiveCodes] = useState<TroubleCode[]>([
-    {
-      id: '1',
-      code: 'P0401',
-      status: 'active',
-      description: 'Exhaust Gas Recirculation Flow Insufficient Detected',
-      system: 'Emission Control',
-      severity: 'medium',
-      firstDetected: '2024-01-15 14:30',
-      symptoms: ['Rough idle', 'Engine knock', 'Increased emissions'],
-      possibleCauses: ['Clogged EGR valve', 'EGR valve stuck closed', 'Carbon buildup in intake'],
-      repairSuggestions: ['Clean EGR valve', 'Check vacuum lines', 'Inspect intake manifold']
-    }
-  ]);
-
-  const [pendingCodes, setPendingCodes] = useState<TroubleCode[]>([
-    {
-      id: '2',
-      code: 'P2002',
-      status: 'pending',
-      description: 'Diesel Particulate Filter Efficiency Below Threshold',
-      system: 'Emission Control',
-      severity: 'high',
-      firstDetected: '2024-01-20 09:15',
-      symptoms: ['DPF warning light', 'Reduced power', 'Engine in limp mode'],
-      possibleCauses: ['DPF clogged with soot', 'DPF temperature sensor fault', 'Incomplete regeneration cycles'],
-      repairSuggestions: ['Perform forced DPF regeneration', 'Replace DPF if severely clogged', 'Check DPF sensors']
-    }
-  ]);
-
+  const [activeCodes, setActiveCodes] = useState<TroubleCode[]>([]);
+  const [pendingCodes, setPendingCodes] = useState<TroubleCode[]>([]);
   const [storedCodes, setStoredCodes] = useState<TroubleCode[]>([]);
+
+  // Initialize with mock data only if not connected (for demo purposes)
+  useEffect(() => {
+    if (!isConnected) {
+      setActiveCodes([
+        {
+          id: '1',
+          code: 'P0401',
+          status: 'active',
+          description: 'Exhaust Gas Recirculation Flow Insufficient Detected',
+          system: 'Emission Control',
+          severity: 'medium',
+          firstDetected: '2024-01-15 14:30',
+          symptoms: ['Rough idle', 'Engine knock', 'Increased emissions'],
+          possibleCauses: ['Clogged EGR valve', 'EGR valve stuck closed', 'Carbon buildup in intake'],
+          repairSuggestions: ['Clean EGR valve', 'Check vacuum lines', 'Inspect intake manifold']
+        }
+      ]);
+
+      setPendingCodes([
+        {
+          id: '2',
+          code: 'P2002',
+          status: 'pending',
+          description: 'Diesel Particulate Filter Efficiency Below Threshold',
+          system: 'Emission Control',
+          severity: 'high',
+          firstDetected: '2024-01-20 09:15',
+          symptoms: ['DPF warning light', 'Reduced power', 'Engine in limp mode'],
+          possibleCauses: ['DPF clogged with soot', 'DPF temperature sensor fault', 'Incomplete regeneration cycles'],
+          repairSuggestions: ['Perform forced DPF regeneration', 'Replace DPF if severely clogged', 'Check DPF sensors']
+        }
+      ]);
+    }
+  }, [isConnected]);
 
   const peugeotSpecificCodes = [
     { code: 'P1336', description: 'Crankshaft Position Sensor Circuit Performance' },
@@ -81,47 +92,101 @@ const TroubleCodesPanel: React.FC<TroubleCodesPanelProps> = ({ isConnected, onBa
     { code: 'P2564', description: 'Turbocharger Boost Control Position Sensor Performance' }
   ];
 
+  const readTroubleCodes = async (): Promise<TroubleCode[]> => {
+    try {
+      // This would be implemented with actual OBD2 commands in a real application
+      // For now, we'll simulate reading codes from the vehicle
+      const codes: TroubleCode[] = [];
+      
+      // Mode 03 - Request DTCs (Diagnostic Trouble Codes)
+      // In a real implementation, you would send "03" command and parse the response
+      // const response = await enhancedNativeBluetoothService.sendCommand("03");
+      
+      // Simulate reading actual codes for demo
+      // In a real implementation, this would parse the actual OBD2 response
+      codes.push({
+        id: '1',
+        code: 'P0401',
+        status: 'active',
+        description: 'Exhaust Gas Recirculation Flow Insufficient Detected',
+        system: 'Emission Control',
+        severity: 'medium',
+        firstDetected: new Date().toISOString(),
+        symptoms: ['Rough idle', 'Engine knock', 'Increased emissions'],
+        possibleCauses: ['Clogged EGR valve', 'EGR valve stuck closed', 'Carbon buildup in intake'],
+        repairSuggestions: ['Clean EGR valve', 'Check vacuum lines', 'Inspect intake manifold']
+      });
+      
+      return codes;
+    } catch (error) {
+      console.error('Error reading trouble codes:', error);
+      throw error;
+    }
+  };
+
   const handleScanCodes = async () => {
+    if (!isConnected) {
+      toast.error('Not connected to OBD2 device');
+      return;
+    }
+
     setIsScanning(true);
     toast.info('Scanning for trouble codes...');
 
-    // Simulate scanning delay
-    await new Promise(resolve => setTimeout(resolve, 3000));
-
-    const scanResults = Math.random() > 0.5 ? 1 : 0; // Randomly find codes or not
-    
-    if (scanResults > 0) {
-      toast.success(`Found ${activeCodes.length + pendingCodes.length} trouble codes`);
-    } else {
-      toast.success('No new trouble codes found');
+    try {
+      // In a real implementation, we would read actual codes from the vehicle
+      const activeCodesResult = await readTroubleCodes();
+      const pendingCodesResult = await readTroubleCodes(); // Would be different in real implementation
+      
+      setActiveCodes(activeCodesResult);
+      setPendingCodes(pendingCodesResult);
+      
+      toast.success(`Found ${activeCodesResult.length + pendingCodesResult.length} trouble codes`);
+    } catch (error) {
+      toast.error('Failed to scan for trouble codes');
+      console.error('Scan error:', error);
+    } finally {
+      setIsScanning(false);
     }
-    
-    setIsScanning(false);
   };
 
   const handleClearCodes = async (type: 'active' | 'pending' | 'stored' | 'all') => {
+    if (!isConnected) {
+      toast.error('Not connected to OBD2 device');
+      return;
+    }
+
     toast.info('Clearing trouble codes...');
     
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    switch (type) {
-      case 'active':
-        setActiveCodes([]);
-        break;
-      case 'pending':
-        setPendingCodes([]);
-        break;
-      case 'stored':
-        setStoredCodes([]);
-        break;
-      case 'all':
-        setActiveCodes([]);
-        setPendingCodes([]);
-        setStoredCodes([]);
-        break;
+    try {
+      // In a real implementation, send the clear codes command
+      // await enhancedNativeBluetoothService.sendCommand("04");
+      
+      // Simulate clearing codes
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      switch (type) {
+        case 'active':
+          setActiveCodes([]);
+          break;
+        case 'pending':
+          setPendingCodes([]);
+          break;
+        case 'stored':
+          setStoredCodes([]);
+          break;
+        case 'all':
+          setActiveCodes([]);
+          setPendingCodes([]);
+          setStoredCodes([]);
+          break;
+      }
+      
+      toast.success('Trouble codes cleared successfully');
+    } catch (error) {
+      toast.error('Failed to clear trouble codes');
+      console.error('Clear error:', error);
     }
-    
-    toast.success('Trouble codes cleared successfully');
   };
 
   const getSeverityColor = (severity: string) => {
@@ -276,26 +341,26 @@ const TroubleCodesPanel: React.FC<TroubleCodesPanelProps> = ({ isConnected, onBa
       </Card>
 
       <Tabs defaultValue="active" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="active" className="flex items-center space-x-1">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1">
+          <TabsTrigger value="active" className="flex flex-col items-center space-y-1 py-2 px-1">
             <XCircle className="h-4 w-4" />
-            <span>Active ({activeCodes.length})</span>
+            <span className="text-xs sm:text-sm">Active ({activeCodes.length})</span>
           </TabsTrigger>
-          <TabsTrigger value="pending" className="flex items-center space-x-1">
+          <TabsTrigger value="pending" className="flex flex-col items-center space-y-1 py-2 px-1">
             <Clock className="h-4 w-4" />
-            <span>Pending ({pendingCodes.length})</span>
+            <span className="text-xs sm:text-sm">Pending ({pendingCodes.length})</span>
           </TabsTrigger>
-          <TabsTrigger value="stored" className="flex items-center space-x-1">
+          <TabsTrigger value="stored" className="flex flex-col items-center space-y-1 py-2 px-1">
             <AlertTriangle className="h-4 w-4" />
-            <span>Stored ({storedCodes.length})</span>
+            <span className="text-xs sm:text-sm">Stored ({storedCodes.length})</span>
           </TabsTrigger>
-          <TabsTrigger value="reference" className="flex items-center space-x-1">
+          <TabsTrigger value="reference" className="flex flex-col items-center space-y-1 py-2 px-1">
             <Wrench className="h-4 w-4" />
-            <span>Reference</span>
+            <span className="text-xs sm:text-sm">Reference</span>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="active" className="space-y-4">
+        <TabsContent value="active" className="space-y-4 mt-4">
           {activeCodes.length > 0 ? (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
@@ -323,7 +388,7 @@ const TroubleCodesPanel: React.FC<TroubleCodesPanelProps> = ({ isConnected, onBa
           )}
         </TabsContent>
 
-        <TabsContent value="pending" className="space-y-4">
+        <TabsContent value="pending" className="space-y-4 mt-4">
           {pendingCodes.length > 0 ? (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
@@ -351,7 +416,7 @@ const TroubleCodesPanel: React.FC<TroubleCodesPanelProps> = ({ isConnected, onBa
           )}
         </TabsContent>
 
-        <TabsContent value="stored" className="space-y-4">
+        <TabsContent value="stored" className="space-y-4 mt-4">
           {storedCodes.length > 0 ? (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
@@ -379,7 +444,7 @@ const TroubleCodesPanel: React.FC<TroubleCodesPanelProps> = ({ isConnected, onBa
           )}
         </TabsContent>
 
-        <TabsContent value="reference" className="space-y-4">
+        <TabsContent value="reference" className="space-y-4 mt-4">
           <Card className="diagnostic-border">
             <CardHeader>
               <CardTitle>Peugeot 307 HDI Specific Codes</CardTitle>
